@@ -1,0 +1,74 @@
+MC TECHNICAL INFO
+
+- 33x33 square column from spawn point cannot dig/place
+- time number is an integer between 0 and 24000, inclusive, where 0 is dawn, 6000 midday, 12000 dusk and 18000 midnight
+- in debug screen: player facing direction, "f" under coordinates such that 0 is South, 1 is West, 2 is North and 3 is East
+- directions (making right hand rule):
+		+x east
+		-x west
+		+z south
+		-z north
+
+
+PLAYER BODY
+Affected by it's bounding box (BB) overlap with blocks.
+
+
+Ladders and vines have same speed, jumping and falling effect
+effect area is if bottom center of legs is in ladder/vine block
+unattached vine has a effect area which slightly overlaps to the empthy block (where it would otherwise attached to the wall)
+
+LADDER
+body lower has to be in ladder block to climb
+ladder blocks has to be continuous, although not directly above (can be diagonal)
+if ladder in upper body, can jump so the lower body would be in ladder block
+can climb/descend on any solid block face (not just ladder it self), probably also in the whole block
+ladder can exist only as attached to block on side, therefore no need to check surrounding blocks
+has collision bb
+
+
+VINE
+similar to ladder with these differences:
+no collision bb
+can exist without being attached to block side (by growing)
+if exists without side block, player can only descend
+
+
+RIGHT CLICK - sword, bow, fishing rod...
+sword:
+start
+CLIENT-enc id 15
+Container({'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 276, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0})
+SERVER-enc id 40
+Container({'eid': 4412, 'metadata': {0: Metadata(type='byte', value=16)}})
+
+end
+Container({'state': 5, 'x': 0, 'y': 0, 'z': 0, 'face': -1})
+
+bow:
+start
+CLIIENT-enc id 15
+Container({'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 261, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0})
+SERVER-enc id 40
+Container({'eid': 5445, 'metadata': {0: Metadata(type='byte', value=16)}})
+
+end - release
+CLIENT-enc id 14
+Container({'state': 5, 'x': 0, 'y': 0, 'z': 0, 'face': -1})
+
+
+fishing rod:
+throw
+CLIENT-enc id 15
+Container({'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 346, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0})
+CLIENT-enc id 18
+Container({'eid': 5445, 'animation': 1})
+SERVER-enc id 23
+Container({'eid': 6655, 'type': 90, 'x': 6504, 'y': 2224, 'z': 8927, 'thrower': 5445, 'fireball': Container({'x': 5491, 'y': 144, 'z': 54898})})
+
+pull
+CLIENT-enc id 15
+Container({'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 346, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0})
+CLIENT-enc id 18
+Container({'eid': 5445, 'animation': 1})
+
