@@ -217,6 +217,7 @@ class ProxyClientFactory(Factory):
 	def startFactory(self):
 		self.log.msg("Proxy ready")
 
+
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Proxy arguments.')
 	parser.add_argument('--serverhost', 
@@ -237,11 +238,29 @@ if __name__ == '__main__':
 						default='default', 
 						dest='processor', 
 						help='Processor for packets, to print, save, analyze...')
+	parser.add_argument('--ignore_packets', 
+						default=[], 
+						dest='ignore_packets', 
+						nargs='+',
+						type=int,
+						help='Ignore there packets IDs for processor. ex. 0 4 11 12 13 24 28 29 30 31 32 33 34 35 62')
+	parser.add_argument('--filter_packets', 
+						default=[], 
+						dest='filter_packets', 
+						nargs='+',
+						type=int,
+						help='Packet IDs to filter for processor. ex 14 15')
 	args = parser.parse_args()
 
 	try:
 		_procmod = __import__('twistedbot.proxy_processors', globals(), locals(), [args.processor], -1)
 		processor = getattr(_procmod, args.processor)
+		if args.ignore_packets:
+			logbot.msg("Ignore packet ids %s" % args.ignore_packets)
+		if args.filter_packets:
+			logbot.msg("Filter packet ids %s" % args.filter_packets)
+		processor.ignore_packets = args.ignore_packets
+		processor.filter_packets = args.filter_packets
 	except:
 		logbot.exit_on_error(_why="Cannot import %s" % ('proxy_processors.' + args.processor,))
 		exit()

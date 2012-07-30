@@ -14,7 +14,8 @@ from pynbt import NBTFile
 
 log = logbot.getlogger("-")
 
-ignore_packets = [0, 4, 11, 12, 13, 24, 28, 29, 30, 31, 32, 33, 34, 35, 62] #these bring a lot of noise
+#########################################################################################################
+# ignore_packets = [0, 4, 11, 12, 13, 24, 28, 29, 30, 31, 32, 33, 34, 35, 62] #these bring a lot of noise
 # 0 keep alive
 # 4 time update
 # 11 player position
@@ -30,8 +31,10 @@ ignore_packets = [0, 4, 11, 12, 13, 24, 28, 29, 30, 31, 32, 33, 34, 35, 62] #the
 # 34 entity teleport
 # 35 entity head look
 # 62 named sound effect
+#########################################################################################################
 
-filter_packets = [4] #[5, 15, 102, 103, 104, 107]
+ignore_packets = []
+filter_packets = []
 
 statistics = defaultdict(lambda: defaultdict(int))	
 

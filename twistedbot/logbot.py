@@ -59,5 +59,10 @@ def getlogger(name):
 		loggers[name] = Logger(name)
 	return loggers[name]
 		
-		
+
 log.startLoggingWithObserver(MinecraftLogObserver(sys.stdout).emit, setStdout=0)
+
+default_logger = getlogger("-")
+default_logger.msg("Start logging")
+msg = default_logger.msg
+err = default_logger.err
