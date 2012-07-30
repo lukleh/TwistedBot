@@ -10,8 +10,10 @@ Usage
 -----
 ### run with defaults server: localhost:25565 proxy: localhost:25566
 pypy proxy.py
+
 ### flags
 pypy proxy.py -h
+
 ### packet print out
 look in twistedbot.proxy_processors.default for an example
 

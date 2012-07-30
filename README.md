@@ -2,7 +2,7 @@ Bot/Proxy for Minecraft
 =======================
 Look into README.BOT and README.PROXY
 
-- support for 12w30c
+- support for 1.3-rc
 - running under PyPy
 - you can try cPython, if you want.
 - anyway, enjoy & hack & learn

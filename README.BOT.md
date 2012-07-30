@@ -3,7 +3,7 @@ Bot for Minecraft
 Client side artificial player for Minecraft written in Python. Runs on vanilla server. No modification on server/client side needed.
 
 
-STATUS 12w30b
+STATUS
 ------------
 broken, fixing it...
 
