@@ -14,7 +14,6 @@ rest of the modules unplugged and/or under development
 
 Current status
 --------------
-- Runs against MC version 1.3
 - Movemets & pathfinding. Only solid blocks. No web.
 - Cannot process fluids(water, lava).
 - No mobs, no food, crafting, combat etc.

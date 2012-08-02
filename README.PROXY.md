@@ -11,6 +11,8 @@ Usage
 ### run with defaults server: localhost:25565 proxy: localhost:25566
 pypy proxy.py
 
+when you close proxy, it prints packet statistics before exit
+
 ### flags
 pypy proxy.py -h
 

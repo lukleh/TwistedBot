@@ -2,7 +2,7 @@ Bot/Proxy for Minecraft
 =======================
 Look into README.BOT and README.PROXY
 
-- support for 1.3-rc
+- support for 1.3
 - running under PyPy
 - you can try cPython, if you want.
 - anyway, enjoy & hack & learn
