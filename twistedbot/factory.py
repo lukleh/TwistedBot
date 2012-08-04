@@ -9,10 +9,14 @@ from twisted.internet import reactor, defer
 import config
 import encryption
 import logbot
-from packets import parse_packets, make_packet
+import proxy_processors.default
+from packets import parse_packets, make_packet, packets_by_name, Container
 from tools import devnull
 from proxy_processors.default import process_packets as packet_printout
 
+
+proxy_processors.default.ignore_packets = []
+proxy_processors.default.filter_packets = [26, 8]
 
 log = logbot.getlogger("PROTOCOL")
 
@@ -33,6 +37,7 @@ class MineCraftProtocol(Protocol):
 			5 : self.p_entity_equipment,
 			6 : self.p_spawn,
 			8 : self.p_health,
+			9 : self.p_respawn,
 			13: self.p_location,
 			17: self.p_use_bed,
 			18: self.p_animate,
@@ -105,7 +110,8 @@ class MineCraftProtocol(Protocol):
 		if not self.packets:
 			cootask = cooperate(self.packet_iter(self.packets))
 			d = cootask.whenDone() #TODO catch error, etc
-		elif len(self.packets) > 50:
+			d.addErrback(logbot.exit_on_error)
+		elif len(self.packets) > 100:
 			log.msg("Did not consume %d packets" % len(self.packets))
 			if len(self.packets) > 10000:
 				reactor.stop() 
@@ -113,6 +119,8 @@ class MineCraftProtocol(Protocol):
 		
 	def send_packet(self, name, payload):
 		p = make_packet(name, payload)
+		if config.DEBUG:
+			packet_printout("CLIENT", [(packets_by_name[name], Container(**payload))])
 		self.sendData(p)
 
 	def packet_iter(self, ipackets):
@@ -137,12 +145,7 @@ class MineCraftProtocol(Protocol):
 		
 	def p_login(self, c):
 		log.msg("LOGIN received EID %s" % c.eid)
-		self.bot.s_eid = c.eid
-		self.bot.s_level_type = c.level_type
-		self.bot.s_mode = c.mode
-		self.bot.s_dimension = c.dimension
-		self.bot.s_difficulty = c.difficulty
-		self.bot.s_max_players = c.players
+		self.bot.login_data(c.eid, c.level_type, c.mode, c.dimension, c.difficulty ,c.players)
 
 	def p_chat(self, c):
 		self.bot.chat.process(c.message)
@@ -160,9 +163,11 @@ class MineCraftProtocol(Protocol):
 		self.bot.spawn_point_received = True
 
 	def p_health(self, c):
-		self.bot.s_health = c.hp
-		self.bot.s_food = c.fp
-		self.bot.s_food_saturation = c.saturation
+		self.bot.health_update(c.hp, c.fp, c.saturation)
+		
+	def p_respawn(self, c):
+		#ignore for now
+		pass
 
 	def p_location(self, c):
 		log.msg("received LOCATION X:%f Y:%f Z:%f STANCE:%f GROUNDED:%s" % (c.position.x, c.position.stance, c.position.z, c.position.y, c.grounded.grounded))			
@@ -191,7 +196,9 @@ class MineCraftProtocol(Protocol):
 		devnull()
 		
 	def p_vehicle(self, c):
-		self.world.entities.new_vehicle(eid=c.eid, etype=c.type,  x=c.x, y=c.y, z=c.z, thrower=c.thrower, velocity={"x": c.fireball.x, "y":c.fireball.y, "z":c.fireball.z} if c.thrower>0 else None)
+		self.world.entities.new_vehicle(eid=c.eid, etype=c.type, 
+				x=c.x, y=c.y, z=c.z, object_data=c.object_data, 
+				velocity={"x": c.velocity.x, "y":c.velocity.y, "z":c.velocity.z} if c.object_data > 0 else None)
 
 	def p_mob(self, c):
 		self.world.entities.new_mob(eid=c.eid, etype=c.type, x=c.x, y=c.y, z=c.z, yaw=c.yaw, pitch=c.pitch, head_yaw=c.head_yaw, velocity_x=c.velocity_x, velocity_y=c.velocity_y, velocity_z=c.velocity_z, metadata=c.metadata)
@@ -235,7 +242,7 @@ class MineCraftProtocol(Protocol):
 		self.bot.s_total_experience = c.total
 
 	def p_chunk(self, c):
-		self.world.grid.load_chunk(c.x, c.z, c.continuous, c.primary_bit, c.add_bit, c.data.decode('zlib'))
+		self.world.grid.load_chunk(c.x, c.z, c.continuous, c.primary_bitmap, c.add_bitmap, c.data.decode('zlib'))
 
 	def p_multi_block_change(self, c):
 		self.world.grid.multi_block_change(c.x, c.z, c.blocks)

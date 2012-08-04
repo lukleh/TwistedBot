@@ -108,12 +108,11 @@ class NavigationMesh(object):
 		pass
 
 	def make_walk_steps(self):
-		if not self.incomplete_nodes:
-			return
 		while self.incomplete_nodes:
 			crd, meta = self.incomplete_nodes.popitem()
 			self.make_walk_step(crd, meta)
 			self.check_node_resources(crd)
+			yield None
 		
 	def make_walk_step(self, crd, meta):
 		center_space = GridSpace(self.grid, crd)

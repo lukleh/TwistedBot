@@ -58,6 +58,14 @@ def getlogger(name):
 	if name not in loggers:
 		loggers[name] = Logger(name)
 	return loggers[name]
+	
+
+def start_filelog(filename=None):
+	if filename is None:
+		filename = "%s.proxy_log.txt" % datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+	f = open(filename, "w")
+	log.addObserver(MinecraftLogObserver(f).emit)
+	msg("Started logging to file %s" % filename)
 		
 
 log.startLoggingWithObserver(MinecraftLogObserver(sys.stdout).emit, setStdout=0)

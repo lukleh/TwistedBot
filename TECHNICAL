@@ -34,37 +34,38 @@ can exist without being attached to block side (by growing)
 if exists without side block, player can only descend
 
 
-RIGHT CLICK - sword, bow, fishing rod...
-sword:
+RIGHT CLICK
+sword blocking:
+#start
+CLIENT id 15
+{'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 276, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0}
+SERVER id 40
+{'eid': 4412, 'metadata': {0: Metadata(type='byte', value=16)}}
+
+#end
+CLIENT id 14
+{'state': 5, 'x': 0, 'y': 0, 'z': 0, 'face': -1}
+
+bow charge:
 start
-CLIENT-enc id 15
-Container({'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 276, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0})
-SERVER-enc id 40
-Container({'eid': 4412, 'metadata': {0: Metadata(type='byte', value=16)}})
+CLIIENT id 15
+{'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 261, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0}
+SERVER id 40
+{'eid': 5445, 'metadata': {0: Metadata(type='byte', value=16)}}
 
-end
-Container({'state': 5, 'x': 0, 'y': 0, 'z': 0, 'face': -1})
-
-bow:
-start
-CLIIENT-enc id 15
-Container({'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 261, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0})
-SERVER-enc id 40
-Container({'eid': 5445, 'metadata': {0: Metadata(type='byte', value=16)}})
-
-end - release
-CLIENT-enc id 14
-Container({'state': 5, 'x': 0, 'y': 0, 'z': 0, 'face': -1})
+#end - release
+CLIENT id 14
+{'state': 5, 'x': 0, 'y': 0, 'z': 0, 'face': -1}
 
 
-fishing rod:
-throw
-CLIENT-enc id 15
-Container({'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 346, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0})
-CLIENT-enc id 18
-Container({'eid': 5445, 'animation': 1})
-SERVER-enc id 23
-Container({'eid': 6655, 'type': 90, 'x': 6504, 'y': 2224, 'z': 8927, 'thrower': 5445, 'fireball': Container({'x': 5491, 'y': 144, 'z': 54898})})
+fishing rod throw:
+#throw
+CLIENT id 15
+{'x': -1, 'y': 255, 'z': -1, 'face': -1, 'slotdata': Container({'id': 346, 'count': 1, 'info': 0, 'size': -1}), 'unknown1': 0, 'unknown2': 0, 'unknown3': 0}
+CLIENT id 18
+{'eid': 5445, 'animation': 1}
+SERVER id 23
+{'eid': 6655, 'type': 90, 'x': 6504, 'y': 2224, 'z': 8927, 'thrower': 5445, 'fireball': Container({'x': 5491, 'y': 144, 'z': 54898})}
 
 pull
 CLIENT-enc id 15

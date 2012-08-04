@@ -12,6 +12,7 @@ from statistics import Statistics
 from aabb import AABB
 from chat import Chat
 from task_manager import TaskManager
+from entity import EntityBot
 
 log = logbot.getlogger("BOT_ENTITY")
 
@@ -23,11 +24,13 @@ class Commander(object):
 
 
 class Bot(object):
-	def __init__(self, name, commander_name):
+	def __init__(self, world, name, commander_name):
+		self.world = world
 		self.name = name
 		self.commander = Commander(commander_name)
-		self.world = None
-		self.grid = None
+		self.eid = None
+		world.bot = self
+		self.grid = self.world.grid
 		self.velocities = [0.0, 0.0, 0.0]
 		self.chunks_ready = False
 		self.taskmgr = TaskManager(self)
@@ -41,7 +44,7 @@ class Bot(object):
 		self.chat = Chat(self)
 		self.stats = Statistics()
 		self.startup()
-		self.iterate_later()
+		self.do_later(self.iterate, config.TIME_STEP)
 	
 	def connection_lost(self):
 		self.protocol = None
@@ -137,21 +140,21 @@ class Bot(object):
 				
 	@property
 	def is_standing(self):
-		""" TODO test if it is possible to stand at the current position """
-		if tools.standing_on_solidblock(self.grid, self.aabb, self.position_grid):
-			return True
-		else:
+		d = tools.directional_collision_distance(self.grid, self.aabb, dy=-1)
+		if d is None or d > 0:
 			return False
+		else:
+			return True
 
-	def iterate_later(self):
+	def do_later(self, fn, delay):
 		d = defer.Deferred()
-		d.addCallback(self.iterate)
+		d.addCallback(fn)
 		d.addErrback(logbot.exit_on_error)
-		reactor.callLater(config.TIME_STEP, d.callback, None)
+		reactor.callLater(delay, d.callback, None)
 
-	def iterate(self, last_time):
+	def iterate(self, ignore):
 		if self.location_received == False:
-			self.iterate_later()
+			self.do_later(self.iterate, config.TIME_STEP)
 			return
 		if not self.ready:
 			if not self.chunks_ready:
@@ -160,13 +163,14 @@ class Bot(object):
 		if self.ready:
 			self.taskmgr.run_current_task()
 		self.send_location()
-		self.iterate_later()
+		self.do_later(self.iterate, config.TIME_STEP)
 
 	def send_packet(self, name, payload):
 		if self.protocol is not None:
 			self.protocol.send_packet(name, payload)
 
 	def send_location(self):
+		#log.msg("position %s" % str(self.position))
 		self.send_packet("player position&look", {
 							"position": packets.Container(x=self.x, y=self.y, z=self.z, stance=self.stance),
 							"orientation": packets.Container(yaw=self.yaw, pitch=self.pitch),
@@ -174,7 +178,7 @@ class Bot(object):
 			
 
 	def turn_to(self, point, elevation=False):
-		if point[0] == self.position.x and point[2] == self.position.z:
+		if point[0] == self.x and point[2] == self.z:
 			return
 		yaw, pitch = tools.yaw_pitch_between(point, self.position_eyelevel)
 		if yaw is None or pitch is None:
@@ -199,7 +203,30 @@ class Bot(object):
 			self.x = xyz.x
 			self.y = xyz.y
 			self.z = xyz.z
-		if deltas or grounded or xyz:
+		elif dy is not None:
+			self.y += dy
+		if deltas or grounded or xyz or dy:
 			log.msg("Updating position x %s y %s z %s stance %s grounded %s" % (self.x, self.y, self.z, self.stance, self.grounded))
 			pass
+			
+	def do_respawn(self, ignore):
+		self.send_packet("client statuses", {"status": 1})
+			
+	def health_update(self, health, food, food_saturation):
+		if health <= 0:
+			self.on_death()
+			
+	def login_data(self, eid, level_type, mode, dimension, difficulty ,players):
+		self.eid = eid
+		self.world.entities.entities[eid] = EntityBot(eid=eid, x=0, y=0, z=0)
+		
+	def on_death(self):
+		self.location_received = False
+		self.spawn_point_received = False
+		self.do_later(self.do_respawn, 1.0)
+		#self.world_erase()
 
+	def on_standing_ready(self, from_task):
+		block = tools.standing_on_solidblock(self.grid, self.aabb, self.position_grid)
+		log.msg("Standing on block %s" % block)
+		self.world.navmesh.block_change(block, None)

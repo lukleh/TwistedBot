@@ -238,6 +238,9 @@ if __name__ == '__main__':
 						default='default', 
 						dest='processor', 
 						help='Processor for packets, to print, save, analyze...')
+	parser.add_argument('--log2file', 
+						action='store_true',
+						help='Save log data to file')
 	parser.add_argument('--ignore_packets', 
 						default=[], 
 						dest='ignore_packets', 
@@ -263,6 +266,12 @@ if __name__ == '__main__':
 		processor.filter_packets = args.filter_packets
 	except:
 		logbot.exit_on_error(_why="Cannot import %s" % ('proxy_processors.' + args.processor,))
+		exit()
+	try:
+		if args.log2file:
+			logbot.start_filelog()
+	except:
+		logbot.exit_on_error(_why="Cannot open log file for writing")
 		exit()
 	
 	endpoint = TCP4ServerEndpoint(reactor, args.proxyport)

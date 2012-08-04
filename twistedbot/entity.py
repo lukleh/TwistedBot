@@ -9,6 +9,7 @@ class Entity(object):
 		self.y = kwargs["y"]
 		self.z = kwargs["z"]
 		self.velocity = None
+		self._isbot = False
 		
 	@property
 	def position(self):
@@ -20,8 +21,17 @@ class Entity(object):
 		y = self.y/32
 		z = self.z/32
 		return (x, y, z)
-
 		
+	@property
+	def is_bot(self):
+		return self._isbot
+		
+		
+class EntityBot(Entity):
+	def __init__(self, **kwargs):
+		super(EntityBot, self).__init__(**kwargs)
+		self._isbot = True
+				
 class EntityLiving(Entity):
 	def __init__(self, **kwargs):
 		super(EntityLiving, self).__init__(**kwargs)
@@ -59,7 +69,7 @@ class EntityVehicle(Entity):
 	def __init__(self, **kwargs):
 		super(EntityVehicle, self).__init__(**kwargs)
 		self.etype = kwargs["etype"]
-		self.thrower = kwargs["thrower"]
+		self.thrower = kwargs["object_data"]
 		if self.thrower > 0:
 			self.vel_x = kwargs["velocity"]["x"]
 			self.vel_y = kwargs["velocity"]["y"]

@@ -26,8 +26,7 @@ def start():
 	commander_name = config.COMMANDER
 
 	world = World(host, port)
-	bot = Bot(name, commander_name)
-	world.add_bot(bot)
+	bot = Bot(world, name, commander_name)
 
 	reactor.addSystemEventTrigger("before", "shutdown", world.shutdown)
 	reactor.connectTCP(host, port, MineCraftFactory(bot))
