@@ -84,13 +84,8 @@ def chunks_complete(chunks):
 			return False
 	return True
 
-	
 def grid_shift(v):
-	if v < 0:
-		return int(v) - 1
-	else:
-		return int(v)
-
+	return int(math.floor(v))
 		
 def standing_pillar(grid, x, y, z):
 	for i in xrange(y+1):

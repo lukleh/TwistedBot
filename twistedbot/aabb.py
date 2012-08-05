@@ -82,10 +82,10 @@ class AABB(object):
 		if self._grid_coords is None:
 			self._grid_coords = [
 					int(floor(self.min_x)),
-					int(self.min_y),
+					int(floor(self.min_y)),
 					int(floor(self.min_z)),
 					int(floor(self.max_x)),
-					int(self.max_y),
+					int(floor(self.max_y)),
 					int(floor(self.max_z))]
 		return self._grid_coords
 

@@ -16,7 +16,7 @@ from proxy_processors.default import process_packets as packet_printout
 
 
 proxy_processors.default.ignore_packets = []
-proxy_processors.default.filter_packets = [26, 8]
+proxy_processors.default.filter_packets = []
 
 log = logbot.getlogger("PROTOCOL")
 
@@ -109,7 +109,7 @@ class MineCraftProtocol(Protocol):
 			packet_printout("SERVER", parsed_packets, self.encryption_on, self.leftover)
 		if not self.packets:
 			cootask = cooperate(self.packet_iter(self.packets))
-			d = cootask.whenDone() #TODO catch error, etc
+			d = cootask.whenDone()
 			d.addErrback(logbot.exit_on_error)
 		elif len(self.packets) > 100:
 			log.msg("Did not consume %d packets" % len(self.packets))
@@ -166,8 +166,8 @@ class MineCraftProtocol(Protocol):
 		self.bot.health_update(c.hp, c.fp, c.saturation)
 		
 	def p_respawn(self, c):
-		#ignore for now
-		pass
+		log.msg("RESPAWN received")
+		self.bot.respawn_data(c.dimension, c.difficulty ,c.game_mode, c.world_height, c.level_type)
 
 	def p_location(self, c):
 		log.msg("received LOCATION X:%f Y:%f Z:%f STANCE:%f GROUNDED:%s" % (c.position.x, c.position.stance, c.position.z, c.position.y, c.grounded.grounded))			
@@ -178,11 +178,11 @@ class MineCraftProtocol(Protocol):
 		self.bot.set_location({"x": c.position.x, "y": c.position.y, "z":c.position.z, "stance":c.position.stance, "grounded":c.grounded.grounded, "yaw": c.orientation.yaw, "pitch": c.orientation.pitch})
 
 	def p_use_bed(self, c):
-		#if ever will use bed, then deal with it. possibly also if commander uses bed.
+		# if ever will use bed, then deal with it. possibly also if commander uses bed.
 		devnull()
 		
 	def p_animate(self, c):
-		#TODO this is two way, vlient uses only value 1 (swing arm). probably needed. devnull for now
+		# TODO this is two way, client uses only value 1 (swing arm). probably needed. devnull for now
 		devnull()
 		
 	def p_player(self, c):
@@ -262,6 +262,7 @@ class MineCraftProtocol(Protocol):
 		self.world.grid.load_bulk_chunk(c.meta, c.data.decode('zlib'))
 
 	def p_explosion(self, c):
+		self.world.grid.explosion(c.x, c.y, c.z, c.records)
 		log.msg("Explosion at %f %f %f radius %f blocks affected %d" % (c.x, c.y, c.z, c.radius, c.count))
 
 	def p_sound(self, c):

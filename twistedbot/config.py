@@ -1,6 +1,7 @@
-﻿import math
+﻿
+import math
 
-DEBUG = True
+DEBUG = False
 
 COMMANDER = "lukleh"
 

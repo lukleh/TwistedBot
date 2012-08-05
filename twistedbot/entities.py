@@ -44,7 +44,7 @@ class Entities(object):
 			if entity.is_bot:
 				log.msg("Server is changing me with %s %s %s" % (fn.__name__, args, kwargs))
 			fn(self, entity, *args[1:], **kwargs)
-			#self.maybe_commander(entity)
+			self.maybe_commander(entity)
 		return f
 
 	def new_mob(self, **kwargs):

@@ -14,6 +14,8 @@ from chunk import Chunk
 
 log = logbot.getlogger("GRID")
 
+
+
 class Chunk(object):
 	levels = config.WORLD_HEIGHT / 16
 	def __init__(self, coords):
@@ -24,8 +26,8 @@ class Chunk(object):
 		self.grid_z = self.z << 4
 		self.blocks 		= [None for _ in xrange(self.levels)]
 		self.meta   		= [None for _ in xrange(self.levels)]
-		self.block_light  	= [] #[None for _ in xrange(self.levels)]
-		self.sky_light  	= [] #[None for _ in xrange(self.levels)]
+		self.block_light  	= [] # ignore block light
+		self.sky_light  	= [] # ifnore sky light
 		self.biome  		= [None for _ in xrange(config.CHUNK_SIDE_LEN * config.CHUNK_SIDE_LEN)]
 		self.complete 		= False
 
@@ -131,7 +133,7 @@ class Grid(object):
 			if add_bit >> i & 1:
 				data_str = data.read(2048)
 				data_count += 2048
-				#ndata = array.array('b', half_bytes_from_string(data_str))
+				ndata = array.array('b', half_bytes_from_string(data_str))
 				log.msg("Add data %s" % ndata)
 		if continuous:
 			data_str = data.read(256)
@@ -204,3 +206,13 @@ class Grid(object):
 			value = None
 		if line1.strip().lower() == "waypoint" and value is not None:
 			self.navmesh.sign_waypoints.new((x, y, z), value, line3)
+
+	def explosion(self, x, y, z, records):
+		for rec in records:
+			rx = x + rec.x
+			ry = y + rec.y
+			rz = z + rec.z
+			gx = int(rx)
+			gy = int(ry)
+			gz = int(rz)
+			self.block_change(gx, gy, gz, 0, 0)

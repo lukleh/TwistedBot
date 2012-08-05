@@ -37,6 +37,7 @@ class SwimToAirTask(TaskBase):
 class FallTask(TaskBase):
 	def __init__(self, *args, **kwargs):
 		super(FallTask, self).__init__(*args, **kwargs)
+		self.callback_finished = self.bot.on_standing_ready
 
 	def do(self):
 		self._do()	

@@ -164,11 +164,14 @@ class NavigationMesh(object):
 			self.incomplete_nodes[crd] = {"border": (chunk_from, chunk_to, crd)}
 		self.make_walk_steps()
 			
-	def block_change(self, old_block, new_block):
+	def block_change(self, new_block, old_block):
 		return
+		coords = new_block.coords
 		# TODO
-		#stand_at = GridSpace(self.grid, new_block.coords).standing_at
-		#if stand_at is not None:
-		#	self.insert_node(MeshNode(stand_at))
-			
-
+		affected = self.get_affected_nodes_by(coords)
+		if len(affected) == 0:
+			gs = GridSpace(self.grid, coords)
+			if gs.can_stand:
+				pass
+		else:
+			pass

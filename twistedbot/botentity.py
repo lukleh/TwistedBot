@@ -32,6 +32,8 @@ class Bot(object):
 		world.bot = self
 		self.grid = self.world.grid
 		self.velocities = [0.0, 0.0, 0.0]
+		self._x = 0
+		self._y = 0
 		self.chunks_ready = False
 		self.taskmgr = TaskManager(self)
 		self.stance = None
@@ -75,6 +77,13 @@ class Bot(object):
 		self.velocities = [0.0, 0.0, 0.0]
 		if self.location_received == False:
 			self.location_received = True
+		if not self.in_complete_chunks:
+			self.ready = False
+		else:
+			if not self.is_standing:
+				self.taskmgr.add_fall()
+			else:
+				self.on_standing_ready()
 		
 	@property
 	def position(self):
@@ -146,7 +155,11 @@ class Bot(object):
 		else:
 			return True
 
-	def do_later(self, fn, delay):
+	@property
+	def in_complete_chunks(self):
+		return tools.chunks_complete(tools.aabb_in_chunks(self.world.grid, self.aabb))
+
+	def do_later(self, fn, delay=0):
 		d = defer.Deferred()
 		d.addCallback(fn)
 		d.addErrback(logbot.exit_on_error)
@@ -157,9 +170,7 @@ class Bot(object):
 			self.do_later(self.iterate, config.TIME_STEP)
 			return
 		if not self.ready:
-			if not self.chunks_ready:
-				self.chunks_ready = tools.chunks_complete(tools.aabb_in_chunks(self.world.grid, self.aabb))
-			self.ready = self.chunks_ready and self.spawn_point_received
+			self.ready = self.in_complete_chunks and self.spawn_point_received
 		if self.ready:
 			self.taskmgr.run_current_task()
 		self.send_location()
@@ -170,7 +181,6 @@ class Bot(object):
 			self.protocol.send_packet(name, payload)
 
 	def send_location(self):
-		#log.msg("position %s" % str(self.position))
 		self.send_packet("player position&look", {
 							"position": packets.Container(x=self.x, y=self.y, z=self.z, stance=self.stance),
 							"orientation": packets.Container(yaw=self.yaw, pitch=self.pitch),
@@ -217,8 +227,16 @@ class Bot(object):
 			self.on_death()
 			
 	def login_data(self, eid, level_type, mode, dimension, difficulty ,players):
+		# TODO 
+		# ignore the details now but eid
 		self.eid = eid
 		self.world.entities.entities[eid] = EntityBot(eid=eid, x=0, y=0, z=0)
+		
+	def respawn_data(self, dimension, difficulty, mode, world_height, level_type):
+		# TODO
+		# ignore the details now
+		# should clear the world(chunks, entities, etc.)
+		pass
 		
 	def on_death(self):
 		self.location_received = False
@@ -226,7 +244,8 @@ class Bot(object):
 		self.do_later(self.do_respawn, 1.0)
 		#self.world_erase()
 
-	def on_standing_ready(self, from_task):
+	def on_standing_ready(self, ignore=None):
 		block = tools.standing_on_solidblock(self.grid, self.aabb, self.position_grid)
 		log.msg("Standing on block %s" % block)
-		self.world.navmesh.block_change(block, None)
+		if not self.world.navmesh.graph.has_node(block.coords):
+			self.world.navmesh.block_change(block, None)
