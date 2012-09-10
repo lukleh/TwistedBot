@@ -8,9 +8,11 @@ import tools
 import blocks
 import config
 import logbot
+import fops
 from navigationmesh import NavigationMesh
 from chunk import Chunk
-		
+from aabb import AABB
+
 
 log = logbot.getlogger("GRID")
 
@@ -57,31 +59,31 @@ class Grid(object):
 			self.chunks[coords] = chunk
 			return chunk
 		else:
-			log.err("chunk %s not initialized" % str(coords))
+			#log.err("chunk %s not initialized" % str(coords))
 			return None
 			
 	def get_block(self, x, y, z):
-		if y > 255:
-			return blocks.Air(x, y, z)
-		elif y < 0:
-			return blocks.Air(x, y, z)
+		if y > 255 or y < 0:
+			#return None
+			return blocks.Air(self, x, y, z)
 		chunk_x = x >> 4
 		chunk_z = z >> 4
 		chunk = self.get_chunk((chunk_x, chunk_z))
 		if chunk is None:
-			return blocks.Air(x, y, z)
+			return blocks.Air(self, x, y, z)
 		y_level = y >> 4
 		block_types = chunk.blocks[y_level]
 		if block_types is None:
-			log.err("level %s not in chunk %s" % (y_level, str(chunk.coords)))
-			return blocks.Air(x, y, z)
+			#log.err("level %s not in chunk %s" % (y_level, str(chunk.coords)))
+			return blocks.Air(self, x, y, z)
 		cx = x & 15
 		cy = y & 15
 		cz = z & 15
 		pos = self.chunk_array_position(cx, cy, cz)
 		try:
-			return blocks.block_map[block_types[pos]](x, y, z, chunk.meta[y_level][pos])
+			return blocks.block_map[block_types[pos]](self, x, y, z, chunk.meta[y_level][pos])
 		except:
+			log.err("get block pos %s y_level %s block_types array length %d meta array length %d " % (pos, y_level, len(block_types), len(chunk.meta[y_level])))
 			raise
 
 	def chunk_updated(self, chunk_x, chunk_z):
@@ -97,6 +99,9 @@ class Grid(object):
 			yield bv >> 4
 
 	def load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array, update_after=True):
+		if primary_bit == 0:
+			#log.msg("Received erase packet for %s, %s" % (x, z))
+			return #TODO actually remove this chunk....
 		self.chunks_loaded += 1
 		if (x, z) not in self.chunks:
 			chunk = Chunk((x, z))
@@ -113,15 +118,15 @@ class Grid(object):
 			if primary_bit & 1 << i:
 				data_str = data.read(4096)
 				data_count += 4096
-				ndata = array.array('b', data_str)  #y, z, x 
+				ndata = array.array('B', data_str)  #y, z, x 
 				chunk.blocks[i] = ndata
 		for h in xrange(3):
 			for i in xrange(chunk.levels):
 				if primary_bit & 1 << i:
 					data_str = data.read(2048)
 					data_count += 2048
+					ndata = array.array('B', self.half_bytes_from_string(data_str))
 					if h == 0:
-						ndata = array.array('b', self.half_bytes_from_string(data_str))
 						chunk.meta[i] = ndata
 					# for now ignore block light and sky light
 					#elif h == 1:
@@ -133,7 +138,7 @@ class Grid(object):
 			if add_bit >> i & 1:
 				data_str = data.read(2048)
 				data_count += 2048
-				ndata = array.array('b', half_bytes_from_string(data_str))
+				ndata = array.array('B', half_bytes_from_string(data_str))
 				log.msg("Add data %s" % ndata)
 		if continuous:
 			data_str = data.read(256)
@@ -164,7 +169,7 @@ class Grid(object):
 		if current_block is None:
 			log.err("change_block chunk %s block %s type %s meta %s is None" % (chunk, (x, y, z), block_type, meta))
 			return None, None
-		if current_block.is_sign and not current_block.same_type(block_type):
+		if current_block.is_sign and not current_block.number == block_type:
 			self.navmesh.sign_waypoints.remove(current_block.coords)
 		cx = x & 15
 		y_level = current_block.y >> 4
@@ -182,7 +187,7 @@ class Grid(object):
 			chunk.fill_level(y_level)
 		chunk.blocks[y_level][pos] = block_type
 		chunk.meta[y_level][pos] = meta
-		new_block = blocks.block_map[block_type](x, y, z, meta)
+		new_block = self.get_block(x, y, z)
 		return current_block, new_block
 
 	def block_change(self, x, y, z, btype, bmeta):
@@ -200,13 +205,9 @@ class Grid(object):
 			self.navmesh.block_change(ob, nb)
 
 	def sign(self, x, y, z, line1, line2, line3, line4):
-		try:
-			value = float(line2)
-		except ValueError:
-			value = None
-		if line1.strip().lower() == "waypoint" and value is not None:
-			self.navmesh.sign_waypoints.new((x, y, z), value, line3)
-
+		if line1.strip().lower() == "waypoint":
+			self.navmesh.sign_waypoints.new((x, y, z), line2, line3, line4)
+	
 	def explosion(self, x, y, z, records):
 		for rec in records:
 			rx = x + rec.x
@@ -216,3 +217,103 @@ class Grid(object):
 			gy = int(ry)
 			gz = int(rz)
 			self.block_change(gx, gy, gz, 0, 0)
+
+	def chunk_complete_at(self, crd):
+		chunk = self.get_chunk(crd)
+		if chunk is None:
+			return False
+		else:
+			return chunk.complete
+
+	def blocks_in_aabb(self, bb):
+		out = []
+		for x, y, z in bb.grid_area:
+			blk = self.get_block(x, y, z)
+			if blk is not None:
+				out.append(blk)
+		return out
+
+	def aabb_collides(self, bb):
+		ebb = bb.extend_to(dy=-1)
+		for block in self.blocks_in_aabb(ebb):
+			if block.collides_with(bb):
+				return True
+		return False
+
+	def passing_blocks_between(self, bb1, bb2):
+		out = []
+		ubb = bb1.union(bb2)
+		blcks = self.blocks_in_aabb(ubb)
+		dvect = bb1.vector_to(bb2)
+		for blk in blcks:
+			bb = AABB.from_block_cube(blk.coords)
+			col, rel_d = bb1.sweep_collision(bb, dvect)
+			if col:
+				out.append(blk)
+		return out
+
+	def min_collision_between(self, bb1, bb2, horizontal=False):
+		ubb = bb1.extend_to(dy=-1).union(bb2.extend_to(dy=-1))
+		blcks = self.blocks_in_aabb(ubb) 
+		dvect = bb1.vector_to(bb2)
+		if horizontal:
+			dvect = (dvect[0], 0, dvect[2])
+		col_rel_d = 1.1
+		for blk in blcks:
+			col, rel_d = blk.sweep_collision(bb1, dvect)
+			if col and fops.lt(rel_d, col_rel_d):
+				col_rel_d = rel_d
+		if col_rel_d < 1.1:
+			return col_rel_d * tools.vector_size(dvect)
+		else:
+			return None
+
+	def collision_between(self, bb1, bb2, debug=False):
+		ubb = bb1.extend_to(dy=-1).union(bb2.extend_to(dy=-1))
+		blcks = self.blocks_in_aabb(ubb)
+		dvect = bb1.vector_to(bb2)
+		for blk in blcks:
+			col, _ = blk.sweep_collision(bb1, dvect, debug=debug)
+			if col:
+				if debug:
+					print "collision_between", bb1, blk.grid_bounding_box
+				return True
+		return False
+
+	def aabbs_in(self, bb1):
+		out = []
+		blcks = self.blocks_in_aabb(bb1)
+		for blk in blcks:
+			blk.add_grid_bounding_boxes_to(out)
+		return out
+
+	def standing_on_solidblock(self, bb):
+		standing_on = None
+		blocks = self.blocks_in_aabb(bb.extend_to(dy=-1))
+		dvect = (0, -1, 0)
+		for blk in blocks:
+			col, rel_d = blk.sweep_collision(bb, dvect)
+			if col and fops.eq(rel_d, 0):
+				standing_on = blk
+				if standing_on.x == bb.grid_x and standing_on.z ==  bb.grid_z:
+					break
+		return standing_on
+
+	def aabb_in_chunks(self, bb):
+		chunk_coords = set()
+		for x, _, z in bb.grid_area:
+			chunk_coords.add((x >> 4, z >> 4))
+		return [self.get_chunk(coord) for coord in chunk_coords]
+
+	def aabb_in_complete_chunks(self, bb):
+		for chunk in self.aabb_in_chunks(bb):
+			if chunk is None:
+				return False
+			elif chunk.complete == False:
+				return False
+		return True
+
+	def check_sign(self, crd):
+		sblk = self.get_block(crd[0], crd[1], crd[2])
+		if not sblk.is_sign:
+			self.navmesh.sign_waypoints.remove(crd)

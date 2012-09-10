@@ -112,7 +112,7 @@ class MineCraftProtocol(Protocol):
 			d = cootask.whenDone()
 			d.addErrback(logbot.exit_on_error)
 		elif len(self.packets) > 100:
-			log.msg("Did not consume %d packets" % len(self.packets))
+			#log.msg("Did not consume %d packets" % len(self.packets))
 			if len(self.packets) > 10000:
 				reactor.stop() 
 		self.packets.extend(parsed_packets)
@@ -127,6 +127,7 @@ class MineCraftProtocol(Protocol):
 		while ipackets:
 			packet = ipackets.popleft()
 			self.process_packet(packet)
+			self.bot.status_diff.packets_in += 1
 			yield None
 				
 	def process_packet(self, packet):
@@ -144,7 +145,7 @@ class MineCraftProtocol(Protocol):
 		self.send_packet("keep alive", {"pid": pid})
 		
 	def p_login(self, c):
-		log.msg("LOGIN received EID %s" % c.eid)
+		log.msg("LOGIN DATA eid %s level type: %s mode: %s dimension: %s difficulty: %s max players: %s" % (c.eid, c.level_type, c.mode, c.dimension, c.difficulty ,c.players))
 		self.bot.login_data(c.eid, c.level_type, c.mode, c.dimension, c.difficulty ,c.players)
 
 	def p_chat(self, c):
@@ -242,6 +243,7 @@ class MineCraftProtocol(Protocol):
 		self.bot.s_total_experience = c.total
 
 	def p_chunk(self, c):
+		#log.msg("chunk %s %s" % (c.x, c.z))
 		self.world.grid.load_chunk(c.x, c.z, c.continuous, c.primary_bitmap, c.add_bitmap, c.data.decode('zlib'))
 
 	def p_multi_block_change(self, c):
@@ -259,6 +261,7 @@ class MineCraftProtocol(Protocol):
 		devnull()
 		
 	def p_bulk_chunk(self, c):
+		#log.msg("bulk chunk %s" % c.count)
 		self.world.grid.load_bulk_chunk(c.meta, c.data.decode('zlib'))
 
 	def p_explosion(self, c):

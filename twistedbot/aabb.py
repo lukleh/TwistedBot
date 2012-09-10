@@ -1,8 +1,10 @@
 ﻿
+import math
+
 import config
 import fops
+import tools
 
-from math import floor
 
 class AABB(object):
 	def __init__(self, min_x, min_y, min_z, max_x, max_y, max_z):
@@ -14,7 +16,6 @@ class AABB(object):
 		self.max_z = max_z
 		self.mins = [min_x, min_y, min_z]
 		self.maxs = [max_x, max_y, max_z]
-		self._grid_coords = None
 		
 	def __add__(self, o):
 		return AABB(self.min_x + o[0], self.min_y + o[1], self.min_z + o[2], \
@@ -28,6 +29,9 @@ class AABB(object):
 	def __str__(self):
 		return "AABB [%s, %s, %s : %s, %s, %s]" % (self.min_x, self.min_y, self.min_z, self.max_x, self.max_y, self.max_z)
 
+	def __repr__(self):
+		return self.__str__()
+
 	@classmethod
 	def from_player_coords(cls, xyz):
 		x = xyz[0]
@@ -36,9 +40,50 @@ class AABB(object):
 		return cls(x - config.PLAYER_BODY_EXTEND, y, z - config.PLAYER_BODY_EXTEND, \
 				x + config.PLAYER_BODY_EXTEND, y + config.PLAYER_HEIGHT, z + config.PLAYER_BODY_EXTEND)
 
+	@classmethod
+	def from_block_coords(cls, xyz):
+		return cls.from_player_coords((xyz[0] + 0.5, xyz[1], xyz[2] + 0.5))
+
+	@classmethod
+	def from_block_cube(cls, xyz):
+		return cls(xyz[0], xyz[1], xyz[2], xyz[0] + 1, xyz[1] + 1, xyz[2] + 1)
+
+	@property
+	def bottom_center(self):
+		return (self.posx, self.posy, self.posz)
+
+	def face(self, dx=0, dy=0, dz=0):
+		if dx < 0:
+			return AABB(self.min_x, self.min_y, self.min_z, self.min_x, self.max_y, self.max_z)
+		elif dx > 0:
+			return AABB(self.max_x, self.min_y, self.min_z, self.max_x, self.max_y, self.max_z)
+		elif dy < 0:
+			return AABB(self.min_x, self.min_y, self.min_z, self.max_x, self.min_y, self.max_z)
+		elif dy > 0:
+			return AABB(self.min_x, self.max_y, self.min_z, self.max_x, self.max_y, self.max_z)
+		elif dz < 0:
+			return AABB(self.min_x, self.min_y, self.min_z, self.max_x, self.max_y, self.min_z)
+		elif dz > 0:
+			return AABB(self.min_x, self.min_y, self.max_z, self.max_x, self.max_y, self.max_z)
+		raise Exception("no face choosen in AABB")
+		
 	def collides(self, bb):
 		for i in xrange(3):
 			if fops.lte(self.maxs[i], bb.mins[i]) or fops.gte(self.mins[i],bb.maxs[i]):
+				return False
+		return True
+		
+	def collides_on_axes(self, bb, x=False, y=False, z=False):
+		if not (x or y or z):
+			raise Exception("axes not set in collides_on_axes")
+		if x:
+			if fops.lte(self.max_x, bb.min_x) or fops.gte(self.min_x, bb.max_x):
+				return False
+		if y:
+			if fops.lte(self.max_y, bb.min_y) or fops.gte(self.min_y, bb.max_y):
+				return False
+		if z:
+			if fops.lte(self.max_z, bb.min_z) or fops.gte(self.min_z, bb.max_z):
 				return False
 		return True
 
@@ -60,14 +105,13 @@ class AABB(object):
 				p = collidee.mins[axis] - self.maxs[axis]
 		return p
 		
-	def shift(self, dx=0, dy=0, dz=0):
-		self.min_x += dx
-		self.max_x += dx
-		self.min_y += dy
-		self.max_y += dy
-		self.min_z += dz
-		self.max_z += dz
-		self._grid_coords = None
+	def offset(self, dx=0, dy=0, dz=0):
+		return AABB(self.min_x + dx,
+					self.min_y + dy,
+					self.min_z + dz,
+					self.max_x + dx,
+					self.max_y + dy,
+					self.max_z + dz)
 
 	def extend_to(self, dx=0, dy=0, dz=0):
 		return AABB(self.min_x if dx==0 or dx > 0 else self.min_x + dx,
@@ -77,60 +121,138 @@ class AABB(object):
 					self.max_y if dy==0 or dy < 0 else self.max_y + dy,
 					self.max_z if dz==0 or dz < 0 else self.max_z + dz)
 		
+	def expand(self, dx=0, dy=0, dz=0):
+		return AABB(self.min_x - dx,
+					self.min_y - dy,
+					self.min_z - dz,
+					self.max_x + dx,
+					self.max_y + dy,
+					self.max_z + dz)
+
+	def union(self, bb):
+		return AABB(self.min_x if self.min_x < bb.min_x else bb.min_x,
+					self.min_y if self.min_y < bb.min_y else bb.min_y,
+					self.min_z if self.min_z < bb.min_z else bb.min_z,
+					self.max_x if self.max_x > bb.max_x else bb.max_x,
+					self.max_y if self.max_y > bb.max_y else bb.max_y,
+					self.max_z if self.max_z > bb.max_z else bb.max_z,)
+
 	@property	
 	def grid_box(self):
-		if self._grid_coords is None:
-			self._grid_coords = [
-					int(floor(self.min_x)),
-					int(floor(self.min_y)),
-					int(floor(self.min_z)),
-					int(floor(self.max_x)),
-					int(floor(self.max_y)),
-					int(floor(self.max_z))]
-		return self._grid_coords
+		return [
+				int(math.floor(self.min_x)),
+				int(math.floor(self.min_y)),
+				int(math.floor(self.min_z)),
+				int(math.floor(self.max_x)),
+				int(math.floor(self.max_y)),
+				int(math.floor(self.max_z))]
 
 	@property
-	def grid_corners(self):
+	def grid_area(self):
 		gbb = self.grid_box
 		for x in xrange(gbb[0], gbb[3] + 1):
 			for y in xrange(gbb[1], gbb[4] + 1):
 				for z in xrange(gbb[2], gbb[5] + 1):
-					yield (x, y, z)
+					yield x, y, z
 
-	#dead code now
-	def sweep_col(B, A, v):
+	@property
+	def posx(self):
+		return self.min_x + config.PLAYER_BODY_EXTEND
+
+	@property
+	def posy(self):
+		return self.min_y
+
+	@property
+	def posz(self):
+		return self.min_z + config.PLAYER_BODY_EXTEND
+
+	@property
+	def grid_x(self):
+		return tools.grid_shift(self.posx)
+
+	@property
+	def grid_z(self):
+		return tools.grid_shift(self.posz)
+
+	def vector_to(self, bb):
+		return bb.posx - self.posx, bb.posy - self.posy, bb.posz - self.posz
+
+	def horizontal_vector_to(self, bb):
+		return bb.min_x - self.min_x, 0, bb.min_z - self.min_z
+
+	def distance_to(self, bb):
+		x, y, z = self.vector_to(bb)
+		return math.sqrt(x*x + y*y + z*z)
+
+	def horizontal_distance_to(self, bb):
+		x, _, z = self.vector_to(bb)
+		return math.sqrt(x*x + z*z)
+
+	def vertical_distance_to(self, bb):
+		_, y, _ = self.vector_to(bb)
+		return abs(y)
+
+	def horizontal_direction_to(self, bb):
+		x, _, z = self.vector_to(bb)
+		size = math.sqrt(x*x + z*z)
+		if fops.eq(size, 0):
+			return (0, 0)
+		return (x/size, z/size)
+
+	def sweep_collision(self, collidee, v, debug=False):
 		""" 
-			B moving, A stationery 
+			self moving by v, collidee stationery 
 			based on http://www.gamasutra.com/view/feature/3383/simple_intersection_tests_for_games.php?page=3	
 		"""
-		#TODO 
-		#make it really work, make sure it returns correct values when not coliding
-		#clean
-		u_0 = [0, 0, 0]
+		u_0 = [2, 2, 2]
 		u_1 = [1, 1, 1]
 		dists = [None, None, None]
 		for i in xrange(3):
-			if A[1][i] < B[0][i] and v[i] < 0:
-				d = A[1][i] - B[0][i]
+			if fops.lte(self.maxs[i], collidee.mins[i]) and fops.gt(v[i], 0):
+				d = collidee.mins[i] - self.maxs[i]
 				dists[i] = d
 				u_0[i] = d / v[i]
-			elif B[1][i] < A[0][i] and v[i] > 0:
-				d = A[0][i] - B[1][i]
+			elif fops.lte(collidee.maxs[i], self.mins[i]) and fops.lt(v[i], 0):
+				d = collidee.maxs[i] - self.mins[i]
 				dists[i] = d
 				u_0[i] = d / v[i]
-				u_0[i] = (A[0][i] - B[1][i]) / v[i]
-			
-			if B[1][i] > A[0][i] and v[i] < 0:
-				u_1[i] = (A[0][i] - B[1][i]) / v[i]
-			elif A[1][i] > B[0][i] and v[i] > 0:
-				u_1[i] = (A[1][i] - B[0][i]) / v[i]
-		u0 = max(u_0)
-		u1 = min(u_1)
-		col = u0 <= u1
-		if col:
-			axis = u_0.index(u0)
-			return col, axis, dists[axis], u0
+			elif fops.eq(v[i], 0) and not(fops.lte(self.maxs[i], collidee.mins[i]) or fops.gte(self.mins[i],collidee.maxs[i])):
+				u_0[i] = 0
+			elif not(fops.lte(self.maxs[i], collidee.mins[i]) or fops.gte(self.mins[i],collidee.maxs[i])):
+				u_0[i] = 0
+			if fops.gte(collidee.maxs[i], self.mins[i]) and fops.gt(v[i], 0):
+				d = collidee.maxs[i] - self.mins[i]
+				u_1[i] = d / v[i]
+			elif fops.gte(self.maxs[i], collidee.mins[i]) and fops.lt(v[i], 0):
+				d = collidee.mins[i] - self.maxs[i]
+				u_1[i] = d / v[i]
+		
+		if max(u_0) == 2:
+			u0 = None
+			col = False
 		else:
-			return col, None, None, None
+			u0 = max(u_0)
+			u1 = min(u_1)
+			if fops.gte(u0, 1.0):
+				col = False
+			else:
+				col = fops.lte(u0, u1)
+		if debug and col:
+			print "AABB.sweep_collision", col, u0
+		return col, u0
 
-
+	def calculate_axis_offset(self, collidee, d, axis):
+		for i in xrange(3):
+			if i == axis: continue
+			if fops.lte(self.maxs[i], collidee.mins[i]) or fops.gte(self.mins[i], collidee.maxs[i]):
+				return d
+		if d < 0 and fops.lte(collidee.maxs[axis], self.mins[axis]):
+			dout = collidee.maxs[axis] - self.mins[axis]
+			if fops.gt(dout, d):
+				d = dout
+		elif d > 0 and fops.gte(collidee.mins[axis], self.maxs[axis]):
+			dout = collidee.mins[axis] - self.maxs[axis]
+			if fops.lt(dout, d):
+				d = dout
+		return d

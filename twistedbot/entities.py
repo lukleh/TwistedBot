@@ -3,7 +3,11 @@
 
 import config
 import logbot
+import tools
+import pathfinding
+from gridspace import GridSpace
 from entity import EntityMob, EntityPlayer, EntityVehicle, EntityExperienceOrb, EntityDroppedItem
+from aabb import AABB
 
 
 log = logbot.getlogger("ENTITIES")
@@ -26,23 +30,40 @@ class Entities(object):
 		gpos = entity.grid_position
 		if self.world.bot.commander.last_possition == gpos:
 			return
-		self.world.bot.commander.last_possition = gpos
-		block = self.world.grid.get_block(gpos[0], gpos[1] - 1, gpos[2]) #TODO this will not work all the time, entity can stand "in" block (soul sand, lilly pad, etc.
+		block = self.world.grid.standing_on_solidblock(AABB.from_player_coords(entity.position))
 		if block is None: return
-		if not block.is_solid: return
+		lpos = self.world.bot.commander.last_possition
+		if lpos is not None and (block.coords == lpos or block.coords == (lpos[0], lpos[1] - 1, lpos[2])):
+			return
 		in_nodes = self.world.navmesh.graph.has_node(block.coords)
-		log.msg("Player in navmesh %s on %s navmesh nodes %d" % (in_nodes, block, len(self.world.navmesh.graph.nodes)))
+		gs = GridSpace(self.world.grid, block=block)
+		gs.can_stand_on
+		msg = "P in nm %s on %s aabb %s nm nodes %d\n" % (in_nodes, block, block.grid_bounding_box, self.world.navmesh.graph.node_count)
+		msg += "gs_stand %s" % str(gs.bb_stand)
+		if lpos is not None:
+			gsl = GridSpace(self.world.grid, lpos)
+			if gsl.can_stand_on:
+				pass
+			else:
+				gsl = GridSpace(self.world.grid, (lpos[0], lpos[1] - 1, lpos[2]))
+				if gsl.can_stand_on:
+					lpos = gsl.coords
+			msg += "\ncost from %s to %s %s\n" % (lpos, block.coords, self.world.navmesh.graph.get_edge(lpos, block.coords))
+			msg += "last stand %s now stand %s from %s to %s\n" % (gsl.can_stand_on, gs.can_stand_on, gsl.bb_stand, gs.bb_stand)
+			msg += "can go %s %s" % GridSpace.can_go_aabb(self.world.grid, gsl.bb_stand, gs.bb_stand, debug=True)
+		log.msg(msg)
+		self.world.bot.commander.last_possition = gpos
 
 	def entityupdate(fn):
 		def f(self, *args, **kwargs):
 			eid = args[0]
 			entity = self.get_entity(eid)
-			if entity is None: 
-				#received entity update packet for entity that was not initialized with new_*, this should not happen 
+			if entity is None: #received entity update packet for entity that was not initialized with new_*, this should not happen 
 				log.msg("do not have entity %d registered" % eid)
 				return
 			if entity.is_bot:
 				log.msg("Server is changing me with %s %s %s" % (fn.__name__, args, kwargs))
+				pass
 			fn(self, entity, *args[1:], **kwargs)
 			self.maybe_commander(entity)
 		return f

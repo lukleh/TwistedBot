@@ -1,4 +1,7 @@
-﻿
+
+
+import math
+from datetime import datetime
 
 
 from twisted.internet import reactor, defer
@@ -8,6 +11,7 @@ import config
 import tools
 import packets
 import logbot
+import fops
 from statistics import Statistics
 from aabb import AABB
 from chat import Chat
@@ -15,6 +19,25 @@ from task_manager import TaskManager
 from entity import EntityBot
 
 log = logbot.getlogger("BOT_ENTITY")
+
+
+class StatusDiff(object):
+	def __init__(self, world):
+		self.world = world
+		self.packets_in = 0
+		self.node_count = 0
+		self.edge_count = 0
+		self.logger = logbot.getlogger("BOT_ENTITY_STATUS")
+
+	def log(self):
+		if self.node_count != self.world.navmesh.graph.node_count:
+			self.logger.msg("navmesh having %d nodes" % self.world.navmesh.graph.node_count)
+			self.node_count = self.world.navmesh.graph.node_count
+		if self.edge_count != self.world.navmesh.graph.edge_count:
+			self.logger.msg("navmesh having %d edges" % self.world.navmesh.graph.edge_count)
+			self.edge_count = self.world.navmesh.graph.edge_count
+		#self.logger.msg("received %d packets" % self.packets_in)
+
 
 class Commander(object):
 	def __init__(self, name):
@@ -29,17 +52,18 @@ class Bot(object):
 		self.name = name
 		self.commander = Commander(commander_name)
 		self.eid = None
-		world.bot = self
+		self.world.bot = self
 		self.grid = self.world.grid
 		self.velocities = [0.0, 0.0, 0.0]
 		self._x = 0
 		self._y = 0
+		self.ticks = 0
 		self.chunks_ready = False
 		self.taskmgr = TaskManager(self)
 		self.stance = None
 		self.pitch = None
 		self.yaw = None
-		self.grounded = None
+		self.on_ground = False
 		self.ready = False
 		self.location_received = False
 		self.spawn_point_received = False
@@ -47,6 +71,8 @@ class Bot(object):
 		self.stats = Statistics()
 		self.startup()
 		self.do_later(self.iterate, config.TIME_STEP)
+		self.last_time = datetime.now()
+		self.status_diff = StatusDiff(self.world)
 	
 	def connection_lost(self):
 		self.protocol = None
@@ -71,17 +97,18 @@ class Bot(object):
 		self.y = kw["y"]
 		self.z = kw["z"]
 		self.stance = kw["stance"]
-		self.grounded = kw["grounded"]
+		self.on_ground = kw["grounded"]
 		self.yaw = kw["yaw"]
 		self.pitch = kw["pitch"]
 		self.velocities = [0.0, 0.0, 0.0]
 		if self.location_received == False:
 			self.location_received = True
 		if not self.in_complete_chunks:
+			log.msg("Server send location into incomplete chunks")
 			self.ready = False
 		else:
-			if not self.is_standing:
-				self.taskmgr.add_fall()
+			if not self.on_ground:
+				self.move()
 			else:
 				self.on_standing_ready()
 		
@@ -146,18 +173,14 @@ class Bot(object):
 		if self._aabb is None:
 			self._aabb = AABB.from_player_coords(self.position)
 		return self._aabb
-				
-	@property
-	def is_standing(self):
-		d = tools.directional_collision_distance(self.grid, self.aabb, dy=-1)
-		if d is None or d > 0:
-			return False
-		else:
-			return True
+
+	@aabb.setter
+	def aabb(self, v):
+		self._aabb = v
 
 	@property
 	def in_complete_chunks(self):
-		return tools.chunks_complete(tools.aabb_in_chunks(self.world.grid, self.aabb))
+		return self.world.grid.aabb_in_complete_chunks(self.aabb)
 
 	def do_later(self, fn, delay=0):
 		d = defer.Deferred()
@@ -165,7 +188,13 @@ class Bot(object):
 		d.addErrback(logbot.exit_on_error)
 		reactor.callLater(delay, d.callback, None)
 
+	def every_n_ticks(self, n=100):
+		return
+		if self.ticks % n == 0:
+			self.status_diff.log()
+
 	def iterate(self, ignore):
+		self.ticks += 1
 		if self.location_received == False:
 			self.do_later(self.iterate, config.TIME_STEP)
 			return
@@ -175,6 +204,7 @@ class Bot(object):
 			self.taskmgr.run_current_task()
 		self.send_location()
 		self.do_later(self.iterate, config.TIME_STEP)
+		self.every_n_ticks()
 
 	def send_packet(self, name, payload):
 		if self.protocol is not None:
@@ -184,8 +214,10 @@ class Bot(object):
 		self.send_packet("player position&look", {
 							"position": packets.Container(x=self.x, y=self.y, z=self.z, stance=self.stance),
 							"orientation": packets.Container(yaw=self.yaw, pitch=self.pitch),
-							"grounded": packets.Container(grounded=self.grounded)})
+							"grounded": packets.Container(grounded=self.on_ground)})
 			
+	def chat_message(self, msg):
+		self.send_packet("chat message", {"message": msg})
 
 	def turn_to(self, point, elevation=False):
 		if point[0] == self.x and point[2] == self.z:
@@ -198,37 +230,103 @@ class Bot(object):
 			self.pitch = pitch
 		else:
 			self.pitch = 0
-	
-	def update_position(self, dy=None, deltas=None, xyz=None, grounded=None):
-		if grounded is not None:
-			if self.grounded != grounded:
-				self.grounded = grounded
-			else:
-				grounded = None
-		if deltas is not None:
-			self.x += deltas.x
-			self.y += deltas.y
-			self.z += deltas.z
-		elif xyz is not None:
-			self.x = xyz.x
-			self.y = xyz.y
-			self.z = xyz.z
-		elif dy is not None:
-			self.y += dy
-		if deltas or grounded or xyz or dy:
-			log.msg("Updating position x %s y %s z %s stance %s grounded %s" % (self.x, self.y, self.z, self.stance, self.grounded))
-			pass
+
+	def update_position(self, x, y, z, onground):
+		self.x = x
+		self.y = y
+		self.z = z
+		self.on_ground = onground
+
+	def set_jump(self, custom_speed=config.SPEED_JUMP):
+		self.velocities[1] = custom_speed
+
+	def set_jumpstep(self, v):
+		self.velocities[1] = 0
+		aabbs = self.grid.aabbs_in(self.aabb.extend_to(0, v, 0))
+		for bb in aabbs:
+			v = self.aabb.calculate_axis_offset(bb, v, 1)
+		self.aabb = self.aabb.offset(dy=v)
+
+	def do_move(self):
+		aabbs = self.grid.aabbs_in(self.aabb.extend_to(self.velocities[0], self.velocities[1], self.velocities[2]))
+		dy = self.velocities[1]
+		for bb in aabbs:
+			dy = self.aabb.calculate_axis_offset(bb, dy, 1)
+		self.aabb = self.aabb.offset(dy=dy)
+		dx = self.velocities[0]
+		for bb in aabbs:
+			dx = self.aabb.calculate_axis_offset(bb, dx, 0)
+		self.aabb = self.aabb.offset(dx=dx)
+		dz = self.velocities[2]
+		for bb in aabbs:
+			dz = self.aabb.calculate_axis_offset(bb, dz, 2)
+		self.aabb = self.aabb.offset(dz=dz)
+		onground = self.velocities[1] != dy and self.velocities[1] < 0
+		if self.velocities[0] != dx:
+			self.velocities[0] = 0
+		if self.velocities[1] != dy:
+			self.velocities[1] = 0
+		if self.velocities[2] != dz:
+			self.velocities[2] = 0
+		self.update_position(self.aabb.posx, self.aabb.min_y, self.aabb.posz, onground)
+
+	def clip_velocities(self):
+		for i in xrange(3):
+			if abs(self.velocities[i]) < 0.005: # minecraft value 
+				self.velocities[i] = 0
+
+	def move(self, clip_vels=True):
+		if clip_vels:
+			self.clip_velocities()
+		self.do_move()
+		slowdown = self.current_slowdown
+		self.velocities[1] -= config.BLOCK_FALL
+		self.velocities[1] *= config.DRAG
+		self.velocities[0] *= slowdown
+		self.velocities[2] *= slowdown
+
+	def move_direction(self, direction):
+		self.clip_velocities()
+		x, z = self.directional_speed(direction, self.current_speed_factor)
+		self.velocities[0] += x
+		self.velocities[2] += z
+		self.move(clip_vels=False)
+
+	def directional_speed(self, dirct, speedf):
+		x, z = dirct
+		dx = x * speedf * 0.98
+		dz = z * speedf * 0.98
+		return dx, dz
+
+	@property
+	def current_slowdown(self):
+		slowdown = 0.91
+		if self.on_ground:
+			slowdown = 0.546
+			block = self.grid.get_block(self.grid_x, self.grid_y - 1, self.grid_z)
+			if block is not None:
+				slowdown = block.slipperiness * 0.91
+		return slowdown		
+
+	@property
+	def current_speed_factor(self):
+		if self.on_ground:
+			slowdown = self.current_slowdown
+			modf = 0.16277136 / (slowdown * slowdown * slowdown)
+			factor = config.SPEED_FACTOR * modf
+		else:
+			factor = config.JUMP_FACTOR
+		return factor
 			
 	def do_respawn(self, ignore):
 		self.send_packet("client statuses", {"status": 1})
 			
 	def health_update(self, health, food, food_saturation):
+		log.msg("current health %s food %s saturation %s" % (health, food, food_saturation))
 		if health <= 0:
 			self.on_death()
 			
 	def login_data(self, eid, level_type, mode, dimension, difficulty ,players):
-		# TODO 
-		# ignore the details now but eid
 		self.eid = eid
 		self.world.entities.entities[eid] = EntityBot(eid=eid, x=0, y=0, z=0)
 		
@@ -236,16 +334,30 @@ class Bot(object):
 		# TODO
 		# ignore the details now
 		# should clear the world(chunks, entities, etc.)
+		self.grid.navmesh.reset_signs()
 		pass
 		
 	def on_death(self):
 		self.location_received = False
 		self.spawn_point_received = False
 		self.do_later(self.do_respawn, 1.0)
-		#self.world_erase()
+		#TODO self.world_erase()
+
+	@property
+	def standing_on_block(self):
+		return self.grid.standing_on_solidblock(self.aabb)
+
+	@property
+	def is_standing(self):
+		col_d = self.grid.min_collision_between(self.aabb, self.aabb - (0, 1, 0))
+		if col_d is None:
+			ret = False
+		else:
+			ret = fops.eq(col_d, 0)
+		return ret
 
 	def on_standing_ready(self, ignore=None):
-		block = tools.standing_on_solidblock(self.grid, self.aabb, self.position_grid)
+		block = self.standing_on_block
 		log.msg("Standing on block %s" % block)
 		if not self.world.navmesh.graph.has_node(block.coords):
-			self.world.navmesh.block_change(block, None)
+			self.world.navmesh.block_change(None, block)

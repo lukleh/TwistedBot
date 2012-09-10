@@ -31,21 +31,3 @@ def decrypt(message, privkey):
 	cipher = PKCS1_v1_5.new(privkey)
 	return cipher.decrypt(message, None)
 	
-
-def benchmark():
-	from datetime import datetime
-	k = get_random_bytes()
-	cipher = make_aes(k, k)
-	decipher = make_aes(k, k)
-	size = 10000000
-	data = get_random_bytes(size)
-	print "running bench"
-	start = datetime.now()
-	enc = cipher.encrypt(data)
-	dec = decipher.decrypt(enc)
-	print "encrypted and decrypted %d bytes in %s" % (size, datetime.now() - start)
-	print "data identical:", data == dec
-	
-
-if __name__ == "__main__":
-	benchmark()

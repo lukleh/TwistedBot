@@ -1,4 +1,4 @@
-﻿
+
 import math
 
 DEBUG = False
@@ -9,8 +9,7 @@ USERNAME = "twistedbot"
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 25565
 
-PROTOCOL_VERSION = 39 #minecraft version 1.3
-NUMBER_OF_BLOCKS = 136
+PROTOCOL_VERSION = 39 # minecraft version 1.3.2
 CONNECTION_MAX_DELAY = 20
 CONNECTION_INITIAL_DELAY = 0.1 
 
@@ -20,24 +19,21 @@ PLAYER_HEIGHT           = 1.74
 PLAYER_EYELEVEL         = 1.62
 PLAYER_BODY_EXTEND      = 0.3
 
-MAX_JUMP_HEIGHT			= 1.2
-G						= -22.0 #18
-
-SPEED_WALK   = 4.27
-SPEED_SNEAK  = 1.31
-SPEED_CLIMB  = 2.327272
-SPEED_SPRINT = 5.6
-SPEED_COBWEB = SPEED_WALK * 0.15
-SPEED_JUMP   = math.sqrt(MAX_JUMP_HEIGHT*2/(-G)) * (-G)
-
-JUMP_HEIGHT  = -0.5 * G * math.pow(SPEED_JUMP/G, 2)
-
-COST_DIRECT		= 1 / SPEED_WALK
-COST_DIAGONAL	= math.sqrt(2) / SPEED_WALK
-COST_CLIMB		= 1 / SPEED_CLIMB
-
-ANGLE_CHANGE_STEP		= 40
+MAX_JUMP_HEIGHT			= 1.25
 MAX_STEP_HEIGHT			= 0.5
-TIME_STEP				= 0.05
-DISTANCE_STEP			= SPEED_WALK * TIME_STEP
+G						= 27.0 # or 0.08 block/tick - drag 0.02 blk/tick (used as final multiply by 0.98)
 
+BLOCK_FALL				= 0.08
+DRAG 					= 0.98
+SPEED_FACTOR   			= 0.1 # on land
+JUMP_FACTOR				= 0.02 # in air
+SPEED_JUMP   			= 0.42 # 0.04 in water and lava
+
+
+TIME_STEP				= 0.05
+
+COST_CLIMB				= 1.1
+COST_FALL				= 1.1
+COST_DIRECT				= 1
+COST_DIAGONAL			= math.sqrt(2) * COST_DIRECT
+ASTAR_LIMIT				= 100 # roughly 50 blocks

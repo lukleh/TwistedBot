@@ -40,7 +40,9 @@ statistics = defaultdict(lambda: defaultdict(int))
 
 
 def format_packet(data, prefix="  ", depth=1):
-	""" return formated string of the packet """
+	""" 
+		return formated string of the packet
+	"""
 	prefixstr = prefix * depth
 	if isinstance(data, NBTFile):
 		return data.pretty(indent=depth, indent_str=prefix)
@@ -80,7 +82,10 @@ def format_packet(data, prefix="  ", depth=1):
 
 
 def process_packets(streamtype, pcks, encrypted=False, leftover=None):
-	""" main function to use """
+	""" 
+		main function to use
+		@streamtype - values 'CLIENT' or 'SERVER', depending where this data came from
+	"""
 	if not pcks: return
 	for p in pcks:
 		packet_id = p[0]

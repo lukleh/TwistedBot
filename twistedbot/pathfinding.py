@@ -1,10 +1,18 @@
 
 import heapq
 	
+import config
+import fops
+import logbot
+import tools
+
+
+log = logbot.getlogger("ASTAR")
+
 
 class PathNode(object):
-	def __init__(self, point, cost=1):
-		self.coords = point
+	def __init__(self, coords, cost=1):
+		self.coords = coords
 		self.cost = cost
 		self.g = 0
 		self.h = 0
@@ -13,7 +21,7 @@ class PathNode(object):
 		self.hash = hash(self.coords)
 
 	def __str__(self):
-		return str(self.coords)
+		return "%s:%s:g%s:h%s:f%s" % (str(self.coords), self.cost, self.g, self.h, self.f)
 
 	def __lt__(self, other):
 		return self.f < other.f
@@ -32,24 +40,13 @@ class PathNode(object):
 		self.h = h
 		self.f = g + h
 		
-	def load_block(self, block):
-		#TODO have to take center of the top face, not center of square (0.5, 0.5)
-		x = block.coords[0] + 0.5
-		y = block.grid_height
-		z = block.coords[2] + 0.5
-		self.path_point = (x, y, z)
-		self.block = block
-		
 	
 class Path(object):
-	def __init__(self, goal=None, broken=False):
-		self.broken = broken
+	def __init__(self, goal=None):
 		self.goal = goal
 		self.nodes = []
-		if not broken:
-			self.reconstruct_path(self.goal)
-			self.atstep = len(self.nodes)
-		self.done = False
+		self.reconstruct_path(self.goal)
+		self.step_index = len(self.nodes)
 		#log.msg("Path broken %s nodes %s" % (self.broken, [str(p) for p in self.nodes]))
 
 	def __str__(self):
@@ -60,36 +57,66 @@ class Path(object):
 		while current.parent is not None:
 			self.nodes.append(current.parent)
 			current = current.parent
+
+	def __iter__(self):
+		self.iter_index = len(self.nodes)
+		return self
+
+	def next(self):
+		self.iter_index -= 1
+		if self.iter_index < 0:
+			raise StopIteration()
+		return self.nodes[self.iter_index]
+
+	def has_next(self):
+		return self.step_index > 0
 		
 	def next_step(self):
-		self.atstep -= 1
-		if self.atstep < 0:
-			self.atstep = 0
-			self.done = True
-		self.next_node = self.nodes[self.atstep]
-		return self.next_node
+		self.step_index -= 1
+		if self.step_index < 0:
+			raise Exception("Path consumed")
+		return self.nodes[self.step_index]
 	
 
 class AStar(object):
 	def __init__(self, navmesh):
 		self.navmesh = navmesh
+		self.succesors = self.navmesh.graph.get_succ
+		self.get_node = self.navmesh.graph.get_node
+
+	def reconstruct_path(self, current):
+		nodes = []
+		nodes.append(current)
+		while current.parent is not None:
+			nodes.append(current.parent)
+			current = current.parent
+		nodes.reverse()
+		return nodes
+
+	def get_edge_cost(self, node_from, node_to):
+		return self.navmesh.graph.get_edge(node_from.coords, node_to.coords)
 		
 	def neighbours(self, start, closed_set):
-		for node, cost in self.navmesh.successors(start.coords):
+		for node, cost in self.succesors(start.coords):
 			if node not in closed_set:
 				yield PathNode(node, cost=cost)
 	
-	def heuristic_cost_estimate(self, x, y):
-		#D axis cost
-		#D2 diagonal cost
-		#h_diagonal(n) = min(abs(n.x-goal.x), abs(n.y-goal.y))
-		#h_straight(n) = (abs(n.x-goal.x) + abs(n.y-goal.y))
-		#h(n) = D2 * h_diagonal(n) + D * (h_straight(n) - 2*h_diagonal(n)))
-		#return h(n)
-		return 0
+	def heuristic_cost_estimate(self, start, goal):
+		h_diagonal = min(abs(start[0]-goal[0]), abs(start[2]-goal[2]))
+		h_straight = (abs(start[0]-goal[0]) + abs(start[2]-goal[2]))
+		vert = self.get_node(start) - self.get_node(goal)
+		if fops.lte(abs(vert), config.MAX_STEP_HEIGHT):
+			vert = 0
+		if fops.lt(vert, 0):
+			vert_cost = int(-vert) * config.COST_CLIMB
+		elif fops.gt(vert, 0):
+			vert_cost = int(vert) * config.COST_FALL
+		else:
+			vert_cost = 0
+		h = config.COST_DIAGONAL*h_diagonal + config.COST_DIRECT*(h_straight - 2*h_diagonal) + vert_cost
+		return h
 	
-	def find_path(self, start, goal, max_cost=50):
-		#log.msg("Find path between %s and %s" % (start, goal))
+	def find_path(self, start, goal, max_cost=config.ASTAR_LIMIT):
 		start_node = PathNode(start)
 		goal_node  = PathNode(goal)
 		closed_set = set() 
@@ -103,7 +130,7 @@ class AStar(object):
 			open_set.remove(x)
 			closed_set.add(x)
 			for y in self.neighbours(x, closed_set):
-				tentative_g_core = x.g + self.navmesh.get_edge(x.coords, y.coords).cost
+				tentative_g_core = x.g + self.get_edge_cost(x, y)
 				if y not in open_set or tentative_g_core < y.g:
 					y.set_score(tentative_g_core, self.heuristic_cost_estimate(y, goal_node))
 					y.parent = x
@@ -111,5 +138,7 @@ class AStar(object):
 						heapq.heappush(open_heap, y)
 						open_set.add(y)
 					if y.g > max_cost:
-						return Path(broken=True)
-		return Path(broken=True)	  
+						log.err("pathfinding too wide")
+						return None
+		log.err("pathfinding no path")
+		return None
