@@ -1,5 +1,6 @@
 ﻿
 
+from aabb import AABB
 
 
 class Entity(object):
@@ -63,6 +64,10 @@ class EntityPlayer(EntityLiving):
 		super(EntityPlayer, self).__init__(**kwargs)
 		self.username = kwargs["username"]
 		self.held_item = kwargs["held_item"]
+
+	@property
+	def aabb(self):
+		return AABB.from_player_coords(self.position)
 
 
 class EntityVehicle(Entity):

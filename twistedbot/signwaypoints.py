@@ -44,7 +44,7 @@ class SignWayPoints(object):
 			self.ordered_sign_groups[group].add(crd, value)
 		if name:
 			self.sign_points[name] = crd
-		if crd not in self.crd_to_sign:
+		if False and crd not in self.crd_to_sign:
 			msg = "Adding sign: coordinates %s %s '%s' " % (crd, "value" if value is not None else "name", value_name)
 			if group:
 				msg += "group '%s' " % group

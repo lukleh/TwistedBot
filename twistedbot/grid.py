@@ -247,42 +247,46 @@ class Grid(object):
 		dvect = bb1.vector_to(bb2)
 		for blk in blcks:
 			bb = AABB.from_block_cube(blk.coords)
-			col, rel_d = bb1.sweep_collision(bb, dvect)
+			col, _ = bb1.sweep_collision(bb, dvect)
 			if col:
 				out.append(blk)
 		return out
 
-	def min_collision_between(self, bb1, bb2, horizontal=False):
+	def min_collision_between(self, bb1, bb2, horizontal=False, max_height=False):
 		ubb = bb1.extend_to(dy=-1).union(bb2.extend_to(dy=-1))
 		blcks = self.blocks_in_aabb(ubb) 
 		dvect = bb1.vector_to(bb2)
 		if horizontal:
 			dvect = (dvect[0], 0, dvect[2])
 		col_rel_d = 1.1
+		col_bb = None
 		for blk in blcks:
-			col, rel_d = blk.sweep_collision(bb1, dvect)
+			col, rel_d, bb = blk.sweep_collision(bb1, dvect, max_height=max_height)
+			if col and fops.eq(col_rel_d, rel_d):
+				if max_height:
+					if fops.lt(col_bb.max_y, bb.max_y):
+						col_bb = bb
 			if col and fops.lt(rel_d, col_rel_d):
 				col_rel_d = rel_d
-		if col_rel_d < 1.1:
-			return col_rel_d * tools.vector_size(dvect)
+				col_bb = bb
+		if col_bb is not None:
+			return col_rel_d * tools.vector_size(dvect), col_bb
 		else:
-			return None
+			return None, None
 
 	def collision_between(self, bb1, bb2, debug=False):
 		ubb = bb1.extend_to(dy=-1).union(bb2.extend_to(dy=-1))
 		blcks = self.blocks_in_aabb(ubb)
 		dvect = bb1.vector_to(bb2)
 		for blk in blcks:
-			col, _ = blk.sweep_collision(bb1, dvect, debug=debug)
+			col, _, _= blk.sweep_collision(bb1, dvect, debug=debug)
 			if col:
-				if debug:
-					print "collision_between", bb1, blk.grid_bounding_box
 				return True
 		return False
 
 	def aabbs_in(self, bb1):
 		out = []
-		blcks = self.blocks_in_aabb(bb1)
+		blcks = self.blocks_in_aabb(bb1.extend_to(0, -1, 0))
 		for blk in blcks:
 			blk.add_grid_bounding_boxes_to(out)
 		return out
@@ -292,7 +296,7 @@ class Grid(object):
 		blocks = self.blocks_in_aabb(bb.extend_to(dy=-1))
 		dvect = (0, -1, 0)
 		for blk in blocks:
-			col, rel_d = blk.sweep_collision(bb, dvect)
+			col, rel_d, _ = blk.sweep_collision(bb, dvect)
 			if col and fops.eq(rel_d, 0):
 				standing_on = blk
 				if standing_on.x == bb.grid_x and standing_on.z ==  bb.grid_z:

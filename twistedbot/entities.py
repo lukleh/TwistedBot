@@ -48,9 +48,12 @@ class Entities(object):
 				gsl = GridSpace(self.world.grid, (lpos[0], lpos[1] - 1, lpos[2]))
 				if gsl.can_stand_on:
 					lpos = gsl.coords
-			msg += "\ncost from %s to %s %s\n" % (lpos, block.coords, self.world.navmesh.graph.get_edge(lpos, block.coords))
-			msg += "last stand %s now stand %s from %s to %s\n" % (gsl.can_stand_on, gs.can_stand_on, gsl.bb_stand, gs.bb_stand)
-			msg += "can go %s %s" % GridSpace.can_go_aabb(self.world.grid, gsl.bb_stand, gs.bb_stand, debug=True)
+			if not(gsl.bb_stand is None or gs.bb_stand is None):
+				msg += "\ncost from %s to %s %s\n" % (lpos, block.coords, self.world.navmesh.graph.get_edge(lpos, block.coords))
+				msg += "last stand %s now stand %s from %s to %s\n" % (gsl.can_stand_on, gs.can_stand_on, gsl.bb_stand, gs.bb_stand)
+				msg += "can go %s %s\n" % GridSpace.can_go_aabb(self.world.grid, gsl.bb_stand, gs.bb_stand, debug=True)
+				msg += "can stand between %s intersection %s"% (gsl.can_stand_between(gs, debug=True), gsl.intersection)
+				#if not entity.aabb.inside_plane_to(self.target_space.bb_stand, self.intersection.bottom_center):
 		log.msg(msg)
 		self.world.bot.commander.last_possition = gpos
 

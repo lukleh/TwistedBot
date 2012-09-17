@@ -28,7 +28,6 @@ class ChunkBorders(object):
 		chunk_from = from_crd[0] >> 4, from_crd[2] >> 4
 		chunk_to   = to_crd[0] >> 4, to_crd[2] >> 4
 		ch_diff = self.chunk_diff(chunk_from, chunk_to)
-		#self.borders.setdefault(chunk_from, {}).setdefault(ch_diff, set()).add(to_crd)
 		self.borders[chunk_from][ch_diff].add(to_crd)
 
 	def remove(self, crd):
@@ -239,7 +238,6 @@ class NavigationMesh(object):
 			for aff in affected:
 				self.compute(aff)
 			self.check_edges_of(affected)
-			self.sign_waypoints.remove((crd[0], crd[1]+1, crd[2]))
 			self.chunk_borders.remove(crd)
 		try:
 			del self.incomplete_nodes[crd]
@@ -256,24 +254,10 @@ class NavigationMesh(object):
 			self.compute(crd)
 			
 	def block_change(self, old_block, new_block):
-		log.msg("block change %s %s %s => %s %s" % \
-			(new_block.coords, old_block.name if old_block is not None else "none", tools.meta2str(old_block.meta) if old_block is not None else "none", \
-				new_block.name, tools.meta2str(new_block.meta)))
+		# log.msg("block change %s %s %s => %s %s" % \
+		# 	(new_block.coords, old_block.name if old_block is not None else "none", tools.meta2str(old_block.meta) if old_block is not None else "none", \
+		# 		new_block.name, tools.meta2str(new_block.meta)))
 		coords = new_block.coords
-		if isinstance(new_block, blocks.BlockDoor):
-			log.msg("DOORS %s " % new_block.grid_bounding_boxes[0])
-			log.msg("door %s half" % ("top" if new_block.is_top_half else "bottom",))
-			if new_block.is_open:
-				log.msg( "door open")
-			else:
-				log.msg( "door closed")
-			if new_block.hinge_right:
-				log.msg( "door hinge right")
-			else:
-				log.msg( "door hinge left")
-			log.msg( "door facing index %s" % new_block.facing_index)
-			bins = tools.meta2str(new_block.meta)
-			log.msg("door meta %s" % bins)
 		gs = GridSpace(self.grid, coords)
 		if gs.can_stand_on:
 			self.insert_node(gs.coords, gspace=gs)

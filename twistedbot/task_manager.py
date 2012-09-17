@@ -38,7 +38,7 @@ class TaskManager(object):
 		log.msg("Added command task %s" % self.current_task)
 
 	def remove_top_task(self):
-		if len(self.taskq) == 1:
+		if len(self.taskq) == 2:
 			return
 		t = self.taskq.pop()
 		log.msg("Removed task %s, %d left" % (t, len(self.taskq)))
@@ -49,8 +49,8 @@ class TaskManager(object):
 			if self.taskq[-1].is_command:
 				log.msg("Task %s is user command, not removing" % self.taskq[-1])
 				break
-			elif len(self.taskq) == 1:
-				log.msg("Only basic task left in the queue, not removing")
+			elif len(self.taskq) == 2:
+				log.msg("Only basic task '%s' left in the queue, not removing" % self.taskq[-1])
 				break
 			else:
 				self.remove_top_task()

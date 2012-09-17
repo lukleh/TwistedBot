@@ -52,6 +52,10 @@ class AABB(object):
 	def bottom_center(self):
 		return (self.posx, self.posy, self.posz)
 
+	@property
+	def center(self):
+		return self.bottom_center
+
 	def face(self, dx=0, dy=0, dz=0):
 		if dx < 0:
 			return AABB(self.min_x, self.min_y, self.min_z, self.min_x, self.max_y, self.max_z)
@@ -157,7 +161,7 @@ class AABB(object):
 
 	@property
 	def posx(self):
-		return self.min_x + config.PLAYER_BODY_EXTEND
+		return (self.min_x + self.max_x) / 2.0
 
 	@property
 	def posy(self):
@@ -165,7 +169,7 @@ class AABB(object):
 
 	@property
 	def posz(self):
-		return self.min_z + config.PLAYER_BODY_EXTEND
+		return (self.min_z + self.max_z) / 2.0
 
 	@property
 	def grid_x(self):
@@ -187,7 +191,7 @@ class AABB(object):
 
 	def horizontal_distance_to(self, bb):
 		x, _, z = self.vector_to(bb)
-		return math.sqrt(x*x + z*z)
+		return math.hypot(x, z)
 
 	def vertical_distance_to(self, bb):
 		_, y, _ = self.vector_to(bb)
@@ -195,7 +199,7 @@ class AABB(object):
 
 	def horizontal_direction_to(self, bb):
 		x, _, z = self.vector_to(bb)
-		size = math.sqrt(x*x + z*z)
+		size = math.hypot(x, z)
 		if fops.eq(size, 0):
 			return (0, 0)
 		return (x/size, z/size)
@@ -238,8 +242,6 @@ class AABB(object):
 				col = False
 			else:
 				col = fops.lte(u0, u1)
-		if debug and col:
-			print "AABB.sweep_collision", col, u0
 		return col, u0
 
 	def calculate_axis_offset(self, collidee, d, axis):
@@ -256,3 +258,121 @@ class AABB(object):
 			if fops.lt(dout, d):
 				d = dout
 		return d
+
+	def intersection_on_axes(self, bb, x=False, y=False, z=False, debug=False):
+		if not (x or y or z):
+			raise Exception("axes not set in collides_on_axes")
+		truth = 0
+		if x: truth += 1
+		if y: truth += 1
+		if z: truth += 1
+		if truth != 2:
+			raise Exception("set exactly two axes to True in collides_on_axes")
+		inter = []
+		if x:
+			if fops.lte(self.max_x, bb.min_x) or fops.gte(self.min_x, bb.max_x):
+				return None
+			else:
+				min_x = self.min_x if self.min_x > bb.min_x else bb.min_x
+				max_x = self.max_x if self.max_x < bb.max_x else bb.max_x
+		else:
+			min_x = self.min_x
+			max_x = self.max_x
+		if y:
+			if fops.lte(self.max_y, bb.min_y) or fops.gte(self.min_y, bb.max_y):
+				return None
+			else:
+				min_y = self.min_y if self.min_y > bb.min_y else bb.min_y
+				max_y = self.max_y if self.max_y < bb.max_y else bb.max_y
+		else:
+			min_y = self.min_y
+			max_y = self.max_y
+		if z:
+			if fops.lte(self.max_z, bb.min_z) or fops.gte(self.min_z, bb.max_z):
+				return None
+			else:
+				min_z = self.min_z if self.min_z > bb.min_z else bb.min_z
+				max_z = self.max_z if self.max_z < bb.max_z else bb.max_z
+		else:
+			min_z = self.min_z
+			max_z = self.max_z
+		return AABB(min_x, min_y, min_z, max_x, max_y, max_z)
+
+	def get_side(self, which=None, x=False, y=False, z=False):
+		if which is None:
+			raise Exception('aabb get_side type not choosen')
+		mx = self.max_x - self.min_x
+		my = self.max_y - self.min_y
+		mz = self.max_z - self.min_z
+		if not x:
+			if which == 'max':
+				return my if my > mz else mz
+			else:
+				return my if my < mz else mz
+		elif not y:
+			if which == 'max':
+				return mx if mx > mz else mz
+			else:
+				return mx if mx < mz else mz
+		elif not z:
+			if which == 'max':
+				return mx if mx > my else my
+			else:
+				return mx if mx < my else my
+
+	def inside_plane_to(self, bb, aabb_center, debug=False):
+		center = (aabb_center[0], aabb_center[2])
+		lines = []
+		lines.append(Line(bb.min_x, bb.min_z, self.min_x, self.min_z, 'min min', debug=debug))
+		lines.append(Line(bb.max_x, bb.min_z, self.max_x, self.min_z, 'max min', debug=debug))
+		lines.append(Line(bb.max_x, bb.max_z, self.max_x, self.max_z, 'max max', debug=debug))
+		lines.append(Line(bb.min_x, bb.max_z, self.min_x, self.max_z, 'min max', debug=debug))
+		this_center = (self.posx, self.posz)
+		ds = [(line.distance_to(this_center), line) for line in lines]
+		lsorted = sorted(ds, key=lambda el: el[0])
+		line1 = lsorted[-1][1]
+		line2 = lsorted[-2][1]
+		#line1.set_direction_towards(this_center, debug=debug)
+		#line2.set_direction_towards(this_center, debug=debug)
+		width = line1.distance_parallel(line2)  # / 3.0 * 2
+		is_inside = fops.lte(line1.distance_to(center), width) and fops.lte(line2.distance_to(center), width)
+		return is_inside
+
+	def on_trajectory_to(self, bb, center, debug=False):
+		line = Line(bb.posx, bb.posz, self.posx, self.posz)
+		return line.has_point(center)
+
+
+class Line(object):
+	def __init__(self, a1, b1, a2, b2, name=None, debug=False):
+		self.name = name
+		self.a1 = a1
+		self.b1 = b1
+		self.a2 = a2
+		self.b2 = b2
+		self.a = a1 - a2
+		self.b = b1 - b2
+		self.length = math.hypot(self.a, self.b)
+
+	def __str__(self):
+		return "%s a %s b %s L %s" % (self.a, self.b, self.name, self.length)
+
+	def __repr__(self):
+		return self.__str__()
+
+	def has_point(self, p):
+		return fops.eq(abs(self.a), abs(self.a1 - p[0])) and fops.eq(abs(self.b), abs(self.b1 - p[1]))
+
+	def set_direction_towards(self, point, debug=False):
+		if fops.lt(self.distance_to(point), 0):
+			self.a *= -1
+			self.b *= -1
+
+	def distance_to(self, point):
+		return abs(self.a * (self.b1 - point[1]) - (self.a1 - point[0]) * self.b) / self.length
+
+	def distance_parallel(self, line):
+		return abs(self.a * (self.b1 - line.b1) - (self.a1 -line.a1) * self.b) / self.length
+
+
+

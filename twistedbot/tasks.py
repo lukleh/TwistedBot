@@ -68,7 +68,6 @@ class SwimToAirTask(TaskBase):
 class InitTask(TaskBase):
 	def __init__(self, *args, **kwargs):
 		super(InitTask, self).__init__(*args, **kwargs)
-		self.callback_finished = self.bot.on_standing_ready
 
 	def do(self):
 		self.bot.move()
@@ -116,6 +115,10 @@ class CirculateSignsTask(TaskBase):
 		self.child_status = None
 
 	def _do(self):
+		if not self.bot.world.navmesh.sign_waypoints.has_name_group(self.group):
+			self.bot.chat_message("no group named %s" % self.group)
+			self.status = Status.finished
+			return
 		self.next_waypoint = self.bot.world.navmesh.sign_waypoints.get_groupnext_circulate(self.group)
 		if self.next_waypoint is not None:
 			self.manager.add_task(TravelToTask, coords=self.next_waypoint, check_sign=True)
@@ -141,6 +144,10 @@ class RotateSignsTask(TaskBase):
 		self.child_status = None
 
 	def _do(self):
+		if not self.bot.world.navmesh.sign_waypoints.has_name_group(self.group):
+			self.bot.chat_message("no group named %s" % self.group)
+			self.status = Status.finished
+			return
 		self.next_waypoint = self.bot.world.navmesh.sign_waypoints.get_groupnext(self.group)
 		if self.next_waypoint is not None:
 			self.manager.add_task(TravelToTask, coords=self.next_waypoint, check_sign=True)
@@ -181,17 +188,19 @@ class TravelToTask(TaskBase):
 		self.astar = pathfinding.AStar(self.bot.world.navmesh)
 		self.calculate_path()
 		self.current_step = None
+		self.last_step = None
 
 	def calculate_path(self):
 		if self.bot.standing_on_block is not None:
 			self.path = self.astar.find_path(self.bot.standing_on_block.coords, self.coords)
 			self.path_ok = self.bot.world.navmesh.check_path(self.path)
-			#print "path", self.path
 		else:
 			self.path_ok = False
 
 	def do(self):
 		self.bot.move()
+		if self.bot.standing_on_block is None:
+			return
 		if self.path_ok == False:
 			self.calculate_path()
 			return
@@ -208,8 +217,10 @@ class TravelToTask(TaskBase):
 		self.child_status = None
 
 	def _do(self):
-		if self.current_step is not None and self.check_sign:
-			self.manager.grid.check_sign((self.current_step[0], self.current_step[1] - 1, self.current_step[2]))
+		if self.current_step is not None:
+			self.last_step = self.current_step
+			if self.check_sign:
+				self.manager.grid.check_sign((self.current_step[0], self.current_step[1] - 1, self.current_step[2]))
 		if self.path.has_next():
 			self.current_step = self.path.next_step()
 			gs = GridSpace(self.manager.grid, coords=self.current_step)
@@ -230,24 +241,27 @@ class MoveToTask(TaskBase):
 		self.turn = True
 		self.started = False
 		self.was_at_target = False
+		self.goal = self.target_space.bb_stand
 
 	def do(self):
 		if (not self.grid.navmesh.graph.has_node(self.target_space.coords)) or (not self.target_space.can_stand_on):
 			self.bot.move()
 			self.status = Status.broken
 			return
-		elif not self.started and not self.bot.on_ground:
+		elif not self.started and self.bot.standing_on_block is None:
 			self.bot.move()
 		else:
-			self.started = True
+			if not self.started:
+				self.started = True
 			self._do()
+			if self.status == Status.not_finished and fops.eq(self.bot.velocities[0], 0) and fops.eq(self.bot.velocities[2], 0):
+				if not GridSpace.can_go_aabb(self.grid, self.bot.aabb, self.target_space.bb_stand)[0]:
+					log.msg("I am stuck, let's try again? vels %s" % str(self.bot.velocities))
+					self.status = Status.broken
+					self.bot.move()
+					return
 
 	def _do(self):
-		if not GridSpace.can_go_aabb(self.grid, self.bot.aabb, self.target_space.bb_stand, debug=True)[0]:
-			print "cannot go", self.target_space.bb_stand
-			self.status = Status.broken
-			self.bot.move()
-			return
 		if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) > 2: #too far from the next step, better try again
 			self.status = Status.broken
 			self.bot.move()
@@ -268,35 +282,47 @@ class MoveToTask(TaskBase):
 				self.move()
 				self.status = Status.finished
 				return
-			col_distance = self.grid.min_collision_between(self.bot.aabb, self.target_space.bb_stand, horizontal=True)
+			col_distance, col_bb = self.grid.min_collision_between(self.bot.aabb, self.goal, horizontal=True, max_height=True)
 			if col_distance is None:
 				self.move()
 			else:
-				elev = self.target_space.bb_stand.min_y - self.bot.aabb.min_y
-				if fops.gt(elev, 0) and fops.lte(elev, config.MAX_STEP_HEIGHT):
+				elev = self.goal.min_y - self.bot.aabb.min_y
+				if fops.lte(elev, 0):
+					self.move()
+				elif fops.gt(elev, 0) and fops.lte(elev, config.MAX_STEP_HEIGHT):
 					if fops.lte(col_distance, self.current_motion):
-						self.jumpstep(elev+0.01)
+						self.jumpstep(config.MAX_STEP_HEIGHT)
 						self.move()
 					else:
 						self.move()
-				elif fops.gt(elev, config.MAX_STEP_HEIGHT):
-					elev += 0.01
-					ticks_to_col = col_distance / self.current_motion
-					ticks_to_jump = math.sqrt(2 * elev / config.G) * 20
-					if ticks_to_col < ticks_to_jump:
-						self.jump(elev)
+				elif fops.gt(elev, config.MAX_STEP_HEIGHT) and fops.lt(elev, config.MAX_JUMP_HEIGHT):
+					first_elev = col_bb.max_y - self.bot.aabb.min_y
+					if fops.lt(first_elev, elev):
+						if fops.lte(col_distance, self.current_motion):
+							self.jumpstep(config.MAX_STEP_HEIGHT)
 						self.move()
 					else:
+						elev += 0.01
+						ticks_to_col = col_distance / self.current_motion
+						ticks_to_jump = math.sqrt(2 * elev / config.G) * 20
+						if ticks_to_col < ticks_to_jump:
+							self.jump(elev)
 						self.move()
+				elif fops.gt(elev, config.MAX_JUMP_HEIGHT):
+					self.status = Status.broken
+					self.bot.move()
+					return
 				else:
-					raise Exception("movetotask, elevation %s and collision %s. should not happen" % (elev, col_distance))
+					raise Exception("move elevation error %s with collision %s" % (elev, col_distance))
 		else:
 			self.move()
 
-	def move(self):
-		direction = self.bot.aabb.horizontal_direction_to(self.target_space.bb_stand)
+	def move(self, towards=None):
+		if towards is None:
+			towards = self.goal
+		direction = self.bot.aabb.horizontal_direction_to(towards)
 		if self.turn:
-			self.bot.turn_to(self.target_space.bb_stand.bottom_center)
+			self.bot.turn_to(self.goal.bottom_center)
 		self.bot.move_direction(direction)
 
 	def jump(self, h):
@@ -305,11 +331,11 @@ class MoveToTask(TaskBase):
 		self.bot.set_jump()
 
 	def jumpstep(self, h):
-		#log.msg("STEP")
+		#log.msg("JUMPSTEP")
 		self.bot.set_jumpstep(h)
 
 	@property
 	def current_motion(self):
 		vx = self.bot.velocities[0]
 		vz = self.bot.velocities[2]
-		return math.sqrt(vx*vx + vz*vz) + self.bot.current_speed_factor
+		return math.hypot(vx, vz) + self.bot.current_speed_factor

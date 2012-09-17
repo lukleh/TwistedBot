@@ -23,6 +23,9 @@ class PathNode(object):
 	def __str__(self):
 		return "%s:%s:g%s:h%s:f%s" % (str(self.coords), self.cost, self.g, self.h, self.f)
 
+	def __repr__(self):
+		return self.__str__()
+
 	def __lt__(self, other):
 		return self.f < other.f
 	
@@ -104,16 +107,7 @@ class AStar(object):
 	def heuristic_cost_estimate(self, start, goal):
 		h_diagonal = min(abs(start[0]-goal[0]), abs(start[2]-goal[2]))
 		h_straight = (abs(start[0]-goal[0]) + abs(start[2]-goal[2]))
-		vert = self.get_node(start) - self.get_node(goal)
-		if fops.lte(abs(vert), config.MAX_STEP_HEIGHT):
-			vert = 0
-		if fops.lt(vert, 0):
-			vert_cost = int(-vert) * config.COST_CLIMB
-		elif fops.gt(vert, 0):
-			vert_cost = int(vert) * config.COST_FALL
-		else:
-			vert_cost = 0
-		h = config.COST_DIAGONAL*h_diagonal + config.COST_DIRECT*(h_straight - 2*h_diagonal) + vert_cost
+		h = config.COST_DIAGONAL*h_diagonal + config.COST_DIRECT*(h_straight - 2*h_diagonal)
 		return h
 	
 	def find_path(self, start, goal, max_cost=config.ASTAR_LIMIT):

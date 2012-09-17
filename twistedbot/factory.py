@@ -275,7 +275,8 @@ class MineCraftProtocol(Protocol):
 		devnull(c)
 
 	def p_state(self, c):
-		log.msg("New state %s" % c.state)
+		#log.msg("New state %s" % c.state)
+		pass
 
 	def p_thunderbolt(self, c):
 		devnull()

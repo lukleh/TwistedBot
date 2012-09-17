@@ -6,6 +6,7 @@ import config
 import logbot
 import tools
 import materials
+import fops
 from aabb import AABB
 
 
@@ -64,14 +65,21 @@ class Block(object):
 	def add_grid_bounding_boxes_to(self, out):
 		out.append(self.grid_bounding_box)
 
-	def sweep_collision(self, bb, vect, debug=False):
-		return bb.sweep_collision(self.grid_bounding_box, vect, debug=debug)
+	def sweep_collision(self, bb, vect, debug=False, max_height=False):
+		col, d = bb.sweep_collision(self.grid_bounding_box, vect, debug=debug)
+		return col, d, self.grid_bounding_box
 
 	def maxedge_platform(self, x = 0, y = 0, z = 0):
 		return self.grid_bounding_box.face(x, y, z)
 
 	def collides_with(self, bb):
 		return bb.collides(self.grid_bounding_box)
+
+	def collides_on_axes(self, bb, x=False, y=False, z=False):
+		return bb.collides_on_axes(self.grid_bounding_box, x, y, z)
+
+	def intersection_on_axes(self, bb, x=False, y=False, z=False, debug=False):
+		return bb.intersection_on_axes(self.grid_bounding_box, x, y, z, debug=debug)
 
 
 class BlockNonSolid(Block):
@@ -89,14 +97,20 @@ class BlockNonSolid(Block):
 	def add_grid_bounding_boxes_to(self, out):
 		pass
 
-	def sweep_collision(self, bb, vect, debug=False):
-		return False, None
+	def sweep_collision(self, bb, vect, debug=False, max_height=False):
+		return False, None, None
 
 	def maxedge_platform(self, x = 0, y = 0, z = 0):
 		raise Exception("maxedge_platform cannot be called for non solid block")
 
 	def collides_with(self, bb):
 		return False
+
+	def collides_on_axes(self, bb, x=False, y=False, z=False):
+		return False
+
+	def intersection_on_axes(self, bb, x=False, y=False, z=False, debug=False):
+		return None
 
 
 class BlockFluid(BlockNonSolid):
@@ -134,28 +148,26 @@ class BlockMultiBox(Block):
 	def add_grid_bounding_boxes_to(self, out):
 		out.extend(self.grid_bounding_box)
 
-	def sweep_collision(self, bb, vect, debug=False):
+	def sweep_collision(self, bb, vect, debug=False, max_height=False):
 		boxes = self.grid_bounding_box
-		col1, rel_d1 = bb.sweep_collision(boxes[0], vect, debug=debug)
 		if len(boxes) == 0:
 			raise Exception("0 bounding boxes from block %s, cannot handle that" % self)
 		elif len(boxes) == 1:
-			col2 = False
-			rel_d2 = None
-		elif len(boxes) == 2:
-			col2, rel_d2 = bb.sweep_collision(boxes[1], vect, debug=debug)
+			col, rel_d = bb.sweep_collision(boxes[0], vect, debug=debug)
+			return col, rel_d, boxes[0]
 		else:
-			raise Exception("More than 2 bounding boxes from block %s, cannot handle that" % self)
-		col = False
-		rel_d = None
-		if col1:
-			rel_d = rel_d1
-		if col2:
-			if rel_d is None:
-				rel_d = rel_d2
-			elif rel_d < rel_d2:
-				rel_d =  rel_d2
-		return col1 or col2, rel_d
+			col_rel_d = 1.1
+			col_bb = None
+			for box in boxes:
+				col, rel_d = bb.sweep_collision(box, vect, debug=debug)
+				if col and fops.eq(col_rel_d, rel_d):
+					if max_height:
+						if fops.lt(col_bb.max_y, bb.max_y):
+							col_bb = bb
+				if col and fops.lt(rel_d, col_rel_d):
+					col_rel_d = rel_d
+					col_bb = bb
+			return col_bb is not None, col_rel_d, col_bb
 
 	def maxedge_platform(self, x = 0, y = 0, z = 0):
 		faces = []
@@ -170,16 +182,38 @@ class BlockMultiBox(Block):
 			elif z:
 				maxes.append(face.min_z)
 		if min([x, y, z]) < 0:
-			index = maxes.index(min(maxes))
+			level = min(maxes)
 		elif max([x, y, z]) > 0:
-			index = maxes.index(max(maxes))
-		return faces[index]
+			level = max(maxes)
+		max_faces = [faces[i] for i, v in enumerate(maxes) if v == level]
+		if len(max_faces) == 1:
+			return max_faces[0]
+		else:
+			max_face = None
+			for i in xrange(0, len(max_faces) - 1):
+				if max_face is None:
+					max_face = max_faces[i].union(max_faces[i+1])
+				else:
+					max_face = max_face.union(max_faces[i+1])
+			return max_face
 
 	def collides_with(self, bb):
 		for box in self.grid_bounding_box:
 			if bb.collides(box):
 				return True
 		return False
+
+	def collides_on_axes(self, bb, x=False, y=False, z=False):
+		for box in self.grid_bounding_box:
+			if bb.collides_on_axes(box, x, y, z):
+				return True
+		return False
+
+	def intersection_on_axes(self, bb, x=False, y=False, z=False, debug=False):
+		ubb = self.grid_bounding_box[0]
+		for box in self.grid_bounding_box[1:]:
+			ubb = ubb.union(box)
+		return bb.intersection_on_axes(ubb, x, y, z, debug=debug)
 
 	
 class BlockStairs(BlockMultiBox):
@@ -1066,16 +1100,27 @@ class FenceGate(Block):
 		if not self.is_open:
 			out.append(self.grid_bounding_box)
 
-	def sweep_collision(self, bb, vect, debug=False):
+	def sweep_collision(self, bb, vect, debug=False, max_height=False):
 		if not self.is_open:
-			return bb.sweep_collision(self.grid_bounding_box, vect, debug=debug)
+			col, d = bb.sweep_collision(self.grid_bounding_box, vect, debug=debug)
+			return col, d, self.grid_bounding_box
 		else:
-			return False, None
+			return False, None, self.grid_bounding_box
 
 	def collides_with(self, bb):
 		if not self.collidable:
 			return False
-		return bb.collides(self.grid_bounding_box)
+		return super(FenceGate, self).collides_with(bb)
+
+	def collides_on_axes(self, bb, x=False, y=False, z=False):
+		if not self.collidable:
+			return False
+		return super(FenceGate, self).collides_on_axes(bb, x, y, z)
+
+	def intersection_on_axes(self, bb, x=False, y=False, z=False, debug=False):
+		if not self.collidable:
+			return None
+		return bb.intersection_on_axes(self.grid_bounding_box, x, y, z, debug=debug)
 	
 	
 class BrickStairs(BlockStairs):
@@ -1310,7 +1355,7 @@ class JungleWoodStairs(BlockStairs):
 
 
 
-block_map = [None for _ in xrange(136 + 1)] #update the number if more blocks added. if you forget, exception will remind you
+block_map = [None for _ in xrange(256)]
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for _, cl in clsmembers:
 	if issubclass(cl, Block) and hasattr(cl, 'number'):
