@@ -117,6 +117,14 @@ class AABB(object):
 					self.max_y + dy,
 					self.max_z + dz)
 
+	def shift(self, min_x=None, min_y=None, min_z=None):
+		return AABB(min_x if min_x is not None else self.min_x,
+					min_y if min_y is not None else self.min_y,
+					min_z if min_z is not None else self.min_z,
+					self.max_x - self.min_x + min_x if min_x is not None else self.max_x,
+					self.max_y - self.min_y + min_y if min_y is not None else self.max_y,
+					self.max_z - self.min_z + min_z if min_z is not None else self.max_z)
+
 	def extend_to(self, dx=0, dy=0, dz=0):
 		return AABB(self.min_x if dx==0 or dx > 0 else self.min_x + dx,
 					self.min_y if dy==0 or dy > 0 else self.min_y + dy,
@@ -142,9 +150,12 @@ class AABB(object):
 					self.max_z if self.max_z > bb.max_z else bb.max_z,)
 
 	@property	
+	def snap_to_grid(self):
+		return AABB(*self.grid_box)
+
+	@property	
 	def grid_box(self):
-		return [
-				int(math.floor(self.min_x)),
+		return [int(math.floor(self.min_x)),
 				int(math.floor(self.min_y)),
 				int(math.floor(self.min_z)),
 				int(math.floor(self.max_x)),

@@ -13,14 +13,18 @@ log = logbot.getlogger("GRIDSPACE")
 
 class GridSpace(object):
 
-	def __init__(self, grid, coords=None, block=None):
+	def __init__(self, grid, coords=None, block=None, bb=None):
 		self.grid = grid
 		if block is not None:
 			self.block = block
-			self.coords = block.coords
+			self.coords = self.block.coords
 		elif coords is not None:
 			self.coords = coords
 			self.block = self.grid.get_block(coords[0], coords[1], coords[2])
+		elif bb is not None:
+			self.bb_stand = bb
+			self.block = self.grid.standing_on_solidblock(bb)
+			self.coords = self.block.coords
 		else:
 			raise Exception("Empty gridspace object")
 		self.blocks3 = (self.block, 
@@ -44,7 +48,7 @@ class GridSpace(object):
 		return "%s %s" % (self.block.coords, ", ".join([b.name for b in self.blocks3]))
 
 	@classmethod
-	def blocks_to_avoid(self, blks):
+	def blocks_to_avoid(cls, blks):
 		for b in blks:
 			if isinstance(b, blocks.Cobweb) or isinstance(b, blocks.Fire) or isinstance(b, blocks.Cactus) or isinstance(b, blocks.BlockFluid):
 				return True
@@ -57,6 +61,18 @@ class GridSpace(object):
 		can stand on top of the center of the block
 		"""
 		under = self.grid.get_block(self.coords[0], self.coords[1] - 1, self.coords[2])
+		if self.block.has_vertical_movement:
+			bb = AABB.from_block_coords(self.block.coords)
+			if (under.is_fence and under.collidable):
+				self.bb_stand = bb.shift(min_y=under.grid_bounding_box.max_y)
+			else:
+				self.bb_stand = bb
+			if self.blocks_to_avoid(self.grid.blocks_in_aabb(self.bb_stand)):
+				return False
+			if self.grid.aabb_collides(self.bb_stan):
+				return False
+			self.stand_block = self.block
+			return True
 		if not self.block.collidable and not (under.is_fence and under.collidable):
 			return False
 		if self.blocks_to_avoid([self.block]):
@@ -90,11 +106,29 @@ class GridSpace(object):
 	def can_go(self, gs):
 		if not self.can_stand_between(gs):
 			return False
-		can, cost = GridSpace.can_go_aabb(self.grid, self.bb_stand, gs.bb_stand)
-		self.edge_cost = cost
+		bb_from = self.bb_stand
+		bb_to	= gs.bb_stand
+		start_in_ladder = False
+		if self.block.has_vertical_movement or gs.block.has_vertical_movement:
+			if self.block.has_vertical_movement and not gs.block.has_vertical_movement:
+				start_in_ladder = True
+				if fops.gte(bb_to.min_y, self.block.y) and fops.lte(bb_to.min_y, self.block.y + 1):
+					bb_from = bb_from.shift(min_y=bb_to.min_y)
+					if self.grid.aabb_collides(bb_from):
+						return False
+			elif not self.block.has_vertical_movement and gs.block.has_vertical_movement:
+				if fops.gte(bb_from.min_y, gs.block.y) and fops.lte(bb_from.min_y, gs.block.y + 1):
+					bb_to = bb_to.shift(min_y=bb_from.min_y)
+					if self.grid.aabb_collides(bb_to):
+						return False
+			else:
+				start_in_ladder = True
+		can = self.can_go_between(bb_from, bb_to, start_in_ladder=start_in_ladder)
 		return can
 
 	def can_stand_between(self, gs, debug=False):
+		if self.block.has_vertical_movement or gs.block.has_vertical_movement:
+			return True
 		if fops.gt(abs(self.platform.min_y - gs.platform.min_y), config.MAX_STEP_HEIGHT):
 			return True
 		stand_platform = self.platform.expand(config.PLAYER_BODY_DIAMETER - 0.09, 0, config.PLAYER_BODY_DIAMETER - 0.09)
@@ -109,8 +143,7 @@ class GridSpace(object):
 		else:
 			return True
 
-	@classmethod
-	def can_go_aabb(cls, grid, bb_stand, other_bb_stand, debug=False):
+	def can_go_between(self, bb_stand, other_bb_stand, start_in_ladder=False, debug=False):
 		edge_cost = None
 		if fops.gt(bb_stand.min_y, other_bb_stand.min_y):
 			elev = bb_stand.min_y - other_bb_stand.min_y
@@ -120,10 +153,10 @@ class GridSpace(object):
 		elif fops.lt(bb_stand.min_y, other_bb_stand.min_y):
 			elev = other_bb_stand.min_y - bb_stand.min_y
 			if fops.gt(elev, config.MAX_JUMP_HEIGHT):
-				return False, edge_cost
+				return False
 			if fops.lte(elev, config.MAX_STEP_HEIGHT):
 				elev = config.MAX_STEP_HEIGHT
-				aabbs = grid.aabbs_in(bb_stand.extend_to(0, elev, 0))
+				aabbs = self.grid.aabbs_in(bb_stand.extend_to(0, elev, 0))
 				for bb in aabbs:
 					elev = bb_stand.calculate_axis_offset(bb, elev, 1)
 			elev_bb = bb_stand.extend_to(dy=elev)
@@ -135,14 +168,14 @@ class GridSpace(object):
 			bb_from = bb_stand
 			bb_to = other_bb_stand
 		if elev_bb is not None:
-			if grid.aabb_collides(elev_bb):
-				return False, edge_cost
-			if cls.blocks_to_avoid(grid.blocks_in_aabb(elev_bb)):
-				return False, edge_cost
-		if grid.collision_between(bb_from, bb_to, debug=debug):
-			return False, edge_cost
-		if cls.blocks_to_avoid(grid.passing_blocks_between(bb_from, bb_to)):
-			return False, edge_cost
+			if self.grid.aabb_collides(elev_bb):
+				return False
+			if self.blocks_to_avoid(self.grid.blocks_in_aabb(elev_bb)):
+				return False
+		if self.grid.collision_between(bb_from, bb_to, debug=debug):
+			return False
+		if self.blocks_to_avoid(self.grid.passing_blocks_between(bb_from, bb_to)):
+			return False
 		if fops.lte(elev, config.MAX_STEP_HEIGHT) and fops.gte(elev, -config.MAX_STEP_HEIGHT):
 			edge_cost = config.COST_DIRECT * bb_from.horizontal_distance_to(bb_to)
 		else:
@@ -152,4 +185,5 @@ class GridSpace(object):
 				edge_cost += config.COST_FALL * vd
 			else:
 				edge_cost += config.COST_CLIMB * vd
-		return True, edge_cost
+		self.edge_cost = edge_cost
+		return True

@@ -227,6 +227,11 @@ class TravelToTask(TaskBase):
 			if not gs.can_stand_on:
 				self.status = Status.broken
 				return
+			if self.last_step is not None:
+				last_gs = GridSpace(self.manager.grid, coords=self.last_step)
+				if not last_gs.can_go(gs):
+					self.status = Status.broken
+					return
 			self.manager.add_task(MoveToTask, target_space=gs)
 		else:
 			self.status = Status.finished
@@ -255,18 +260,20 @@ class MoveToTask(TaskBase):
 				self.started = True
 			self._do()
 			if self.status == Status.not_finished and fops.eq(self.bot.velocities[0], 0) and fops.eq(self.bot.velocities[2], 0):
-				if not GridSpace.can_go_aabb(self.grid, self.bot.aabb, self.target_space.bb_stand)[0]:
-					log.msg("I am stuck, let's try again? vels %s" % str(self.bot.velocities))
-					self.status = Status.broken
-					self.bot.move()
-					return
+				if self.bot.on_ground:
+					gs = GridSpace(self.grid, bb=self.bot.aabb)
+					if not gs.can_go(self.target_space.bb_stand):
+						log.msg("I am stuck, let's try again? vels %s" % str(self.bot.velocities))
+						self.status = Status.broken
+						self.bot.move()
+						return
 
 	def _do(self):
 		if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) > 2: #too far from the next step, better try again
 			self.status = Status.broken
 			self.bot.move()
 			return
-		if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) < self.current_motion:
+		if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) < self.bot.current_motion:
 			self.turn = False
 			if not self.was_at_target:
 				pass
@@ -290,7 +297,7 @@ class MoveToTask(TaskBase):
 				if fops.lte(elev, 0):
 					self.move()
 				elif fops.gt(elev, 0) and fops.lte(elev, config.MAX_STEP_HEIGHT):
-					if fops.lte(col_distance, self.current_motion):
+					if fops.lte(col_distance, self.bot.current_motion):
 						self.jumpstep(config.MAX_STEP_HEIGHT)
 						self.move()
 					else:
@@ -298,12 +305,12 @@ class MoveToTask(TaskBase):
 				elif fops.gt(elev, config.MAX_STEP_HEIGHT) and fops.lt(elev, config.MAX_JUMP_HEIGHT):
 					first_elev = col_bb.max_y - self.bot.aabb.min_y
 					if fops.lt(first_elev, elev):
-						if fops.lte(col_distance, self.current_motion):
+						if fops.lte(col_distance, self.bot.current_motion):
 							self.jumpstep(config.MAX_STEP_HEIGHT)
 						self.move()
 					else:
 						elev += 0.01
-						ticks_to_col = col_distance / self.current_motion
+						ticks_to_col = col_distance / self.bot.current_motion
 						ticks_to_jump = math.sqrt(2 * elev / config.G) * 20
 						if ticks_to_col < ticks_to_jump:
 							self.jump(elev)
@@ -323,7 +330,7 @@ class MoveToTask(TaskBase):
 		direction = self.bot.aabb.horizontal_direction_to(towards)
 		if self.turn:
 			self.bot.turn_to(self.goal.bottom_center)
-		self.bot.move_direction(direction)
+		self.bot.move(direction=direction)
 
 	def jump(self, h):
 		#TODO calculate jump speed
@@ -333,9 +340,3 @@ class MoveToTask(TaskBase):
 	def jumpstep(self, h):
 		#log.msg("JUMPSTEP")
 		self.bot.set_jumpstep(h)
-
-	@property
-	def current_motion(self):
-		vx = self.bot.velocities[0]
-		vz = self.bot.velocities[2]
-		return math.hypot(vx, vz) + self.bot.current_speed_factor

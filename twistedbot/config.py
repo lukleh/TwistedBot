@@ -34,6 +34,7 @@ SPEED_JUMP   			= 0.42 # 0.04 in water and lava
 TIME_STEP				= 0.05
 
 COST_CLIMB				= 1.1
+COST_LADDER				= 0.21/0.15 # speed on ground / speed on ladder
 COST_FALL				= 1.1
 COST_DIRECT				= 1
 COST_DIAGONAL			= math.sqrt(2) * COST_DIRECT

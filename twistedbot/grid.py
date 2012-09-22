@@ -233,6 +233,13 @@ class Grid(object):
 				out.append(blk)
 		return out
 
+	def is_any_liquid(self, bb): # mcp has --val is val < 0
+		minius_one_x, minius_one_y, minius_one_z = (-1 if bb.min_x < 0 else 0, -1 if bb.min_y < 0 else 0, -1 if bb.min_z < 0 else 0)
+		for blk in self.blocks_in_aabb(bb.extend_to(minius_one_x, minius_one_y, minius_one_z)):
+			if blk.material.is_liquid:
+				return True
+		return False
+
 	def aabb_collides(self, bb):
 		ebb = bb.extend_to(dy=-1)
 		for block in self.blocks_in_aabb(ebb):

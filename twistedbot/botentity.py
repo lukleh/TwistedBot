@@ -12,6 +12,7 @@ import tools
 import packets
 import logbot
 import fops
+import blocks
 from statistics import Statistics
 from aabb import AABB
 from chat import Chat
@@ -76,6 +77,9 @@ class Bot(object):
 		self.do_later(self.iterate, config.TIME_STEP)
 		self.last_time = datetime.now()
 		self.status_diff = StatusDiff(self, self.world)
+		self.is_collided_horizontally = False
+		self.is_in_water = False
+		self.is_in_lava = False
 	
 	def connection_lost(self):
 		self.protocol = None
@@ -227,7 +231,6 @@ class Bot(object):
 			self.pitch = 0
 
 	def update_position(self, x, y, z, onground):
-		cur_aabb = self.aabb
 		self.x = x
 		self.y = y
 		self.z = z
@@ -260,6 +263,7 @@ class Bot(object):
 			dz = b_bb.calculate_axis_offset(bb, dz, 2)
 		b_bb = b_bb.offset(dz=dz)
 		onground = self.velocities[1] != dy and self.velocities[1] < 0
+		self.is_collided_horizontally = dx != self.velocities[0] or dz != self.velocities[2]
 		if self.velocities[0] != dx:
 			self.velocities[0] = 0
 		if self.velocities[1] != dy:
@@ -268,33 +272,94 @@ class Bot(object):
 			self.velocities[2] = 0
 		self.update_position(b_bb.posx, b_bb.min_y, b_bb.posz, onground)
 
-	def clip_velocities(self):
+	def clip_abs_velocities(self):
+		out = list(self.velocities)
 		for i in xrange(3):
 			if abs(self.velocities[i]) < 0.005: # minecraft value 
-				self.velocities[i] = 0
+				out[i] = 0
+		return out
 
-	def move(self, clip_vels=True):
-		if clip_vels:
-			self.clip_velocities()
-		self.do_move()
-		slowdown = self.current_slowdown
-		self.velocities[1] -= config.BLOCK_FALL
-		self.velocities[1] *= config.DRAG
-		self.velocities[0] *= slowdown
-		self.velocities[2] *= slowdown
+	def clip_ladder_velocities(self):
+		out = list(self.velocities)
+		if self.is_on_ladder:
+			for i in xrange(3):
+				if i == 1:
+					if self.velocities[i] < -0.15:
+						self.out[i] = -0.15
+				elif abs(self.velocities[i]) > 0.15:
+					self.out[i] = math.copysign(0.15, self.velocities[i])
+		return out
 
-	def move_direction(self, direction):
-		self.clip_velocities()
-		x, z = self.directional_speed(direction, self.current_speed_factor)
+	def handle_water_movement(self):
+		is_in_water = False
+		water_current = (0,0,0)
+		bb = self.aabb.expand(-0.001, -0.4010000059604645, -0.001)
+		max_y = bb.snap_to_grid.max_y + 1
+		for blk in self.grid.blocks_in_aabb(bb):
+			if isinstance(blk, blocks.BlockWater):
+				wy = blk.y + 1 - blk.height_percent
+				if max_y >= wy:
+					is_in_water = True
+					water_current = blk.velocity_to_add_to(water_current)
+		if max(water_current) > 0:
+			water_current = tools.normalize(water_current)
+			wconst = 0.014
+			water_current = (water_current[0] * wconst, water_current[1] * wconst, water_current[2] * wconst)	
+		return is_in_water, water_current
+
+	def handle_lava_movement(self):
+		for blk in self.grid.blocks_in_aabb(self.aabb.expand(-0.10000000149011612, -0.4000000059604645, -0.10000000149011612)):
+			if isinstance(blk, blocks.BlockLava):
+				return True
+		return False
+
+	def move(self, direction=(0, 0)):
+		self.velocities = self.clip_abs_velocities()
+		self.is_in_water, water_current = self.handle_water_movement()
+		self.is_in_lava = self.handle_lava_movement()
+		if self.is_in_water:
+			self.velocities = [self.velocities[0] + water_current [0], self.velocities[1] + water_current [1], self.velocities[2] + water_current [2]]
+			orig_y = self.y
+			self.update_directional_speed(direction, 0.02)
+			self.do_move()
+			self.velocities[0] *= 0.800000011920929
+			self.velocities[1] *= 0.800000011920929
+			self.velocities[2] *= 0.800000011920929
+			self.velocities[1] -= 0.02
+			if self.is_collided_horizontally and self.is_offset_in_liquid(self.velocities[0], self.velocities[1] + 0.6000000238418579 - self.y + orig_y, self.velocities[2]):
+				self.velocities[1] = 0.30000001192092896
+		elif self.is_in_lava:
+			orig_y = self.y
+			self.update_directional_speed(direction, 0.02)
+			self.do_move()
+			self.velocities[0] *= 0.5
+			self.velocities[1] *= 0.5
+			self.velocities[2] *= 0.5
+			self.velocities[1] -= 0.02
+			if self.is_collided_horizontally and self.is_offset_in_liquid(self.velocities[0], self.velocities[1] + 0.6000000238418579 - self.y + orig_y, self.velocities[2]):
+				self.velocities[1] = 0.30000001192092896
+		else:
+			slowdown = self.current_slowdown
+			self.update_directional_speed(direction, self.current_speed_factor)
+			self.velocities = self.clip_ladder_velocities()
+			self.do_move()
+			if self.is_collided_horizontally and self.is_on_ladder:
+				self.velocities[1] = 0.2
+			self.velocities[1] -= config.BLOCK_FALL
+			self.velocities[1] *= config.DRAG
+			self.velocities[0] *= slowdown
+			self.velocities[2] *= slowdown
+
+	def directional_speed(self, direction, speedf):
+		x, z = direction
+		dx = x * speedf
+		dz = z * speedf
+		return dx, dz
+
+	def update_directional_speed(self, direction, speedf):
+		x, z = self.directional_speed(direction, speedf)
 		self.velocities[0] += x
 		self.velocities[2] += z
-		self.move(clip_vels=False)
-
-	def directional_speed(self, dirct, speedf):
-		x, z = dirct
-		dx = x * speedf# * 0.98
-		dz = z * speedf# * 0.98
-		return dx, dz
 
 	@property
 	def current_slowdown(self):
@@ -315,7 +380,32 @@ class Bot(object):
 		else:
 			factor = config.JUMP_FACTOR
 		return factor * 0.98
-			
+
+	@property
+	def current_motion(self):
+		#TODO
+		# check if in water or lava -> factor = 0.2
+		# else check ladder and clip if necessary
+		velocities = self.clip_velocities()
+		vx = velocities[0]
+		vz = velocities[2]
+		return math.hypot(vx, vz) + self.current_speed_factor
+		
+	@property	
+	def is_on_ladder(self):
+		x = tools.grid_shift(self.x)
+		y = tools.grid_shift(self.y)
+		z = tools.grid_shift(self.z)
+		blk = self.grid.get_block(x, y, z)
+		return blk.number == blocks.Ladders.number or blk.number == blocks.Vines.number
+
+	def is_offset_in_liquid(self, dx, dy, dz):
+		bb = self.aabb.offset(dx, dy, dz)
+		if self.grid.aabb_collides(bb):
+			return False
+		else:
+			return not self.grid.is_any_liquid(bb)
+
 	def do_respawn(self, ignore):
 		self.send_packet("client statuses", {"status": 1})
 			

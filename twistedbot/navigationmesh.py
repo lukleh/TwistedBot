@@ -173,13 +173,19 @@ class NavigationMesh(object):
 			if gs.can_stand_on:
 				self.make_node(center_space, gs)
 				continue
+			gs = GridSpace(self.grid, coords=(crd[0] + i, crd[1] + 2, crd[2] + j))
+			if gs.can_stand_on:
+				self.make_node(center_space, gs)
+				continue
 			for k in [-1, -2, -3]:
 				gs = GridSpace(self.grid, coords=(crd[0] + i, crd[1] + k, crd[2] + j))
 				if gs.can_stand_on:
 					self.make_node(center_space, gs)
 					break
-		for k in [-1, 1]: # climb, descend
-			pass
+		for k in [-1, 1, 2]: # climb, descend
+			gs = GridSpace(self.grid, coords=(crd[0], crd[1] + k, crd[2]))
+			if gs.can_stand_on:
+				self.make_node(center_space, gs)
 
 	def make_node(self, center_space, possible_space):
 		is_new = False

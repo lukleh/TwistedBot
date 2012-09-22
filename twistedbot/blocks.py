@@ -55,6 +55,11 @@ class Block(object):
 		return isinstance(self, BlockFence) or (isinstance(self, FenceGate) and not self.is_open)
 
 	@property
+	def has_vertical_movement(self):
+		#return isinstance(self, Ladders) or isinstance(self, Vines)
+		return False
+
+	@property
 	def coords(self):
 		return (self.x, self.y, self.z)
 
@@ -80,6 +85,13 @@ class Block(object):
 
 	def intersection_on_axes(self, bb, x=False, y=False, z=False, debug=False):
 		return bb.intersection_on_axes(self.grid_bounding_box, x, y, z, debug=debug)
+
+	@property
+	def effective_flow_decay(self):
+		return -1
+
+	def is_solid_block(self, blk, v):
+		return blk.material.is_solid
 
 
 class BlockNonSolid(Block):
@@ -119,6 +131,74 @@ class BlockFluid(BlockNonSolid):
 
 class BlockWater(BlockFluid):
 	material = materials.water
+
+	def is_solid_block(self, blk, v):
+		if self.material == blk.material:
+			return False
+		else:
+			if v == 1:
+				return True
+			else:
+				if blk.material == materials.ice:
+					return False
+				else:
+					return super(BlockWater, self).is_solid_block(blk, v)
+
+	@property
+	def effective_flow_decay(self):
+		if self.meta >= 8:
+			return 0
+		else:
+			return self.meta
+
+	@property
+	def flow_vector(self):
+		v = [0, 0, 0]
+		for i, j in tools.cross:
+			blk = self.grid.get_block(self.x + i, self.y, self.z + j)
+			fd = blk.effective_flow_decay
+			if fd < -1:
+				if not blk.material.blocks_movement:
+					blk_below = self.grid.get_block(self.x + i, self.y - 1, self.z + j)
+					if blk_below.effective_flow_decay >= 0:
+						va = fd - (self.effective_flow_decay - 8)
+						v = [v[0] + i * va, v[1], v[2] + j * va]
+			elif fd >= 0:
+				va = fd - self.effective_flow_decay
+				v = [v[0] + i * va, v[1], v[2] + j * va]
+		if self.meta >= 8:
+			t = False
+			if t or self.is_solid_block(self.grid.get_block(self.x, self.y, self.z - 1), 2):
+				t = True
+			if t or self.is_solid_block(self.grid.get_block(self.x, self.y, self.z + 1), 3):
+				t = True
+			if t or self.is_solid_block(self.grid.get_block(self.x - 1, self.y, self.z), 4):
+				t = True
+			if t or self.is_solid_block(self.grid.get_block(self.x + 1, self.y, self.z), 5):
+				t = True
+			if t or self.is_solid_block(self.grid.get_block(self.x, self.y + 1, self.z - 1), 2):
+				t = True
+			if t or self.is_solid_block(self.grid.get_block(self.x, self.y + 1, self.z + 1), 3):
+				t = True
+			if t or selfis_solid_block(self.grid.get_block(self.x - 1, self.y + 1, self.z), 4):
+				t = True
+			if t or self.is_solid_block(self.grid.get_block(self.x + 1, self.y + 1, self.z), 5):
+				t = True
+			if t:
+				v = tools.normalize(v)
+				v = [v[0], v[1] - 6.0, v[2]]
+		return tools.normalize(v)
+
+	def velocity_to_add_to(self, v):
+		fv = self.flow_vector
+		return (v[0] + fv[0], v[1] + fv[1], v[2] + fv[2])
+
+	
+	def height_percent(self):
+		if self.meta >= 8:
+			return 1 / 9.0
+		else:
+			return (self.meta + 1) / 9.0
 	
 	
 class BlockLava(BlockFluid):
