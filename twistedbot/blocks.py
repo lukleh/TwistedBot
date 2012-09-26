@@ -56,8 +56,8 @@ class Block(object):
 
 	@property
 	def has_vertical_movement(self):
-		#return isinstance(self, Ladders) or isinstance(self, Vines)
-		return False
+		return isinstance(self, Ladders) or isinstance(self, Vines)
+		#return False
 
 	@property
 	def coords(self):

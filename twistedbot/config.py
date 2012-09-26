@@ -26,15 +26,15 @@ G						= 27.0 # or 0.08 block/tick - drag 0.02 blk/tick (used as final multiply 
 
 BLOCK_FALL				= 0.08
 DRAG 					= 0.98
-SPEED_FACTOR   			= 0.1 # on land
-JUMP_FACTOR				= 0.02 # in air
+SPEED_ON_GROUND			= 0.1
+SPEED_IN_AIR			= 0.02
 SPEED_JUMP   			= 0.42 # 0.04 in water and lava
 
 
 TIME_STEP				= 0.05
 
 COST_CLIMB				= 1.1
-COST_LADDER				= 0.21/0.15 # speed on ground / speed on ladder
+COST_LADDER				= 0.21/0.15 # common speed on ground / max speed on ladder
 COST_FALL				= 1.1
 COST_DIRECT				= 1
 COST_DIAGONAL			= math.sqrt(2) * COST_DIRECT

@@ -14,7 +14,6 @@ class TaskManager(object):
 		self.taskq = []
 		self.add_task(tasks.NullTask)
 		self.add_task(tasks.LookAtPlayerTask)
-		self.add_task(tasks.InitTask)
 		
 	@property
 	def current_task(self):

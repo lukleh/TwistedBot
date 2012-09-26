@@ -128,7 +128,8 @@ class MineCraftProtocol(Protocol):
 			packet = ipackets.popleft()
 			self.process_packet(packet)
 			self.bot.status_diff.packets_in += 1
-			yield None
+			if len(ipackets) < 50:
+				yield None
 				
 	def process_packet(self, packet):
 		pid = packet[0]

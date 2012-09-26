@@ -264,7 +264,7 @@ class NavigationMesh(object):
 		# 	(new_block.coords, old_block.name if old_block is not None else "none", tools.meta2str(old_block.meta) if old_block is not None else "none", \
 		# 		new_block.name, tools.meta2str(new_block.meta)))
 		coords = new_block.coords
-		gs = GridSpace(self.grid, coords)
+		gs = GridSpace(self.grid, coords=coords)
 		if gs.can_stand_on:
 			self.insert_node(gs.coords, gspace=gs)
 		else:

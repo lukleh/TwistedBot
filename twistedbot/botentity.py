@@ -248,6 +248,12 @@ class Bot(object):
 		self.y = ab.posy
 
 	def do_move(self):
+		zero_vels = False
+		if self.is_in_web:
+			self.velocities[0] *= 0.25
+			self.velocities[1] *= 0.05000000074505806
+			self.velocities[2] *= 0.25
+			zero_vels = True
 		aabbs = self.grid.aabbs_in(self.aabb.extend_to(self.velocities[0], self.velocities[1], self.velocities[2]))
 		b_bb = self.aabb
 		dy = self.velocities[1]
@@ -271,6 +277,8 @@ class Bot(object):
 		if self.velocities[2] != dz:
 			self.velocities[2] = 0
 		self.update_position(b_bb.posx, b_bb.min_y, b_bb.posz, onground)
+		if zero_vels:
+			self.velocities = [0, 0, 0]
 
 	def clip_abs_velocities(self):
 		out = list(self.velocities)
@@ -283,11 +291,8 @@ class Bot(object):
 		out = list(self.velocities)
 		if self.is_on_ladder:
 			for i in xrange(3):
-				if i == 1:
-					if self.velocities[i] < -0.15:
-						self.out[i] = -0.15
-				elif abs(self.velocities[i]) > 0.15:
-					self.out[i] = math.copysign(0.15, self.velocities[i])
+				if abs(self.velocities[i]) > 0.15:
+					out[i] = math.copysign(0.15, self.velocities[i])
 		return out
 
 	def handle_water_movement(self):
@@ -314,6 +319,7 @@ class Bot(object):
 		return False
 
 	def move(self, direction=(0, 0)):
+		#print 'bot.move dirs', direction
 		self.velocities = self.clip_abs_velocities()
 		self.is_in_water, water_current = self.handle_water_movement()
 		self.is_in_lava = self.handle_lava_movement()
@@ -376,9 +382,9 @@ class Bot(object):
 		if self.on_ground:
 			slowdown = self.current_slowdown
 			modf = 0.16277136 / (slowdown * slowdown * slowdown)
-			factor = config.SPEED_FACTOR * modf
+			factor = config.SPEED_ON_GROUND * modf
 		else:
-			factor = config.JUMP_FACTOR
+			factor = config.SPEED_IN_AIR
 		return factor * 0.98
 
 	@property
@@ -386,18 +392,22 @@ class Bot(object):
 		#TODO
 		# check if in water or lava -> factor = 0.2
 		# else check ladder and clip if necessary
-		velocities = self.clip_velocities()
+		velocities = self.clip_abs_velocities()
 		vx = velocities[0]
 		vz = velocities[2]
 		return math.hypot(vx, vz) + self.current_speed_factor
 		
 	@property	
 	def is_on_ladder(self):
-		x = tools.grid_shift(self.x)
-		y = tools.grid_shift(self.y)
-		z = tools.grid_shift(self.z)
-		blk = self.grid.get_block(x, y, z)
-		return blk.number == blocks.Ladders.number or blk.number == blocks.Vines.number
+		return self.grid.aabb_on_ladder(self.aabb)
+
+	@property
+	def is_in_web(self):
+		bb = self.aabb.expand(dx=-0.001, dy=-0.001, dz=-0.001)
+		for blk in self.grid.blocks_in_aabb(bb):
+			if isinstance(blk, blocks.Cobweb):
+				return True
+		return False 
 
 	def is_offset_in_liquid(self, dx, dy, dz):
 		bb = self.aabb.offset(dx, dy, dz)

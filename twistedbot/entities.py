@@ -37,21 +37,20 @@ class Entities(object):
 			return
 		in_nodes = self.world.navmesh.graph.has_node(block.coords)
 		gs = GridSpace(self.world.grid, block=block)
-		gs.can_stand_on
 		msg = "P in nm %s on %s aabb %s nm nodes %d\n" % (in_nodes, block, block.grid_bounding_box, self.world.navmesh.graph.node_count)
 		msg += "gs_stand %s" % str(gs.bb_stand)
 		if lpos is not None:
-			gsl = GridSpace(self.world.grid, lpos)
+			gsl = GridSpace(self.world.grid, coords=lpos)
 			if gsl.can_stand_on:
 				pass
 			else:
-				gsl = GridSpace(self.world.grid, (lpos[0], lpos[1] - 1, lpos[2]))
+				gsl = GridSpace(self.world.grid, coords=(lpos[0], lpos[1] - 1, lpos[2]))
 				if gsl.can_stand_on:
 					lpos = gsl.coords
 			if not(gsl.bb_stand is None or gs.bb_stand is None):
 				msg += "\ncost from %s to %s %s\n" % (lpos, block.coords, self.world.navmesh.graph.get_edge(lpos, block.coords))
 				msg += "last stand %s now stand %s from %s to %s\n" % (gsl.can_stand_on, gs.can_stand_on, gsl.bb_stand, gs.bb_stand)
-				if gsl.can_go_between(gsl.bb_stand, gs.bb_stand, debug=True):
+				if gsl.can_go_between(gs, debug=True):
 					msg += "can go True with cost %s\n" % gsl.edge_cost
 				else:
 					msg += "can go False\n"

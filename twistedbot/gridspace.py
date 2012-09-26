@@ -33,6 +33,7 @@ class GridSpace(object):
 		self.bb_stand = None
 		self.stand_block = None
 		self.intersection = None
+		self.can_stand_on = self._can_stand_on()
 
 	def __unicode__(self):
 		return unicode(self.block)
@@ -55,8 +56,7 @@ class GridSpace(object):
 		else:
 			return False
 
-	@property
-	def can_stand_on(self):
+	def _can_stand_on(self):
 		"""
 		can stand on top of the center of the block
 		"""
@@ -69,9 +69,10 @@ class GridSpace(object):
 				self.bb_stand = bb
 			if self.blocks_to_avoid(self.grid.blocks_in_aabb(self.bb_stand)):
 				return False
-			if self.grid.aabb_collides(self.bb_stan):
+			if self.grid.aabb_collides(self.bb_stand):
 				return False
 			self.stand_block = self.block
+			self.platform = self.bb_stand.set_to(max_y=self.bb_stand.min_y)
 			return True
 		if not self.block.collidable and not (under.is_fence and under.collidable):
 			return False
@@ -103,28 +104,12 @@ class GridSpace(object):
 		else:
 			return False
 
-	def can_go(self, gs):
+	def can_go(self, gs, update_to_bb_stand=False):
 		if not self.can_stand_between(gs):
 			return False
-		bb_from = self.bb_stand
-		bb_to	= gs.bb_stand
-		start_in_ladder = False
-		if self.block.has_vertical_movement or gs.block.has_vertical_movement:
-			if self.block.has_vertical_movement and not gs.block.has_vertical_movement:
-				start_in_ladder = True
-				if fops.gte(bb_to.min_y, self.block.y) and fops.lte(bb_to.min_y, self.block.y + 1):
-					bb_from = bb_from.shift(min_y=bb_to.min_y)
-					if self.grid.aabb_collides(bb_from):
-						return False
-			elif not self.block.has_vertical_movement and gs.block.has_vertical_movement:
-				if fops.gte(bb_from.min_y, gs.block.y) and fops.lte(bb_from.min_y, gs.block.y + 1):
-					bb_to = bb_to.shift(min_y=bb_from.min_y)
-					if self.grid.aabb_collides(bb_to):
-						return False
-			else:
-				start_in_ladder = True
-		can = self.can_go_between(bb_from, bb_to, start_in_ladder=start_in_ladder)
-		return can
+		if not self.can_go_between(gs, update_to_bb_stand=update_to_bb_stand):
+			return False
+		return True
 
 	def can_stand_between(self, gs, debug=False):
 		if self.block.has_vertical_movement or gs.block.has_vertical_movement:
@@ -134,7 +119,7 @@ class GridSpace(object):
 		stand_platform = self.platform.expand(config.PLAYER_BODY_DIAMETER - 0.09, 0, config.PLAYER_BODY_DIAMETER - 0.09)
 		self.intersection = gs.stand_block.intersection_on_axes(stand_platform, x=True, z=True, debug=debug)
 		if self.intersection is None:
-				return False
+			return False
 		if self.stand_block.x != gs.stand_block.x and self.stand_block.z != gs.stand_block.z:
 			if fops.lt(gs.platform.get_side('min', x=True, z=True), 0.5):
 				return False
@@ -143,8 +128,14 @@ class GridSpace(object):
 		else:
 			return True
 
-	def can_go_between(self, bb_stand, other_bb_stand, start_in_ladder=False, debug=False):
-		edge_cost = None
+	def can_go_between(self, gs, update_to_bb_stand=False, debug=False):
+		edge_cost = 0
+		bb_stand = self.bb_stand
+		other_bb_stand	= gs.bb_stand
+		if self.grid.aabb_on_ladder(self.bb_stand):
+			if fops.gt(other_bb_stand.min_y, self.bb_stand.min_y):
+				if not self.grid.aabb_on_ladder(bb_stand.shift(min_y=other_bb_stand.min_y)):
+					return False
 		if fops.gt(bb_stand.min_y, other_bb_stand.min_y):
 			elev = bb_stand.min_y - other_bb_stand.min_y
 			elev_bb = other_bb_stand.extend_to(dy=elev)
@@ -177,13 +168,15 @@ class GridSpace(object):
 		if self.blocks_to_avoid(self.grid.passing_blocks_between(bb_from, bb_to)):
 			return False
 		if fops.lte(elev, config.MAX_STEP_HEIGHT) and fops.gte(elev, -config.MAX_STEP_HEIGHT):
-			edge_cost = config.COST_DIRECT * bb_from.horizontal_distance_to(bb_to)
+			edge_cost += config.COST_DIRECT * bb_from.horizontal_distance_to(bb_to)
 		else:
-			edge_cost = config.COST_FALL * bb_from.horizontal_distance_to(bb_to)
+			edge_cost += config.COST_FALL * bb_from.horizontal_distance_to(bb_to)
 			vd = bb_from.horizontal_distance_to(bb_to)
 			if vd < 0:
 				edge_cost += config.COST_FALL * vd
 			else:
 				edge_cost += config.COST_CLIMB * vd
 		self.edge_cost = edge_cost
+		if update_to_bb_stand:
+			gs.bb_stand = other_bb_stand
 		return True

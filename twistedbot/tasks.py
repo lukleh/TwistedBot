@@ -65,19 +65,6 @@ class SwimToAirTask(TaskBase):
 		super(SwimToAirTask, self).__init__(*args, **kwargs)
 
 
-class InitTask(TaskBase):
-	def __init__(self, *args, **kwargs):
-		super(InitTask, self).__init__(*args, **kwargs)
-
-	def do(self):
-		self.bot.move()
-		self._do()	
-
-	def _do(self):
-		if self.bot.on_ground:
-			self.status = Status.finished
-
-
 class LookAtPlayerTask(TaskBase):
 	def __init__(self, *args, **kwargs):
 		super(LookAtPlayerTask, self).__init__(*args)
@@ -196,6 +183,7 @@ class TravelToTask(TaskBase):
 			self.path_ok = self.bot.world.navmesh.check_path(self.path)
 		else:
 			self.path_ok = False
+		print 'path', self.path
 
 	def do(self):
 		self.bot.move()
@@ -222,7 +210,7 @@ class TravelToTask(TaskBase):
 			if self.check_sign:
 				self.manager.grid.check_sign((self.current_step[0], self.current_step[1] - 1, self.current_step[2]))
 		if self.path.has_next():
-			self.current_step = self.path.next_step()
+			self.current_step = self.path.next_step().coords
 			gs = GridSpace(self.manager.grid, coords=self.current_step)
 			if not gs.can_stand_on:
 				self.status = Status.broken
@@ -243,57 +231,75 @@ class MoveToTask(TaskBase):
 		super(MoveToTask, self).__init__(*args)
 		self.target_space = kwargs["target_space"]
 		self.direction = (0,0)
-		self.turn = True
 		self.started = False
 		self.was_at_target = False
-		self.goal = self.target_space.bb_stand
+		print 'at', self.bot.aabb
+		print 'moveto', self.target_space.bb_stand
 
 	def do(self):
-		if (not self.grid.navmesh.graph.has_node(self.target_space.coords)) or (not self.target_space.can_stand_on):
+		if self.status != Status.not_finished:
+			raise Exception("this task is done")
+		elif not self.target_space._can_stand_on():
 			self.bot.move()
 			self.status = Status.broken
-			return
 		elif not self.started and self.bot.standing_on_block is None:
 			self.bot.move()
 		else:
 			if not self.started:
 				self.started = True
+				gs = GridSpace(self.grid, block=self.bot.standing_on_block)
+				if not gs.can_go(self.target_space, update_to_bb_stand=True):
+					self.status = Status.broken
+					self.bot.move()
+					return
+				print 'started to', self.target_space.bb_stand
+			self.check_state()
+			if self.status != Status.not_finished:
+				return
 			self._do()
-			if self.status == Status.not_finished and fops.eq(self.bot.velocities[0], 0) and fops.eq(self.bot.velocities[2], 0):
-				if self.bot.on_ground:
-					gs = GridSpace(self.grid, bb=self.bot.aabb)
-					if not gs.can_go(self.target_space.bb_stand):
-						log.msg("I am stuck, let's try again? vels %s" % str(self.bot.velocities))
-						self.status = Status.broken
-						self.bot.move()
-						return
-
-	def _do(self):
+			self.check_state(after_move=False)
+			
+	def check_state(self, after_move=True):
 		if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) > 2: #too far from the next step, better try again
 			self.status = Status.broken
-			self.bot.move()
+			if after_move: self.bot.move()
 			return
 		if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) < self.bot.current_motion:
-			self.turn = False
-			if not self.was_at_target:
-				pass
 			self.was_at_target = True
-			if self.bot.is_standing:
+			if self.bot.is_on_ladder:
+				d = self.bot.aabb.min_y - self.target_space.bb_stand.min_y
+				if fops.gte(d, 0) and fops.lt(d, 0.2):
+					print 'finished vines'
+					print self.bot.aabb
+					self.status = Status.finished
+					return
+			elif self.bot.is_standing:
+				print 'finished standing'
+				print self.bot.aabb
 				self.status = Status.finished
-				self.bot.move()
-			else:
-				self.move()
-			return
-		if self.bot.is_standing:
-			if self.was_at_target:
-				self.move()
-				self.status = Status.finished
+				if after_move: self.bot.move()
 				return
-			col_distance, col_bb = self.grid.min_collision_between(self.bot.aabb, self.goal, horizontal=True, max_height=True)
+		if self.started and fops.eq(self.bot.velocities[0], 0) and fops.eq(self.bot.velocities[2], 0):
+			if self.bot.on_ground:
+				gs = GridSpace(self.grid, bb=self.bot.aabb)
+				if not gs.can_go(self.target_space):
+					log.msg("I am stuck, let's try again? vels %s" % str(self.bot.velocities))
+					self.status = Status.broken
+					if after_move: self.bot.move()
+					return
+
+	def _do(self):
+		if self.bot.is_on_ladder:
+			elev = self.target_space.bb_stand.min_y - self.bot.aabb.min_y
+			if fops.gt(elev, 0):
+				self.jump()
+			self.move()
+		elif self.bot.is_standing:
+			col_distance, col_bb = self.grid.min_collision_between(self.bot.aabb, self.target_space.bb_stand, horizontal=True, max_height=True)
 			if col_distance is None:
 				self.move()
 			else:
-				elev = self.goal.min_y - self.bot.aabb.min_y
+				elev = self.target_space.bb_stand.min_y - self.bot.aabb.min_y
 				if fops.lte(elev, 0):
 					self.move()
 				elif fops.gt(elev, 0) and fops.lte(elev, config.MAX_STEP_HEIGHT):
@@ -326,17 +332,17 @@ class MoveToTask(TaskBase):
 
 	def move(self, towards=None):
 		if towards is None:
-			towards = self.goal
+			towards = self.target_space.bb_stand
 		direction = self.bot.aabb.horizontal_direction_to(towards)
-		if self.turn:
-			self.bot.turn_to(self.goal.bottom_center)
+		if not self.was_at_target:
+			self.bot.turn_to(self.target_space.bb_stand.bottom_center)
 		self.bot.move(direction=direction)
 
-	def jump(self, h):
+	def jump(self, height=0):
 		#TODO calculate jump speed
-		#log.msg("JUMP")
+		log.msg("JUMP")
 		self.bot.set_jump()
 
 	def jumpstep(self, h):
-		#log.msg("JUMPSTEP")
+		log.msg("JUMPSTEP")
 		self.bot.set_jumpstep(h)

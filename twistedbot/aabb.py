@@ -108,6 +108,11 @@ class AABB(object):
 			elif fops.gt(collidee.mins[axis], self.maxs[axis]):
 				p = collidee.mins[axis] - self.maxs[axis]
 		return p
+
+	def set_to(self, max_y=None):
+		if max_y is None:
+			raise Exception("AABB set_to wrong parameters")
+		return AABB(self.min_x, self.min_y, self.min_z, self.max_x, max_y, self.max_z)
 		
 	def offset(self, dx=0, dy=0, dz=0):
 		return AABB(self.min_x + dx,
@@ -185,6 +190,10 @@ class AABB(object):
 	@property
 	def grid_x(self):
 		return tools.grid_shift(self.posx)
+
+	@property
+	def grid_y(self):
+		return tools.grid_shift(self.posy)
 
 	@property
 	def grid_z(self):

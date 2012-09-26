@@ -298,7 +298,13 @@ class Grid(object):
 			blk.add_grid_bounding_boxes_to(out)
 		return out
 
+	def aabb_on_ladder(self, bb):
+		blk = self.get_block(bb.grid_x, bb.grid_y, bb.grid_z)
+		return blk.number == blocks.Ladders.number or blk.number == blocks.Vines.number
+
 	def standing_on_solidblock(self, bb):
+		if self.aabb_on_ladder(bb):
+			return self.get_block(bb.grid_x, bb.grid_y, bb.grid_z)
 		standing_on = None
 		blocks = self.blocks_in_aabb(bb.extend_to(dy=-1))
 		dvect = (0, -1, 0)
