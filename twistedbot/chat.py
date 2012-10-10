@@ -2,9 +2,8 @@
 import re
 
 
-import tasks
+import goals
 import logbot
-from task_manager import TaskManager
 
 log = logbot.getlogger("BOT_ENTITY")
 
@@ -46,36 +45,22 @@ class Chat(object):
 			self.parse_command(verb, subject)
 
 	def parse_command(self, verb, subject):
-		if verb == "rotate":
+		if verb == "rotate" or verb == "circulate":
 			if subject:
-				if self.bot.world.navmesh.sign_waypoints.has_name_group(subject):
-					self.bot.taskmgr.add_command(tasks.RotateSignsTask, group=subject)
-				else:
-					self.bot.chat_message("don't have group %s" % subject)
+				self.bot.goal_manager.command_goal(goals.WalkSignsGoal, group=subject, type=verb)
 			else:
-				self.bot.chat_message("which sign group to rotate?")
-		elif verb == "circulate":
-			if subject:
-				if self.bot.world.navmesh.sign_waypoints.has_name_group(subject):
-					self.bot.taskmgr.add_command(tasks.CirculateSignsTask, group=subject)
-				else:
-					self.bot.chat_message("don't have group %s" % subject)
-			else:
-				self.bot.chat_message("which sign group to circulate?")
+				self.bot.chat_message("which sign group to %s?" % verb)
 		elif verb == "go":
 			if subject:
-				if self.bot.world.navmesh.sign_waypoints.has_name_point(subject):
-					self.bot.taskmgr.add_command(tasks.GoToSignTask, name=subject)
-				else:
-					self.bot.chat_message("don't have sign with name %s" % subject)
+				self.bot.goal_manager.command_goal(goals.GoToSignGoal, sign_name=subject)
 			else:
 				self.bot.chat_message("go where?")
 		elif verb == "look":
 			if subject == "at me":
-				self.bot.taskmgr.add_command(tasks.LookAtPlayerTask)
+				self.bot.goal_manager.command_goal(goals.LookAtPlayerGoal)
 			else:
 				self.bot.chat_message("look at what?")
 		elif verb == "cancel":
-			self.bot.taskmgr.cancel_task()
+			self.bot.goal_manager.cancel_goal()
 		else:
 			log.msg("Unknown command: %s" % self.clean_msg)

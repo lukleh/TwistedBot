@@ -351,14 +351,10 @@ class MineCraftFactory(ReconnectingClientFactory):
 		
 	def clientConnectionLost(self, connector, unused_reason):
 		log.msg('Connection lost, reason:', unused_reason.getErrorMessage())
-		if reactor.running:
-			reactor.stop()
 		ReconnectingClientFactory.clientConnectionLost(self, connector, unused_reason)
 
 	def clientConnectionFailed(self, connector, reason):
 		log.msg('Connection failed, reason:', reason.getErrorMessage())
-		if reactor.running:
-			reactor.stop()
 		ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
 	
 

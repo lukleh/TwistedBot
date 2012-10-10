@@ -3,20 +3,16 @@
 import math
 from datetime import datetime
 
-
-from twisted.internet import reactor, defer
-
-
 import config
 import tools
 import packets
 import logbot
 import fops
 import blocks
+import goals
 from statistics import Statistics
 from aabb import AABB
 from chat import Chat
-from task_manager import TaskManager
 from entity import EntityBot
 
 log = logbot.getlogger("BOT_ENTITY")
@@ -32,12 +28,12 @@ class StatusDiff(object):
 		self.logger = logbot.getlogger("BOT_ENTITY_STATUS")
 
 	def log(self):
-		if self.node_count != self.world.navmesh.graph.node_count:
-			self.logger.msg("navmesh having %d nodes" % self.world.navmesh.graph.node_count)
-			self.node_count = self.world.navmesh.graph.node_count
-		if self.edge_count != self.world.navmesh.graph.edge_count:
-			self.logger.msg("navmesh having %d edges" % self.world.navmesh.graph.edge_count)
-			self.edge_count = self.world.navmesh.graph.edge_count
+		if self.node_count != self.world.navgrid.graph.node_count:
+			self.logger.msg("navgrid having %d nodes" % self.world.navgrid.graph.node_count)
+			self.node_count = self.world.navgrid.graph.node_count
+		if self.edge_count != self.world.navgrid.graph.edge_count:
+			self.logger.msg("navgrid having %d edges" % self.world.navgrid.graph.edge_count)
+			self.edge_count = self.world.navgrid.graph.edge_count
 		#self.logger.msg("received %d packets" % self.packets_in)
 		#self.logger.msg(self.bot.stats)
 
@@ -58,11 +54,12 @@ class Bot(object):
 		self.world.bot = self
 		self.grid = self.world.grid
 		self.velocities = [0.0, 0.0, 0.0]
+		self.direction = [0,0]
 		self._x = 0
 		self._y = 0
 		self.ticks = 0
 		self.chunks_ready = False
-		self.taskmgr = TaskManager(self)
+		self.goal_manager = goals.Manager(self)
 		self.stance = None
 		self.pitch = None
 		self.yaw = None
@@ -74,12 +71,17 @@ class Bot(object):
 		self.chat = Chat(self)
 		self.stats = Statistics()
 		self.startup()
-		self.do_later(self.iterate, config.TIME_STEP)
+		tools.do_later(config.TIME_STEP, self.iterate)
 		self.last_time = datetime.now()
+		self.period_time_estimation = 1/20.0
 		self.status_diff = StatusDiff(self, self.world)
 		self.is_collided_horizontally = False
+		self.horizontally_blocked = False
 		self.is_in_water = False
 		self.is_in_lava = False
+		self.action = 2 #normal
+		self.is_jumping = False
+		self.is_floating = True
 	
 	def connection_lost(self):
 		self.protocol = None
@@ -180,30 +182,40 @@ class Bot(object):
 	def in_complete_chunks(self):
 		return self.world.grid.aabb_in_complete_chunks(self.aabb)
 
-	def do_later(self, fn, delay=0):
-		d = defer.Deferred()
-		d.addCallback(fn)
-		d.addErrback(logbot.exit_on_error)
-		reactor.callLater(delay, d.callback, None)
-
 	def every_n_ticks(self, n=100):
 		return
 		if self.ticks % n == 0:
 			self.status_diff.log()
 
-	def iterate(self, ignore):
+	def iterate(self):
+		iter_start = datetime.now()
 		self.ticks += 1
 		if self.location_received == False:
-			self.do_later(self.iterate, config.TIME_STEP)
+			self.last_iterate_time = iter_start
+			tools.do_later(config.TIME_STEP, self.iterate)
 			return
 		if not self.ready:
 			self.ready = self.in_complete_chunks and self.spawn_point_received
-		if self.ready:
-			self.taskmgr.run_current_task()
+			if not self.ready:
+				self.last_iterate_time = iter_start
+				tools.do_later(config.TIME_STEP, self.iterate)
+				return
+		self.move(direction = self.direction)
+		self.direction = [0,0]
 		self.send_location()
-		self.do_later(self.iterate, config.TIME_STEP)
-		self.every_n_ticks()
-		self.on_standing_ready()
+		tools.do_later(0, self.goal_manager.run_goal)
+		tools.do_later(0, self.every_n_ticks)
+		tools.do_later(0, self.on_standing_ready)
+		iter_end = datetime.now()
+		d_run = (iter_end - iter_start).total_seconds()
+		t = config.TIME_STEP - d_run # decreased by computation in iterate
+		d_iter = (iter_start - self.last_iterate_time).total_seconds() # real iterate period
+		r_over = d_iter - self.period_time_estimation # diff from scheduled by
+		t -= r_over
+		t = max(0, t) # cannot delay into past
+		self.period_time_estimation = t + d_run
+		self.last_iterate_time = iter_start
+		tools.do_later(t, self.iterate)
 
 	def send_packet(self, name, payload):
 		if self.protocol is not None:
@@ -214,8 +226,14 @@ class Bot(object):
 							"position": packets.Container(x=self.x, y=self.y, z=self.z, stance=self.stance),
 							"orientation": packets.Container(yaw=self.yaw, pitch=self.pitch),
 							"grounded": packets.Container(grounded=self.on_ground)})
+
+	def set_action(self, action_id): #sneaking, not sneaking, leave bed, start sprinting, stop sprinting
+		if self.action != action_id:
+			self.action = action_id
+		self.send_packet("entity action", {"eid": self.eid, "action": self.action})
 			
 	def chat_message(self, msg):
+		log.msg(msg)
 		self.send_packet("chat message", {"message": msg})
 
 	def turn_to(self, point, elevation=False):
@@ -236,10 +254,7 @@ class Bot(object):
 		self.z = z
 		self.on_ground = onground
 
-	def set_jump(self, custom_speed=config.SPEED_JUMP):
-		self.velocities[1] = custom_speed
-
-	def set_jumpstep(self, v):
+	def set_jumpstep(self, v=config.MAX_STEP_HEIGHT):
 		self.velocities[1] = 0
 		aabbs = self.grid.aabbs_in(self.aabb.extend_to(0, v, 0))
 		for bb in aabbs:
@@ -270,6 +285,7 @@ class Bot(object):
 		b_bb = b_bb.offset(dz=dz)
 		onground = self.velocities[1] != dy and self.velocities[1] < 0
 		self.is_collided_horizontally = dx != self.velocities[0] or dz != self.velocities[2]
+		self.horizontally_blocked = dx != self.velocities[0] and dz != self.velocities[2]
 		if self.velocities[0] != dx:
 			self.velocities[0] = 0
 		if self.velocities[1] != dy:
@@ -291,8 +307,13 @@ class Bot(object):
 		out = list(self.velocities)
 		if self.is_on_ladder:
 			for i in xrange(3):
-				if abs(self.velocities[i]) > 0.15:
+				if i == 1:
+					if self.velocities[i] < -0.15:
+						out[i] = -0.15
+				elif abs(self.velocities[i]) > 0.15:
 					out[i] = math.copysign(0.15, self.velocities[i])
+		if self.is_sneaking and self.velocities[1] < 0:
+			out[1] = 0
 		return out
 
 	def handle_water_movement(self):
@@ -319,10 +340,15 @@ class Bot(object):
 		return False
 
 	def move(self, direction=(0, 0)):
-		#print 'bot.move dirs', direction
 		self.velocities = self.clip_abs_velocities()
 		self.is_in_water, water_current = self.handle_water_movement()
 		self.is_in_lava = self.handle_lava_movement()
+		if self.is_jumping:
+			if self.is_in_water or self.is_in_lava:
+				self.velocities[1] += config.SPEED_LIQUID_JUMP 
+			else:
+				self.velocities[1] = config.SPEED_JUMP
+			self.is_jumping = False
 		if self.is_in_water:
 			self.velocities = [self.velocities[0] + water_current [0], self.velocities[1] + water_current [1], self.velocities[2] + water_current [2]]
 			orig_y = self.y
@@ -334,6 +360,7 @@ class Bot(object):
 			self.velocities[1] -= 0.02
 			if self.is_collided_horizontally and self.is_offset_in_liquid(self.velocities[0], self.velocities[1] + 0.6000000238418579 - self.y + orig_y, self.velocities[2]):
 				self.velocities[1] = 0.30000001192092896
+			self.is_floating = True
 		elif self.is_in_lava:
 			orig_y = self.y
 			self.update_directional_speed(direction, 0.02)
@@ -363,9 +390,13 @@ class Bot(object):
 		return dx, dz
 
 	def update_directional_speed(self, direction, speedf):
+		#TODO recalculate so final velocities have possibly same direction as 'direction'
 		x, z = self.directional_speed(direction, speedf)
 		self.velocities[0] += x
 		self.velocities[2] += z
+
+	def set_direction(self, direction):
+		self.direction = direction
 
 	@property
 	def current_slowdown(self):
@@ -409,6 +440,16 @@ class Bot(object):
 				return True
 		return False 
 
+	@property
+	def is_sneaking(self):
+		return self.action == 1
+
+	def start_sneaking(self):
+		self.set_action(1)
+
+	def stop_sneaking(self):
+		self.set_action(2)
+
 	def is_offset_in_liquid(self, dx, dy, dz):
 		bb = self.aabb.offset(dx, dy, dz)
 		if self.grid.aabb_collides(bb):
@@ -432,13 +473,13 @@ class Bot(object):
 		# TODO
 		# ignore the details now
 		# should clear the world(chunks, entities, etc.)
-		# signs can stay self.grid.navmesh.reset_signs()
+		# signs can stay self.grid.navgrid.reset_signs()
 		pass
 		
 	def on_death(self):
 		self.location_received = False
 		self.spawn_point_received = False
-		self.do_later(self.do_respawn, 1.0)
+		tools.do_later(1.0, self.do_respawn)
 		#TODO self.world_erase()
 
 	@property
@@ -454,12 +495,12 @@ class Bot(object):
 			stand = fops.eq(col_d, 0)
 		return stand
 
-	def on_standing_ready(self, ignore=None):
+	def on_standing_ready(self):
 		if self.new_location_received:
 			block = self.standing_on_block
 			if block is None:
 				return
 			log.msg("Standing on block %s" % block)
-			if not self.world.navmesh.graph.has_node(block.coords):
-				self.world.navmesh.block_change(None, block)
+			if not self.world.navgrid.graph.has_node(block.coords):
+				self.world.navgrid.block_change(None, block)
 			self.new_location_received = False

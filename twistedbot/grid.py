@@ -9,7 +9,6 @@ import blocks
 import config
 import logbot
 import fops
-from navigationmesh import NavigationMesh
 from chunk import Chunk
 from aabb import AABB
 
@@ -90,7 +89,7 @@ class Grid(object):
 		for i, j in tools.adjacency:
 			c = (chunk_x + i, chunk_z + j)
 			if c in self.chunks:
-				self.navmesh.incomplete_on_chunk_border(c, (chunk_x, chunk_z))
+				self.navgrid.incomplete_on_chunk_border(c, (chunk_x, chunk_z))
 
 	def half_bytes_from_string(self, bstr):
 		for s in bstr:
@@ -170,7 +169,7 @@ class Grid(object):
 			log.err("change_block chunk %s block %s type %s meta %s is None" % (chunk, (x, y, z), block_type, meta))
 			return None, None
 		if current_block.is_sign and not current_block.number == block_type:
-			self.navmesh.sign_waypoints.remove(current_block.coords)
+			self.navgrid.sign_waypoints.remove(current_block.coords)
 		cx = x & 15
 		y_level = current_block.y >> 4
 		cy = y & 15
@@ -192,7 +191,7 @@ class Grid(object):
 
 	def block_change(self, x, y, z, btype, bmeta):
 		ob, nb = self.change_block_to(x, y, z, btype, bmeta)
-		self.navmesh.block_change(ob, nb)
+		self.navgrid.block_change(ob, nb)
 
 	def multi_block_change(self, chunk_x, chunk_z, blocks):
 		shift_x = chunk_x << 4
@@ -202,11 +201,11 @@ class Grid(object):
 			ob, nb = self.change_block_to(block.x + shift_x, block.y, block.z + shift_z, block.block_id, block.meta)
 			changed.append((ob, nb))
 		for ob, nb in changed:
-			self.navmesh.block_change(ob, nb)
+			self.navgrid.block_change(ob, nb)
 
 	def sign(self, x, y, z, line1, line2, line3, line4):
 		if line1.strip().lower() == "waypoint":
-			self.navmesh.sign_waypoints.new((x, y, z), line2, line3, line4)
+			self.navgrid.sign_waypoints.new((x, y, z), line2, line3, line4)
 	
 	def explosion(self, x, y, z, records):
 		for rec in records:
@@ -333,4 +332,4 @@ class Grid(object):
 	def check_sign(self, crd):
 		sblk = self.get_block(crd[0], crd[1], crd[2])
 		if not sblk.is_sign:
-			self.navmesh.sign_waypoints.remove(crd)
+			self.navgrid.sign_waypoints.remove(crd)

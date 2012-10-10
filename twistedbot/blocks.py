@@ -1433,6 +1433,52 @@ class JungleWoodStairs(BlockStairs):
     name = "Jungle Wood Stairs"
     material = WoodenPlanks.material
 
+#TODO just guessing the materials and bounding boxes, need to wait for MCP
+class CommandBlock(Block):
+	number = 137
+	name = "Command Block"
+	material = materials.iron
+
+
+class Beacon(Block):
+	number = 138
+	name = "Beacon"
+	material = materials.iron
+
+
+class CobblestoneWall(BlockFence):
+	number = 139
+	name = "Cobblestone Wall"
+	material = materials.rock
+
+
+class FlowerPot(Block):
+	number = 140
+	name = "Flower Pot"
+	material = materials.wood
+
+
+class Carrots(BlockFlower):
+	number = 141
+	name = "Carrots"
+
+
+class Potatoes(BlockFlower):
+	number = 142
+	name = "Potatoes"
+
+
+class WoodenButton(BlockNonSolid):
+	number = 143
+	name = "Wooden Button"
+	material = materials.circuits
+
+
+class Head(Block):
+	number = 144
+	name = "Head"
+	material = materials.rock
+
 
 
 block_map = [None for _ in xrange(256)]

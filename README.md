@@ -65,4 +65,4 @@ To make your own filter, look in twistedbot.proxy_processors.default for an exam
 
 ##### Other places
 Twitter [@lukleh](https://twitter.com/lukleh "@lukleh")
-Youtube [@lukleh](https://twitter.com/lukleh "@lukleh")
+Youtube [playlist](http://www.youtube.com/user/lukleh/videos?flow=grid&view=0 "youtube playlist")

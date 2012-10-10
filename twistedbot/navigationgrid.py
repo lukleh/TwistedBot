@@ -14,7 +14,7 @@ from gridspace import GridSpace
 
 
 
-log = logbot.getlogger("NAVMESH")
+log = logbot.getlogger("navgrid")
 
 
 class ChunkBorders(object):
@@ -45,86 +45,24 @@ class ChunkBorders(object):
 			yield crd
 
 
-class MeshEdge(object):
+class GridEdge(object):
 	__slots__ = ('cost')
 	def __init__(self, cost):
 		self.cost = cost
 
 		
-class MeshNode(object):
+class GridNode(object):
 	__slots__ = ('area_id')
 	def __init__(self):
 		self.area_id = None
 
 		
-class MeshGraph(object):
-	def __init__(self):
-		self.nodes = {}
-		self.pred = {}
-		self.succ = {}
-
-	@property
-	def node_count(self):
-		return len(self.nodes)
-
-	@property
-	def edge_count(self):
-		return len(self.pred) + len(self.succ)
-		
-	def has_node(self, crd):
-		return crd in self.nodes
-		
-	def get_node(self, crd):
-		return self.nodes[crd]
-		
-	def add_node(self, crd, miny=None):
-		if crd not in self.nodes:
-			self.nodes[crd] = miny
-			self.pred[crd] = {}
-			self.succ[crd] = {}
-		
-	def remove_node(self, crd):
-		affected = set()
-		del self.nodes[crd]
-		for n in self.succ[crd].keys():
-			del self.pred[n][crd]
-			affected.add(n)
-		del self.succ[crd]
-		for n in self.pred[crd].keys():
-			del self.succ[n][crd]
-			affected.add(n)
-		del self.pred[crd]
-		return affected
-				
-	def has_edge(self, crd1, crd2):
-		return crd2 in self.succ.get(crd1, {})
-		
-	def get_edge(self, crd1, crd2):
-		try:
-			return self.succ[crd1][crd2]
-		except KeyError:
-			return None
-
-	def add_edge(self, crd1, crd2, cost):
-		self.succ[crd1][crd2] = cost
-		self.pred[crd2][crd1] = cost
-		
-	def remove_edge(self, crd1, crd2):
-		if self.has_edge(crd1, crd2):
-			del self.succ[crd1][crd2]
-			del self.pred[crd2][crd1]
-
-	def get_succ(self, crd):
-		return self.succ[crd].items()
-
-		
-class NavigationMesh(object):
+class NavigationGrid(object):
 	def __init__(self, world):
 		self.world = world
 		self.incomplete_nodes = OrderedDict()
-		self.graph = MeshGraph()
+		self.graph = tools.DirectedGraph()
 		self.chunk_borders = ChunkBorders()
-		self.astar = AStar(self)
 		self.reset_signs()
 
 	def reset_signs(self):
@@ -141,11 +79,10 @@ class NavigationMesh(object):
 			cootask = cooperate(self.do_incomplete_nodes())
 			d = cootask.whenDone()
 			d.addErrback(logbot.exit_on_error)
-			#log.msg("New compute cooperate")
 
 	def do_incomplete_nodes(self):
 		while self.incomplete_nodes:
-			crd = self.incomplete_nodes.popitem(last=False)[1]
+			crd = self.incomplete_nodes.popitem()[1]
 			self.do_incomplete_node(crd)
 			self.check_node_resources(crd)
 			yield None
@@ -258,6 +195,7 @@ class NavigationMesh(object):
 	def incomplete_on_chunk_border(self, chunk_from, chunk_to):
 		for crd in self.chunk_borders.between(chunk_from, chunk_to):
 			self.compute(crd)
+			self.chunk_borders.remove(crd)
 			
 	def block_change(self, old_block, new_block):
 		# log.msg("block change %s %s %s => %s %s" % \

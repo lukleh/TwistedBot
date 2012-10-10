@@ -2,7 +2,7 @@
 
 from entities import Entities
 from grid import Grid
-from navigationmesh import NavigationMesh
+from navigationgrid import NavigationGrid
 
 
 class World(object):
@@ -15,9 +15,9 @@ class World(object):
 		self.s_time = None
 		self.players = {}
 		self.grid = Grid(self)
-		self.navmesh = NavigationMesh(self)
-		self.grid.navmesh = self.navmesh
-		self.navmesh.grid = self.grid
+		self.navgrid = NavigationGrid(self)
+		self.grid.navgrid = self.navgrid
+		self.navgrid.grid = self.grid
 
 	def shutdown(self):
 		""" actions to perform before shutdown """

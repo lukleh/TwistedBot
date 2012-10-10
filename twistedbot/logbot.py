@@ -10,7 +10,7 @@ def exit_on_error(_stuff=None, _why=None):
 	log.err(_stuff=_stuff, _why=_why)
 	if reactor.running:
 		reactor.stop()
-	exit()
+	sys.exit(1)
 
 class MinecraftLogObserver(object):
 	
