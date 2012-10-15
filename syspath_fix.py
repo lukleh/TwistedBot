@@ -8,5 +8,5 @@ this_loc =  os.path.dirname(this_file)
 libs_loc = os.path.join(this_loc, "libs")
 sys.path = [libs_loc] + sys.path
 if this_loc not in sys.path:
-	sys.path = [this_loc] + sys.path
+    sys.path = [this_loc] + sys.path
 
