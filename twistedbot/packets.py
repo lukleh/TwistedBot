@@ -9,7 +9,7 @@ from codecs import (BufferedIncrementalDecoder, CodecInfo, IncrementalEncoder,
                     StreamReader, StreamWriter, utf_16_be_encode,
                     utf_16_be_decode)
 
-                    
+
 from construct import Construct, Struct, Container, Embed, MetaField, Value
 from construct import MetaArray, If, IfThenElse, Switch, Const, Peek
 from construct import OptionalGreedyRange, RepeatUntil
@@ -25,6 +25,7 @@ from pynbt import NBTFile
 # Strings.
 # This one is a UCS2 string, which effectively decodes single writeChar()
 # invocations. We need to import the encoding for it first, though.
+
 
 def ucs2(name):
     if name.lower() not in ("ucs2", "ucs-2"):
@@ -67,30 +68,34 @@ class DoubleAdapter(LengthValueAdapter):
     def _encode(self, obj, context):
         return len(obj) / 2, obj
 
+
 def AlphaString(name):
     return StringAdapter(
         DoubleAdapter(
             Sequence(name,
-                UBInt16("length"),
-                MetaField("data", lambda ctx: ctx["length"] * 2),
-            )
+                     UBInt16("length"),
+                     MetaField("data", lambda ctx: ctx["length"] * 2),
+                     )
         ),
         encoding="ucs2",
     )
 
 # Boolean converter.
+
+
 def Bool(*args, **kwargs):
     return Flag(*args, default=True, **kwargs)
 
 # Flying, position, and orientation, reused in several places.
 grounded = Struct("grounded", UBInt8("grounded"))
 position = Struct("position",
-    BFloat64("x"),
-    BFloat64("y"),
-    BFloat64("stance"),
-    BFloat64("z")
-)
+                  BFloat64("x"),
+                  BFloat64("y"),
+                  BFloat64("stance"),
+                  BFloat64("z")
+                  )
 orientation = Struct("orientation", BFloat32("yaw"), BFloat32("pitch"))
+
 
 def ByteString(name, size_name, encoding=None):
     return StringAdapter(MetaField("data", lambda ctx: ctx[size_name]), encoding=encoding)
@@ -108,25 +113,27 @@ def NBTdata(name, size_name):
 
 # item packing
 slotdata = Struct("slotdata",
-    SBInt16("id"),
-    If(lambda context: context["id"] >= 0,
-        Embed(Struct("item_information",
-            UBInt8("count"),
-            UBInt16("info"),
-            SBInt16("size"),
-            If(lambda context: context["size"] >= 0,
-                NBTdata("data", size_name="size")
-            )
-        ))
-    )
-)
+                  SBInt16("id"),
+                  If(lambda context: context["id"] >= 0,
+                     Embed(Struct("item_information",
+                                  UBInt8("count"),
+                                  UBInt16("info"),
+                                  SBInt16("size"),
+                                  If(lambda context: context["size"] >= 0,
+                                     NBTdata("data", size_name="size")
+                                     )
+                                  ))
+                     )
+                  )
 
 
 Metadata = namedtuple("Metadata", "type value")
 metadata_types = ["byte", "short", "int", "float", "string", "unused1",
-    "unused2"]
+                  "unused2"]
 
 # Metadata adaptor.
+
+
 class MetadataAdapter(Adapter):
 
     def _decode(self, obj, context):
@@ -155,109 +162,112 @@ metadata_switch = {
     3: BFloat32("value"),
     4: AlphaString("value"),
     5: Struct("unused1",
-        UBInt16("primary"),
-        UBInt8("count"),
-        UBInt16("secondary"),
-    ),
+              UBInt16("primary"),
+              UBInt8("count"),
+              UBInt16("secondary"),
+              ),
     6: Struct("unused2",
-        UBInt32("x"),
-        UBInt32("y"),
-        UBInt32("z"),
-    ),
+              UBInt32("x"),
+              UBInt32("y"),
+              UBInt32("z"),
+              ),
 }
 
 # Metadata subconstruct.
 entity_metadata = MetadataAdapter(
     Struct("metadata",
-        RepeatUntil(lambda obj, context: obj["peeked"] == 0x7f,
-            Struct("data",
-                BitStruct("id",
-                    BitField("first", 3),
-                    BitField("second", 5),
-                ),
-                Switch("value", lambda context: context["id"]["first"],
-                    metadata_switch),
-                Peek(UBInt8("peeked")),
-            ),
-        ),
-        Const(UBInt8("terminator"), 0x7f),
-    ),
+           RepeatUntil(lambda obj, context: obj["peeked"] == 0x7f,
+                       Struct("data",
+                              BitStruct("id",
+                                        BitField("first", 3),
+                                        BitField("second", 5),
+                                        ),
+                              Switch(
+                                  "value", lambda context: context[
+                                      "id"]["first"],
+                              metadata_switch),
+                              Peek(UBInt8("peeked")),
+                              ),
+                       ),
+           Const(UBInt8("terminator"), 0x7f),
+           ),
 )
 
 
 # The actual packet list.
 packets = {
     0: Struct("keep alive",
-        SBInt32("pid"),
-    ),
+              SBInt32("pid"),
+              ),
     1: Struct("login request ",
-        SBInt32("eid"),
-        AlphaString("level_type"),
-        SBInt8("mode"),
-        SBInt8("dimension"),
-        SBInt8("difficulty"),
-        UBInt8("unused"),
-        UBInt8("players"),
-    ),
+              SBInt32("eid"),
+              AlphaString("level_type"),
+              SBInt8("mode"),
+              SBInt8("dimension"),
+              SBInt8("difficulty"),
+              UBInt8("unused"),
+              UBInt8("players"),
+              ),
     2: Struct("handshake",
-        UBInt8("protocol"),
-        AlphaString("username"),
-        AlphaString("server_host"),
-        SBInt32("server_port"),
-    ),
+              UBInt8("protocol"),
+              AlphaString("username"),
+              AlphaString("server_host"),
+              SBInt32("server_port"),
+              ),
     3: Struct("chat message",
-        AlphaString("message"),
-    ),
+              AlphaString("message"),
+              ),
     4: Struct("time update",
-        SBInt64("timestamp"),
-    ),
+              SBInt64("timestamp"),
+              ),
     5: Struct("entity equipment",
-        UBInt32("eid"),
-        UBInt16("slot"),
-        slotdata,
-    ),
+              UBInt32("eid"),
+              UBInt16("slot"),
+              slotdata,
+              ),
     6: Struct("spawn position",
-        SBInt32("x"),
-        SBInt32("y"),
-        SBInt32("z"),
-    ),
+              SBInt32("x"),
+              SBInt32("y"),
+              SBInt32("z"),
+              ),
     7: Struct("use entity",
-        UBInt32("eid"),
-        UBInt32("target"),
-        UBInt8("button"),
-    ),
+              UBInt32("eid"),
+              UBInt32("target"),
+              UBInt8("button"),
+              ),
     8: Struct("update health",
-        SBInt16("hp"),
-        SBInt16("fp"),
-        BFloat32("saturation"),
-    ),
+              SBInt16("hp"),
+              SBInt16("fp"),
+              BFloat32("saturation"),
+              ),
     9: Struct("respawn",
-        SBInt32("dimension"),
-        UBInt8("difficulty"),
-        UBInt8("game_mode"),
-        UBInt16("world_height"),
-        AlphaString("level_type"),
-    ),
+              SBInt32("dimension"),
+              UBInt8("difficulty"),
+              UBInt8("game_mode"),
+              UBInt16("world_height"),
+              AlphaString("level_type"),
+              ),
     10: Struct("player", UBInt8("grounded")),
     11: Struct("player position", position, grounded),
     12: Struct("player look", orientation, grounded),
     13: Struct("player position&look", position, orientation, grounded),
     14: Struct("player digging",
-        UBInt8("state"),
-        SBInt32("x"),
-        SBInt8("y"),
-        SBInt32("z"),
-        SBInt8("face"),
-    ),
+               UBInt8("state"),
+               SBInt32("x"),
+               SBInt8("y"),
+               SBInt32("z"),
+               SBInt8("face"),
+               ),
     15: Struct("player block placement",
-        SBInt32("x"),
-        UBInt8("y"),
-        SBInt32("z"),
-        SBInt8("face"),
-        slotdata, 
-        SBInt8("cursor_x"), # The position of the crosshair on the block
-        SBInt8("cursor_y"),
-        SBInt8("cursor_z"),
+               SBInt32("x"),
+               UBInt8("y"),
+               SBInt32("z"),
+               SBInt8("face"),
+               slotdata,
+               SBInt8(
+                   "cursor_x"),  # The position of the crosshair on the block
+               SBInt8("cursor_y"),
+               SBInt8("cursor_z"),
     ),
     16: Struct("held item change",
         UBInt16("item"),
@@ -582,7 +592,7 @@ packets = {
         SBInt8("action"),
         SBInt16("size"),
         If(lambda context: context["size"] > 0,
-            NBTdata("nbt","size")),
+            NBTdata("nbt", "size")),
     ),
     200: Struct("increment statistics",
         UBInt32("sid"),
@@ -595,10 +605,10 @@ packets = {
     ),
     202: Struct("player abilities",
         UBInt8("flags"),
-        Value("is_god", lambda ctx: ctx["flags"] & 1 ),
-        Value("is_flying", lambda ctx: ctx["flags"] & 2 ),
-        Value("can_fly", lambda ctx: ctx["flags"] & 4 ),
-        Value("is_creative", lambda ctx: ctx["flags"] & 8 ),
+        Value("is_god", lambda ctx: ctx["flags"] & 1),
+        Value("is_flying", lambda ctx: ctx["flags"] & 2),
+        Value("can_fly", lambda ctx: ctx["flags"] & 4),
+        Value("is_creative", lambda ctx: ctx["flags"] & 8),
         UBInt8("walking_speed"),
         UBInt8("flying_speed"),
     ),
@@ -607,9 +617,9 @@ packets = {
     ),
     204: Struct("locale view distance",
         AlphaString("locale"),
-        UBInt8("view_distance"), #0 0-3 for 'far', 'normal', 'short', 'tiny'.
-        UBInt8("chat_flags"), #0 on, no colors
-        UBInt8("difficulty"), #0 0-peacefull,easy, normal, 3-hard
+        UBInt8("view_distance"),  # 0 0-3 for 'far', 'normal', 'short', 'tiny'.
+        UBInt8("chat_flags"),  # 0 on, no colors
+        UBInt8("difficulty"),  # 0 0-peacefull,easy, normal, 3-hard
     ),
     205: Struct("client statuses",
         UBInt8("status"),
@@ -637,9 +647,11 @@ packets = {
     ),
 }
 
+
 def packet_stream_print_header(context):
     #log.msg("packet_stream_print_header %s" % context["header"])
     return context["header"]
+
 
 def print_and_return(pv, rv):
     log.msg("packet_stream_print_header %s" % pv)
@@ -663,6 +675,7 @@ packet_stream = Struct("packet_stream",
         UBInt8("leftovers"),
     ),
 )
+
 
 def parse_packets(bytestream):
     """
@@ -693,6 +706,7 @@ incremental_packet_stream = Struct("incremental_packet_stream",
     ),
 )
 
+
 def parse_packets_incrementally(bytestream):
     """
     Parse out packets one-by-one, yielding a tuple of packet header and packet
@@ -716,6 +730,7 @@ def parse_packets_incrementally(bytestream):
 
 packets_by_name = dict((v.name, k) for (k, v) in packets.iteritems())
 
+
 def make_packet(packet, payload, template=None):
     """
     Constructs a packet bytestream from a packet header and payload.
@@ -736,6 +751,7 @@ def make_packet(packet, payload, template=None):
         template = packets[header]
     payload = template.build(container)
     return chr(header) + payload
+
 
 def make_error_packet(message):
     """

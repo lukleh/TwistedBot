@@ -27,8 +27,9 @@ class GridSpace(object):
             self.coords = self.block.coords
         else:
             raise Exception("Empty gridspace object")
-        self.blocks3 = (self.block, 
-                        self.grid.get_block(self.coords[0], self.coords[1] + 1, self.coords[2]),
+        self.blocks3 = (self.block,
+                        self.grid.get_block(self.coords[0], self.coords[
+                                            1] + 1, self.coords[2]),
                         self.grid.get_block(self.coords[0], self.coords[1] + 2, self.coords[2]))
         self.bb_stand = None
         self.stand_block = None
@@ -66,11 +67,13 @@ class GridSpace(object):
         if m is None:
             #print 'self.grid.can_stand_memory count', self.grid.can_stand_memory.count, 'can', can, 's', s
             m = (can, self.bb_stand, self.platform, self.stand_block)
-            self.grid.can_stand_memory[s] = (can, self.bb_stand, self.platform, self.stand_block)
+            self.grid.can_stand_memory[s] = (
+                can, self.bb_stand, self.platform, self.stand_block)
         if m2 is None:
             #print 'self.grid.can_stand_memory count', self.grid.can_stand_memory.count, 'can', can, 's', s
             m2 = (can, self.bb_stand, self.platform, self.stand_block)
-            self.grid.can_stand_memory2[s2] = (can, self.bb_stand, self.platform, self.stand_block)
+            self.grid.can_stand_memory2[s2] = (
+                can, self.bb_stand, self.platform, self.stand_block)
         #else:
         #    can, self.bb_stand, self.platform, self.stand_block = m
         #if m[0] != m2[0] or can != m[0] or can != m2[0]:
@@ -82,7 +85,8 @@ class GridSpace(object):
         can stand on top of the center of the block
         """
         self.grid.can_stand_memory
-        under = self.grid.get_block(self.coords[0], self.coords[1] - 1, self.coords[2])
+        under = self.grid.get_block(
+            self.coords[0], self.coords[1] - 1, self.coords[2])
         if self.block.is_ladder_vine:
             bb = AABB.from_block_coords(self.block.coords)
             if (under.is_fence and under.collidable):
@@ -139,7 +143,8 @@ class GridSpace(object):
         if fops.gt(abs(self.platform.min_y - gs.platform.min_y), config.MAX_STEP_HEIGHT):
             return True
         stand_platform = self.platform.expand(config.PLAYER_BODY_DIAMETER - 0.09, 0, config.PLAYER_BODY_DIAMETER - 0.09)
-        self.intersection = gs.stand_block.intersection_on_axes(stand_platform, x=True, z=True, debug=debug)
+        self.intersection = gs.stand_block.intersection_on_axes(
+            stand_platform, x=True, z=True, debug=debug)
         if self.intersection is None:
             return False
         if self.stand_block.x != gs.stand_block.x and self.stand_block.z != gs.stand_block.z:
@@ -153,7 +158,7 @@ class GridSpace(object):
     def can_go_between(self, gs, update_to_bb_stand=False, debug=False):
         edge_cost = 0
         bb_stand = self.bb_stand
-        other_bb_stand    = gs.bb_stand
+        other_bb_stand = gs.bb_stand
         std_block = self.grid.standing_on_solidblock(bb_stand)
         if std_block.is_ladder_vine:
             if fops.gt(other_bb_stand.min_y, bb_stand.min_y):
@@ -192,9 +197,11 @@ class GridSpace(object):
         if self.blocks_to_avoid(self.grid.passing_blocks_between(bb_from, bb_to)):
             return False
         if fops.lte(elev, config.MAX_STEP_HEIGHT) and fops.gte(elev, -config.MAX_STEP_HEIGHT):
-            edge_cost += config.COST_DIRECT * bb_from.horizontal_distance_to(bb_to)
+            edge_cost += config.COST_DIRECT * \
+                bb_from.horizontal_distance_to(bb_to)
         else:
-            edge_cost += config.COST_FALL * bb_from.horizontal_distance_to(bb_to)
+            edge_cost += config.COST_FALL * \
+                bb_from.horizontal_distance_to(bb_to)
             vd = bb_from.horizontal_distance_to(bb_to)
             if vd < 0:
                 edge_cost += config.COST_FALL * vd

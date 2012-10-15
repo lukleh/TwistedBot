@@ -12,13 +12,13 @@ from aabb import AABB
 
 log = logbot.getlogger("BLOCKS")
 
-    
+
 class Block(object):
     slipperiness = 0.6
     render_as_normal_block = True
     is_opaque_cube = True
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
-    
+
     def __init__(self, grid=None, x=None, y=None, z=None, meta=0):
         if grid.__class__.__name__ != "Grid":
             raise Exception("bad parameter to Block. Expecting World, received %s" % grid.__class__.__name__)
@@ -27,13 +27,13 @@ class Block(object):
         self.y = y
         self.z = z
         self.meta = meta
-        
+
     def __str__(self):
         return "%d %d %d %s %s" % (self.x, self.y, self.z, self.name, tools.meta2str(self.meta))
 
     def __hash__(self):
         return hash(self.x, self.y, self.z)
-        
+
     def __getitem__(self, i):
         if i == 0:
             return self.x
@@ -88,7 +88,7 @@ class Block(object):
         col, d = bb.sweep_collision(self.grid_bounding_box, vect, debug=debug)
         return col, d, self.grid_bounding_box
 
-    def maxedge_platform(self, x = 0, y = 0, z = 0):
+    def maxedge_platform(self, x=0, y=0, z=0):
         return self.grid_bounding_box.face(x, y, z)
 
     def collides_with(self, bb):
@@ -130,8 +130,9 @@ class BlockNonSolid(Block):
     def sweep_collision(self, bb, vect, debug=False, max_height=False):
         return False, None, None
 
-    def maxedge_platform(self, x = 0, y = 0, z = 0):
-        raise Exception("maxedge_platform cannot be called for non solid block")
+    def maxedge_platform(self, x=0, y=0, z=0):
+        raise Exception(
+            "maxedge_platform cannot be called for non solid block")
 
     def collides_with(self, bb):
         return False
@@ -145,7 +146,7 @@ class BlockNonSolid(Block):
 
 class BlockFluid(BlockNonSolid):
     pass
-    
+
 
 class BlockWater(BlockFluid):
     material = materials.water
@@ -181,7 +182,8 @@ class BlockWater(BlockFluid):
             fd = blk.effective_flow_decay
             if fd < -1:
                 if not blk.material.blocks_movement:
-                    blk_below = self.grid.get_block(self.x + i, self.y - 1, self.z + j)
+                    blk_below = self.grid.get_block(
+                        self.x + i, self.y - 1, self.z + j)
                     if blk_below.effective_flow_decay >= 0:
                         va = fd - (self.effective_flow_decay - 8)
                         v = [v[0] + i * va, v[1], v[2] + j * va]
@@ -215,14 +217,13 @@ class BlockWater(BlockFluid):
         fv = self.flow_vector
         return (v[0] + fv[0], v[1] + fv[1], v[2] + fv[2])
 
-    
     def height_percent(self):
         if self.meta >= 8:
             return 1 / 9.0
         else:
             return (self.meta + 1) / 9.0
-    
-    
+
+
 class BlockLava(BlockFluid):
     material = materials.lava
 
@@ -261,7 +262,8 @@ class BlockMultiBox(Block):
     def sweep_collision(self, bb, vect, debug=False, max_height=False):
         boxes = self.grid_bounding_box
         if len(boxes) == 0:
-            raise Exception("0 bounding boxes from block %s, cannot handle that" % self)
+            raise Exception(
+                "0 bounding boxes from block %s, cannot handle that" % self)
         elif len(boxes) == 1:
             col, rel_d = bb.sweep_collision(boxes[0], vect, debug=debug)
             return col, rel_d, boxes[0]
@@ -279,7 +281,7 @@ class BlockMultiBox(Block):
                     col_bb = bb
             return col_bb is not None, col_rel_d, col_bb
 
-    def maxedge_platform(self, x = 0, y = 0, z = 0):
+    def maxedge_platform(self, x=0, y=0, z=0):
         faces = []
         for bb in self.grid_bounding_box:
             faces.append(bb.face(x, y, z))
@@ -302,9 +304,9 @@ class BlockMultiBox(Block):
             max_face = None
             for i in xrange(0, len(max_faces) - 1):
                 if max_face is None:
-                    max_face = max_faces[i].union(max_faces[i+1])
+                    max_face = max_faces[i].union(max_faces[i + 1])
                 else:
-                    max_face = max_face.union(max_faces[i+1])
+                    max_face = max_face.union(max_faces[i + 1])
             return max_face
 
     def collides_with(self, bb):
@@ -325,7 +327,7 @@ class BlockMultiBox(Block):
             ubb = ubb.union(box)
         return bb.intersection_on_axes(ubb, x, y, z, debug=debug)
 
-    
+
 class BlockStairs(BlockMultiBox):
     render_as_normal_block = False
     is_opaque_cube = False
@@ -335,7 +337,7 @@ class BlockStairs(BlockMultiBox):
                             AABB(0.0, 0.5, 0.5, 1.0, 1.0, 1.0),
                             AABB(0.0, 0.5, 0.0, 1.0, 1.0, 0.5)]
     bounding_box_upper_half = AABB(0.0, 0.5, 0.0, 1.0, 1.0, 1.0)
-    bounding_box_upper_quarter =     [AABB(0.5, 0.0, 0.0, 1.0, 0.5, 1.0),
+    bounding_box_upper_quarter = [AABB(0.5, 0.0, 0.0, 1.0, 0.5, 1.0),
                                     AABB(0.0, 0.0, 0.0, 0.5, 0.5, 1.0),
                                     AABB(0.0, 0.0, 0.5, 1.0, 0.5, 1.0),
                                     AABB(0.0, 0.0, 0.0, 1.0, 0.5, 0.5)]
@@ -358,7 +360,7 @@ class BlockDoor(Block):
     bounding_boxes = [AABB(0.0, 0.0, 0.0, 0.1875, 1.0, 1.0),
                       AABB(0.0, 0.0, 0.0, 1.0, 1.0, 0.1875),
                       AABB(0.8125, 0.0, 0.0, 1.0, 1.0, 1.0),
-                      AABB(0.0, 0.0, 0.8125, 1.0, 1.0, 1.0)] 
+                      AABB(0.0, 0.0, 0.8125, 1.0, 1.0, 1.0)]
     top_part = None
     bottom_part = None
 
@@ -379,12 +381,12 @@ class BlockDoor(Block):
         else:
             self.bottom_part = self
             self.top_part = self.grid.get_block(self.x, self.y + 1, self.z)
-    
+
     @property
     def is_open(self):
         self.assign_parts()
         return (self.bottom_part.meta & 4) != 0
-    
+
     @property
     def hinge_right(self):
         return (self.top_part.meta & 1) != 0
@@ -404,14 +406,14 @@ class BlockDoor(Block):
             if self.hinge_right:
                 return self.facing_index - 1 if self.facing_index - 1 >= 0 else 3
             else:
-                return self.facing_index + 1 if self.facing_index + 1 <  4 else 0
+                return self.facing_index + 1 if self.facing_index + 1 < 4 else 0
         else:
             return self.facing_index
-        
+
     @property
     def grid_bounding_box(self):
         return self.bounding_boxes[self.boxes_index] + self.coords
-    
+
 
 class BlockPane(BlockMultiBox):
     render_as_normal_block = False
@@ -422,28 +424,33 @@ class BlockPane(BlockMultiBox):
         return blk.is_opaque_cube or blk.number == self.number or blk.number == Glass.number
 
     def cross_connected(self):
-        return (self.can_connect_to(self.x, self.y, self.z - 1), self.can_connect_to(self.x, self.y, self.z + 1), \
+        return (
+            self.can_connect_to(self.x, self.y, self.z - 1), self.can_connect_to(self.x, self.y, self.z + 1),
                 self.can_connect_to(self.x - 1, self.y, self.z), self.can_connect_to(self.x + 1, self.y, self.z))
 
     @property
     def grid_bounding_box(self):
         out = []
-        zl , zr, xl, xr = self.cross_connected()
+        zl, zr, xl, xr = self.cross_connected()
         if (not xl or not xr) and (xl or xr or zl or zr):
             if xl and not xr:
-                out.append(AABB(0.0, 0.0, 0.4375, 0.5, 1.0, 0.5625) + self.coords)
+                out.append(
+                    AABB(0.0, 0.0, 0.4375, 0.5, 1.0, 0.5625) + self.coords)
             elif not xl and xr:
-                out.append(AABB(0.5, 0.0, 0.4375, 1.0, 1.0, 0.5625) + self.coords)
+                out.append(
+                    AABB(0.5, 0.0, 0.4375, 1.0, 1.0, 0.5625) + self.coords)
         else:
             out.append(AABB(0.0, 0.0, 0.4375, 1.0, 1.0, 0.5625) + self.coords)
         if (not zl or not zr) and (xl or xr or zl or zr):
             if zl and not zr:
-                out.append(AABB(0.4375, 0.0, 0.0, 0.5625, 1.0, 0.5) + self.coords)
+                out.append(
+                    AABB(0.4375, 0.0, 0.0, 0.5625, 1.0, 0.5) + self.coords)
             elif not zl and zr:
-                out.append(AABB(0.4375, 0.0, 0.5, 0.5625, 1.0, 1.0) + self.coords)
+                out.append(
+                    AABB(0.4375, 0.0, 0.5, 0.5625, 1.0, 1.0) + self.coords)
         else:
             out.append(AABB(0.4375, 0.0, 0.0, 0.5625, 1.0, 1.0) + self.coords)
-         return out
+        return out
 
     
 class BlockFence(Block):

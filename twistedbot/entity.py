@@ -11,28 +11,29 @@ class Entity(object):
         self.z = kwargs["z"]
         self.velocity = None
         self._isbot = False
-        
+
     @property
     def position(self):
-        return (self.x/32.0, self.y/32.0, self.z/32.0) 
-        
+        return (self.x / 32.0, self.y / 32.0, self.z / 32.0)
+
     @property
     def grid_position(self):
-        x = self.x/32
-        y = self.y/32
-        z = self.z/32
+        x = self.x / 32
+        y = self.y / 32
+        z = self.z / 32
         return (x, y, z)
-        
+
     @property
     def is_bot(self):
         return self._isbot
-        
-        
+
+
 class EntityBot(Entity):
     def __init__(self, **kwargs):
         super(EntityBot, self).__init__(**kwargs)
         self._isbot = True
-                
+
+
 class EntityLiving(Entity):
     def __init__(self, **kwargs):
         super(EntityLiving, self).__init__(**kwargs)
@@ -57,7 +58,7 @@ class EntityMob(EntityLiving):
         self.head_yaw = kwargs["yaw"]
         self.status = None
         #TODO assign mob type according to the etype and metadata
-        
+
 
 class EntityPlayer(EntityLiving):
     def __init__(self, **kwargs):

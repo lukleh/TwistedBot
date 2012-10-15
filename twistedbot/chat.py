@@ -12,7 +12,8 @@ class Chat(object):
     def __init__(self, bot):
         self.bot = bot
         self.clean_colors_re = re.compile(ur'\u00A7.', re.UNICODE)
-        self.commander_re = re.compile(ur'<%s> .*' % self.bot.commander.name.lower(), re.UNICODE)
+        self.commander_re = re.compile(
+            ur'<%s> .*' % self.bot.commander.name.lower(), re.UNICODE)
         self.wspace_re = re.compile(ur"\s+")
 
     def clean(self, orig_msg):
@@ -20,12 +21,12 @@ class Chat(object):
         log.msg("Chat: %s" % msg)
         msg = msg.strip().lower()
         return msg
-        
+
     def from_commander(self, msg):
         return self.commander_re.match(msg)
-        
+
     def get_command(self, msg):
-        msg = msg[msg.find(">")+2:]
+        msg = msg[msg.find(">") + 2:]
         msg = self.wspace_re.sub(" ", msg)
         log.msg("Possible command >%s<" % msg)
         return msg
@@ -47,12 +48,14 @@ class Chat(object):
     def parse_command(self, verb, subject):
         if verb == "rotate" or verb == "circulate":
             if subject:
-                self.bot.goal_manager.command_goal(goals.WalkSignsGoal, group=subject, type=verb)
+                self.bot.goal_manager.command_goal(
+                    goals.WalkSignsGoal, group=subject, type=verb)
             else:
                 self.bot.chat_message("which sign group to %s?" % verb)
         elif verb == "go":
             if subject:
-                self.bot.goal_manager.command_goal(goals.GoToSignGoal, sign_name=subject)
+                self.bot.goal_manager.command_goal(
+                    goals.GoToSignGoal, sign_name=subject)
             else:
                 self.bot.chat_message("go where?")
         elif verb == "look":

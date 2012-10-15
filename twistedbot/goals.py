@@ -30,7 +30,7 @@ class Manager(object):
         self.goalq = []
         self.default_goal = LookAtPlayerGoal(self, self.bot)
         self.running = False
-        
+
     @property
     def current_goal(self):
         if self.goalq:
@@ -60,7 +60,7 @@ class Manager(object):
 
     def not_running(self):
         self.running = False
-        
+
     def add_subgoal(self, goal, *args, **kwargs):
         self.goalq.append(goal(self, self.bot, *args, **kwargs))
         cg = self.current_goal
@@ -71,7 +71,6 @@ class Manager(object):
         self.goalq.append(goal(self, self.bot, *args, **kwargs))
         self.running = False
         log.msg("Added command goal %s" % self.current_goal)
-
 
 
 class GoalBase(object):
@@ -135,7 +134,8 @@ class LookAtPlayerGoal(GoalBase):
         if player is None:
             return
         p = player.position
-        self.bot.turn_to((p[0], p[1] + config.PLAYER_EYELEVEL, p[2]), elevation=True)
+        self.bot.turn_to(
+            (p[0], p[1] + config.PLAYER_EYELEVEL, p[2]), elevation=True)
 
 
 class WalkSignsGoal(GoalBase):
@@ -150,7 +150,8 @@ class WalkSignsGoal(GoalBase):
             self.next_sign = self.bot.world.navgrid.sign_waypoints.get_groupnext_rotate
         else:
             raise Exception("unknown walk type")
-        self.name = '%s signs in %s' % (self.walk_type.capitalize(), self.group)
+        self.name = '%s signs in %s' % (
+            self.walk_type.capitalize(), self.group)
         log.msg(self.name)
         self.bot.world.navgrid.sign_waypoints.reset_group(self.group)
 
@@ -164,7 +165,8 @@ class WalkSignsGoal(GoalBase):
             self.do()
         elif status == Status.broken:
             if self.signpoint is not None:
-                self.manager.add_subgoal(TravelToGoal, coords=self.signpoint.coords)
+                self.manager.add_subgoal(
+                    TravelToGoal, coords=self.signpoint.coords)
             else:
                 self.manager_goal_return(Status.finished)
 
@@ -179,7 +181,8 @@ class WalkSignsGoal(GoalBase):
         self.signpoint = self.next_sign(self.group)
         print 'WALK to', self.signpoint
         if self.signpoint is not None:
-            self.manager.add_subgoal(TravelToGoal, coords=self.signpoint.nav_coords)
+            self.manager.add_subgoal(
+                TravelToGoal, coords=self.signpoint.nav_coords)
         else:
             self.manager_goal_return(Status.finished)
 
@@ -202,15 +205,18 @@ class GoToSignGoal(GoalBase):
             self.manager_goal_return(Status.finished)
 
     def check_state(self):
-        self.signpoint = self.bot.world.navgrid.sign_waypoints.get_namepoint(self.sign_name)
+        self.signpoint = self.bot.world.navgrid.sign_waypoints.get_namepoint(
+            self.sign_name)
         if self.signpoint is None:
-            self.bot.chat_message("don't have sign with name %s" % self.sign_name)
+            self.bot.chat_message(
+                "don't have sign with name %s" % self.sign_name)
             return Status.impossible
         else:
             return Status.not_finished
 
     def do(self):
-        self.manager.add_subgoal(TravelToGoal, coords=self.signpoint.nav_coords)
+        self.manager.add_subgoal(
+            TravelToGoal, coords=self.signpoint.nav_coords)
 
 
 class TravelToGoal(GoalBase):
@@ -290,7 +296,7 @@ class MoveToGoal(GoalBase):
         self.was_at_target = False
         self.name = 'Move to %s' % str(self.target_space.coords)
         #log.msg(self.name)
-    
+
     def check_state(self):
         elev = self.target_space.bb_stand.min_y - self.bot.aabb.min_y
         if fops.gt(elev, config.MAX_JUMP_HEIGHT):
@@ -298,7 +304,7 @@ class MoveToGoal(GoalBase):
         if not self.target_space._can_stand_on():
             self.grid.navgrid.delete_node(self.target_space.coords)
             return Status.impossible
-        if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) > 2: #too far from the next step, better try again
+        if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) > 2:  # too far from the next step, better try again
             return Status.broken
         if self.bot.position_grid == self.target_space.coords and self.bot.is_on_ladder:
             return Status.finished
@@ -309,7 +315,8 @@ class MoveToGoal(GoalBase):
         if self.bot.on_ground and self.bot.horizontally_blocked:
             gs = GridSpace(self.grid, bb=self.bot.aabb)
             if not gs.can_go(self.target_space):
-                log.msg("I am stuck, let's try again? vels %s" % str(self.bot.velocities))
+                log.msg("I am stuck, let's try again? vels %s" %
+                        str(self.bot.velocities))
                 return Status.broken
         return Status.not_finished
 

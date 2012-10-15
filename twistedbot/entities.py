@@ -1,6 +1,5 @@
 
 
-
 import config
 import logbot
 import tools
@@ -26,12 +25,15 @@ class Entities(object):
             return None
 
     def maybe_commander(self, entity):
-        if self.world.bot.commander.eid != entity.eid: return
+        if self.world.bot.commander.eid != entity.eid:
+            return
         gpos = entity.grid_position
         if self.world.bot.commander.last_possition == gpos:
             return
-        block = self.world.grid.standing_on_solidblock(AABB.from_player_coords(entity.position))
-        if block is None: return
+        block = self.world.grid.standing_on_solidblock(
+            AABB.from_player_coords(entity.position))
+        if block is None:
+            return
         lpos = self.world.bot.commander.last_possition
         if lpos is not None and (block.coords == lpos or block.coords == (lpos[0], lpos[1] - 1, lpos[2])):
             return
@@ -44,7 +46,8 @@ class Entities(object):
             if gsl.can_stand_on:
                 pass
             else:
-                gsl = GridSpace(self.world.grid, coords=(lpos[0], lpos[1] - 1, lpos[2]))
+                gsl = GridSpace(
+                    self.world.grid, coords=(lpos[0], lpos[1] - 1, lpos[2]))
                 if gsl.can_stand_on:
                     lpos = gsl.coords
             if not(gsl.bb_stand is None or gs.bb_stand is None):
@@ -54,7 +57,8 @@ class Entities(object):
                     msg += "can go True with cost %s\n" % gsl.edge_cost
                 else:
                     msg += "can go False\n"
-                msg += "can stand between %s intersection %s" % (gsl.can_stand_between(gs, debug=True), gsl.intersection)
+                msg += "can stand between %s intersection %s" % (
+                    gsl.can_stand_between(gs, debug=True), gsl.intersection)
         #log.msg(msg)
         self.world.bot.commander.last_possition = gpos
 
@@ -62,11 +66,12 @@ class Entities(object):
         def f(self, *args, **kwargs):
             eid = args[0]
             entity = self.get_entity(eid)
-            if entity is None: #received entity update packet for entity that was not initialized with new_*, this should not happen 
+            if entity is None:  # received entity update packet for entity that was not initialized with new_*, this should not happen
                 log.msg("do not have entity %d registered" % eid)
                 return
             if entity.is_bot:
-                log.msg("Server is changing me with %s %s %s" % (fn.__name__, args, kwargs))
+                log.msg("Server is changing me with %s %s %s" %
+                        (fn.__name__, args, kwargs))
                 pass
             fn(self, entity, *args[1:], **kwargs)
             self.maybe_commander(entity)
@@ -92,20 +97,20 @@ class Entities(object):
     def destroy(self, eids):
         for eid in eids:
             entity = self.get_entity(eid)
-            if entity: 
+            if entity:
                 del self.entities[eid]
                 if self.world.bot.commander.eid == eid:
                     self.world.bot.commander.eid = None
 
     @entityupdate
     def move(self, entity, dx, dy, dz):
-        entity.x += dx 
-        entity.y += dy 
-        entity.z += dz 
+        entity.x += dx
+        entity.y += dy
+        entity.z += dz
 
     @entityupdate
     def look(self, entity, yaw, pitch):
-        entity.yaw = yaw 
+        entity.yaw = yaw
         entity.pitch = pitch
 
     @entityupdate
@@ -115,32 +120,31 @@ class Entities(object):
     @entityupdate
     def move_look(self, entity, dx, dy, dz, yaw, pitch):
         entity.x += dx
-        entity.y += dy 
-        entity.z += dz 
-        entity.yaw = yaw 
-        entity.pitch = pitch 
+        entity.y += dy
+        entity.z += dz
+        entity.yaw = yaw
+        entity.pitch = pitch
 
     @entityupdate
     def teleport(self, entity, x, y, z, yaw, pitch):
         entity.x = x
         entity.y = y
         entity.z = z
-        entity.yaw = yaw 
-        entity.pitch = pitch 
+        entity.yaw = yaw
+        entity.pitch = pitch
 
     @entityupdate
     def velocity(self, entity, dx, dy, dz):
-        entity.velocity = (dx, dy, dz) 
+        entity.velocity = (dx, dy, dz)
 
     @entityupdate
     def status(self, entity, status):
-        entity.status = status 
+        entity.status = status
 
     @entityupdate
     def attach(self, entity, vehicle):
-        pass 
+        pass
 
     @entityupdate
     def metadata(self, entity, metadata):
         pass
-

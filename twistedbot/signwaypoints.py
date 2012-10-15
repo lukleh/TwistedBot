@@ -9,7 +9,6 @@ import tools
 log = logbot.getlogger("SIGNS")
 
 
-
 class SignWayPoints(object):
     def __init__(self, navgrid):
         self.navgrid = navgrid
@@ -22,11 +21,12 @@ class SignWayPoints(object):
 
     def has_name_point(self, name):
         return name in self.sign_points
-        
+
     def new(self, sign):
         if sign.is_groupable:
             if sign.group not in self.ordered_sign_groups:
-                self.ordered_sign_groups[sign.group] = tools.OrderedLinkedList(name=sign.group)
+                self.ordered_sign_groups[
+                    sign.group] = tools.OrderedLinkedList(name=sign.group)
             self.ordered_sign_groups[sign.group].add(sign.value, sign)
         if sign.name:
             self.sign_points[sign.name] = sign
@@ -40,7 +40,7 @@ class SignWayPoints(object):
                 msg += "name '%s'" % sign.name
             #log.msg(msg)
         self.crd_to_sign[sign.coords] = sign
-        
+
     def remove(self, crd):
         if crd in self.crd_to_sign:
             sign = self.crd_to_sign[crd]
@@ -64,7 +64,8 @@ class SignWayPoints(object):
         group = self.ordered_sign_groups[group]
         cs = group.current_point()
         if cs is None:
-            return None
+            group.start()
+            return group.current_point()
         while True:
             s = group.next_rotate()
             if s == cs:
@@ -78,10 +79,11 @@ class SignWayPoints(object):
         group = self.ordered_sign_groups[group]
         cs = group.current_point()
         if cs is None:
-            return None
+            group.start()
+            return group.current_point()
         n_pass = 0
         while True:
-            s = group.next_rotate()
+            s = group.next_circulate()
             if s == cs:
                 n_pass += 1
                 if n_pass == 2:
@@ -94,7 +96,3 @@ class SignWayPoints(object):
             return
         else:
             self.ordered_sign_groups[group].reset()
-
-
-
-

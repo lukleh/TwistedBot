@@ -7,16 +7,18 @@ from collections import namedtuple
 
 from twisted.internet import defer, reactor
 
-import config    
+import config
 import logbot
-            
-                    
-adjacency = [(i,j) for i in (-1,0,1) for j in (-1,0,1) if not (i == j == 0)]
-cross = [(i,j) for i in (-1,0,1) for j in (-1,0,1) if ((i == 0) or (j == 0)) and (j != i)]
-corners = [(i,j) for i in (-1,0,1) for j in (-1,0,1) if (i != 0) and (j != 0)]
+
+
+adjacency = [(i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if not (
+    i == j == 0)]
+cross = [(i, j) for i in (
+    -1, 0, 1) for j in (-1, 0, 1) if ((i == 0) or (j == 0)) and (j != i)]
+corners = [(i, j) for i in (-1, 0, 1) for j in (-1, 0, 1) if (i != 0) and (
+    j != 0)]
 
 sign = functools.partial(math.copysign, 1)
-
 
 
 def do_now(fn, *args, **kwargs):
@@ -25,6 +27,7 @@ def do_now(fn, *args, **kwargs):
 
 def do_later(delay, fn, *args, **kwargs):
     d = defer.Deferred()
+
     def fire(ignore):
         return fn(*args, **kwargs)
     d.addCallback(fire)
@@ -52,7 +55,7 @@ def lower_y(o, diff=-1):
 
 
 def vector_size(tup):
-    return math.sqrt(tup[0]*tup[0] + tup[1]*tup[1] + tup[2]*tup[2])
+    return math.sqrt(tup[0] * tup[0] + tup[1] * tup[1] + tup[2] * tup[2])
 
 
 def yaw_pitch_between(p1, p2):
@@ -75,6 +78,7 @@ def yaw_pitch_between(p1, p2):
             yaw = 360 + yaw
     return yaw, -pitch
 
+
 class DirectedGraph(object):
     def __init__(self):
         self.nodes = {}
@@ -88,19 +92,19 @@ class DirectedGraph(object):
     @property
     def edge_count(self):
         return len(self.pred) + len(self.succ)
-        
+
     def has_node(self, crd):
         return crd in self.nodes
-        
+
     def get_node(self, crd):
         return self.nodes[crd]
-        
+
     def add_node(self, crd, miny=None):
         if crd not in self.nodes:
             self.nodes[crd] = miny
             self.pred[crd] = {}
             self.succ[crd] = {}
-        
+
     def remove_node(self, crd):
         affected = set()
         del self.nodes[crd]
@@ -113,10 +117,10 @@ class DirectedGraph(object):
             affected.add(n)
         del self.pred[crd]
         return affected
-                
+
     def has_edge(self, crd1, crd2):
         return crd2 in self.succ.get(crd1, {})
-        
+
     def get_edge(self, crd1, crd2):
         try:
             return self.succ[crd1][crd2]
@@ -126,7 +130,7 @@ class DirectedGraph(object):
     def add_edge(self, crd1, crd2, cost):
         self.succ[crd1][crd2] = cost
         self.pred[crd2][crd1] = cost
-        
+
     def remove_edge(self, crd1, crd2):
         if self.has_edge(crd1, crd2):
             del self.succ[crd1][crd2]
@@ -157,7 +161,7 @@ class OrderedLinkedList(object):
         self.head = None
         self.tail = None
         self.length = 0
-        self.head_to_tail = True 
+        self.head_to_tail = True
         self.reset()
 
     def __len__(self):
@@ -181,6 +185,9 @@ class OrderedLinkedList(object):
 
     def reset(self):
         self.pointer = None
+
+    def start(self):
+        self.pointer = self.head
 
     def add(self, order, obj):
         if self.head is None:
@@ -271,6 +278,8 @@ class OrderedLinkedList(object):
         return self.current_point()
 
     def current_point(self):
+        if self.pointer is None:
+            return None
         obj = self.pointer.obj
         return obj
 

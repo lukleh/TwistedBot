@@ -2,17 +2,16 @@
 from collections import defaultdict
 
 
-GENERAL_STATS     = 1000
-ACHIEVEMENTS    = 5242880
-BLOCK_MINED        = 16777216 
-ITEM_USED        = 16908288
-ITEM_BREAKED    = 16973824
+GENERAL_STATS = 1000
+ACHIEVEMENTS = 5242880
+BLOCK_MINED = 16777216
+ITEM_USED = 16908288
+ITEM_BREAKED = 16973824
 
 groups = {
     GENERAL_STATS: "general",
     ACHIEVEMENTS: "achievements"
 }
-
 
 
 class Statistics(object):

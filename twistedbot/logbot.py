@@ -12,8 +12,9 @@ def exit_on_error(_stuff=None, _why=None):
         reactor.stop()
     sys.exit(1)
 
+
 class MinecraftLogObserver(object):
-    
+
     def __init__(self, f):
         self.write = f.write
         self.flush = f.flush
@@ -31,44 +32,49 @@ class MinecraftLogObserver(object):
         if text is None:
             return
         timeStr = self.formatTime(eventDict['time'])
-        fmtDict = {'header': eventDict['header'], 'text': text.replace("\n", "\n\t")}
+        fmtDict = {'header': eventDict['header'], 'text':
+                   text.replace("\n", "\n\t")}
         msgStr = log._safeFormat("[%(header)s] %(text)s\n", fmtDict)
         util.untilConcludes(self.write, timeStr + " " + msgStr)
-        util.untilConcludes(self.flush) 
-        
-        
+        util.untilConcludes(self.flush)
+
+
 class Logger(object):
-    
+
     def __init__(self, name):
         self.name = name
-        
+
     def msg(self, *args, **kwargs):
         if "header" not in kwargs:
             kwargs["header"] = self.name
         log.msg(*args, **kwargs)
-        
+
     def err(self, *args, **kwargs):
         if "header" not in kwargs:
             kwargs["header"] = self.name
-        log.err(*args, **kwargs)    
-        
+        log.err(*args, **kwargs)
+
 
 loggers = {}
+
+
 def getlogger(name):
     if name not in loggers:
         loggers[name] = Logger(name)
     return loggers[name]
-    
+
 
 def start_filelog(filename=None):
     if filename is None:
-        filename = "%s.proxy_log.txt" % datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
+        filename = "%s.proxy_log.txt" % datetime.now(
+        ).strftime("%Y.%m.%d_%H.%M.%S")
     f = open(filename, "w")
     log.addObserver(MinecraftLogObserver(f).emit)
     msg("Started logging to file %s" % filename)
-        
 
-log.startLoggingWithObserver(MinecraftLogObserver(sys.stdout).emit, setStdout=0)
+
+log.startLoggingWithObserver(
+    MinecraftLogObserver(sys.stdout).emit, setStdout=0)
 
 default_logger = getlogger("-")
 default_logger.msg("Start logging")

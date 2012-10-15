@@ -16,21 +16,22 @@ from aabb import AABB
 log = logbot.getlogger("GRID")
 
 
-
 class Chunk(object):
     levels = config.WORLD_HEIGHT / 16
+
     def __init__(self, coords):
         self.coords = coords
-        self.x         = coords[0]
-        self.z         = coords[1]
+        self.x = coords[0]
+        self.z = coords[1]
         self.grid_x = self.x << 4
         self.grid_z = self.z << 4
-        self.blocks         = [None for _ in xrange(self.levels)]
-        self.meta           = [None for _ in xrange(self.levels)]
-        self.block_light      = [] # ignore block light
-        self.sky_light      = [] # ifnore sky light
-        self.biome          = [None for _ in xrange(config.CHUNK_SIDE_LEN * config.CHUNK_SIDE_LEN)]
-        self.complete         = False
+        self.blocks = [None for _ in xrange(self.levels)]
+        self.meta = [None for _ in xrange(self.levels)]
+        self.block_light = []  # ignore block light
+        self.sky_light = []  # ifnore sky light
+        self.biome = [None for _ in xrange(
+            config.CHUNK_SIDE_LEN * config.CHUNK_SIDE_LEN)]
+        self.complete = False
 
     def fill_level(self, level):
         self.blocks[level] = array.array('b', [0 for _ in xrange(4096)])
@@ -38,7 +39,7 @@ class Chunk(object):
 
     def __str__(self):
         return "%s %s %s" % (str(self.coords), self.complete, [i if i is None else 1 for i in self.blocks])
-        
+
 
 class Grid(object):
     def __init__(self, world):
@@ -56,13 +57,13 @@ class Grid(object):
         if coords in self.chunks:
             return self.chunks[coords]
         elif auto_create:
-            chunk = Chunk(coords)            
+            chunk = Chunk(coords)
             self.chunks[coords] = chunk
             return chunk
         else:
             #log.err("chunk %s not initialized" % str(coords))
             return None
-            
+
     def get_block(self, x, y, z):
         if y > 255 or y < 0:
             #return None
@@ -102,7 +103,7 @@ class Grid(object):
     def load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array, update_after=True):
         if primary_bit == 0:
             #log.msg("Received erase packet for %s, %s" % (x, z))
-            return #TODO actually remove this chunk....
+            return  # TODO actually remove this chunk....
         self.chunks_loaded += 1
         if (x, z) not in self.chunks:
             chunk = Chunk((x, z))
@@ -119,14 +120,15 @@ class Grid(object):
             if primary_bit & 1 << i:
                 data_str = data.read(4096)
                 data_count += 4096
-                ndata = array.array('B', data_str)  #y, z, x 
+                ndata = array.array('B', data_str)  # y, z, x
                 chunk.blocks[i] = ndata
         for h in xrange(3):
             for i in xrange(chunk.levels):
                 if primary_bit & 1 << i:
                     data_str = data.read(2048)
                     data_count += 2048
-                    ndata = array.array('B', self.half_bytes_from_string(data_str))
+                    ndata = array.array(
+                        'B', self.half_bytes_from_string(data_str))
                     if h == 0:
                         chunk.meta[i] = ndata
                     # for now ignore block light and sky light
@@ -168,7 +170,8 @@ class Grid(object):
     def change_block_to(self, x, y, z, block_type, meta):
         current_block = self.get_block(x, y, z)
         if current_block is None:
-            log.err("change_block chunk %s block %s type %s meta %s is None" % (chunk, (x, y, z), block_type, meta))
+            log.err("change_block chunk %s block %s type %s meta %s is None" %
+                    (chunk, (x, y, z), block_type, meta))
             return None, None
         if current_block.is_sign and not current_block.number == block_type:
             self.navgrid.sign_waypoints.remove(current_block.coords)
@@ -209,7 +212,7 @@ class Grid(object):
         sign = tools.Sign((x, y, z), line1, line2, line3, line4)
         if sign.is_waypoint:
             self.navgrid.sign_waypoints.new(sign)
-    
+
     def explosion(self, x, y, z, records):
         for rec in records:
             rx = x + rec.x
@@ -235,7 +238,7 @@ class Grid(object):
                 out.append(blk)
         return out
 
-    def is_any_liquid(self, bb): # mcp has --val is val < 0
+    def is_any_liquid(self, bb):  # mcp has --val is val < 0
         minius_one_x, minius_one_y, minius_one_z = (-1 if bb.min_x < 0 else 0, -1 if bb.min_y < 0 else 0, -1 if bb.min_z < 0 else 0)
         for blk in self.blocks_in_aabb(bb.extend_to(minius_one_x, minius_one_y, minius_one_z)):
             if blk.material.is_liquid:
@@ -263,14 +266,15 @@ class Grid(object):
 
     def min_collision_between(self, bb1, bb2, horizontal=False, max_height=False):
         ubb = bb1.extend_to(dy=-1).union(bb2.extend_to(dy=-1))
-        blcks = self.blocks_in_aabb(ubb) 
+        blcks = self.blocks_in_aabb(ubb)
         dvect = bb1.vector_to(bb2)
         if horizontal:
             dvect = (dvect[0], 0, dvect[2])
         col_rel_d = 1.1
         col_bb = None
         for blk in blcks:
-            col, rel_d, bb = blk.sweep_collision(bb1, dvect, max_height=max_height)
+            col, rel_d, bb = blk.sweep_collision(
+                bb1, dvect, max_height=max_height)
             if col and fops.eq(col_rel_d, rel_d):
                 if max_height:
                     if fops.lt(col_bb.max_y, bb.max_y):
@@ -288,7 +292,7 @@ class Grid(object):
         blcks = self.blocks_in_aabb(ubb)
         dvect = bb1.vector_to(bb2)
         for blk in blcks:
-            col, _, _= blk.sweep_collision(bb1, dvect, debug=debug)
+            col, _, _ = blk.sweep_collision(bb1, dvect, debug=debug)
             if col:
                 return True
         return False
@@ -312,7 +316,7 @@ class Grid(object):
             col, rel_d, _ = blk.sweep_collision(bb, dvect)
             if col and fops.eq(rel_d, 0):
                 standing_on = blk
-                if standing_on.x == bb.grid_x and standing_on.z ==  bb.grid_z:
+                if standing_on.x == bb.grid_x and standing_on.z == bb.grid_z:
                     break
         if standing_on is None:
             if self.aabb_on_ladder(bb):
