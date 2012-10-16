@@ -1,15 +1,22 @@
 # Bot/Proxy for Minecraft
 - Support for 1.3.2 protocol version 39
 - Running under [PyPy](http://pypy.org/ "PyPy"). You can try [CPython](http://python.org/ "CPython"), if you want
+- flake8 clean with long lines
 
 #### Requirements
 - [PyCrypto](https://www.dlitz.net/software/pycrypto/ "PyCrypto")
 - Rest of the dependencies is included in "libs" directory
 
 ## Bot
-- Client side artificial player for Minecraft
-- Runs on vanilla server in offline mode
-- No modification on server/client side needed
+- Client side artificial player for Minecraft that runs on vanilla server in offline mode. No modification on server/client side needed.
+- Basic pathfinding
+- Solid block awareness
+- Avoiding water, lava, web and cactus
+- Reasonable usage of vines and ladders
+- No active interaction with the world. That is no digging, placing blocks, open/close doors, etc.
+- Use signs to set up points to rotate  -> details below
+- Configure using command line arguments or modifying twistedbot/config.py
+- In the idle state bot just stares at you, turning his head and body.
 
 #### Usage
 By default connects to localhost
@@ -18,14 +25,6 @@ By default connects to localhost
 
 #### Possible flags
 	pypy bot.py -h
-
-#### Status
-- Basic pathfinding
-- Solid block awareness
-- Avoid water, lava, vines, ladders.
-- No active interaction with the world. That is no digging, placing blocks, open/close doors, etc.
-- Use signs to set up points to rotate  -> details below
-- Configure using command line arguments or modifying twistedbot/config.py
 
 #### In game commands
 If your username (commander) is set, then you can use chat to send commands to bot.
@@ -65,4 +64,3 @@ To make your own filter, look in twistedbot.proxy_processors.default for an exam
 
 ##### Other places
 Twitter [@lukleh](https://twitter.com/lukleh "@lukleh")
-Youtube [playlist](http://www.youtube.com/user/lukleh/videos?flow=grid&view=0 "youtube playlist")

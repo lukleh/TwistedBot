@@ -75,9 +75,9 @@ class Block(object):
         return (self.x, self.y, self.z)
 
     def adjacent_block(self, dx=None, dy=None, dz=None):
-        x = dx if dx is not None else 0
-        y = dy if dy is not None else 0
-        z = dz if dz is not None else 0
+        x = self.x + dx if dx is not None else self.x
+        y = self.y + dy if dy is not None else self.y
+        z = self.z + dz if dz is not None else self.z
         return self.grid.get_block(x, y, z)
 
     @property

@@ -158,12 +158,8 @@ class GridSpace(object):
         edge_cost = 0
         bb_stand = self.bb_stand
         other_bb_stand = gs.bb_stand
-        std_block = self.grid.standing_on_solidblock(bb_stand)
-        if std_block.is_ladder_vine:
-            if fops.gt(other_bb_stand.min_y, bb_stand.min_y):
-                if fops.gt(other_bb_stand.min_y, std_block.y + 1) and not std_block.adjacent_block(dy=1).is_ladder_vine:
-                #if not self.grid.aabb_on_ladder(bb_stand.shift(min_y=other_bb_stand.min_y)):
-                    return False
+        if fops.gt(other_bb_stand.min_y - bb_stand.min_y, config.MAX_JUMP_HEIGHT):
+            return False
         if fops.gt(bb_stand.min_y, other_bb_stand.min_y):
             elev = bb_stand.min_y - other_bb_stand.min_y
             elev_bb = other_bb_stand.extend_to(dy=elev)
@@ -172,6 +168,11 @@ class GridSpace(object):
         elif fops.lt(bb_stand.min_y, other_bb_stand.min_y):
             elev = other_bb_stand.min_y - bb_stand.min_y
             if fops.gt(elev, config.MAX_JUMP_HEIGHT):
+                return False
+            if self.grid.aabb_on_ladder(bb_stand) and \
+                    other_bb_stand.grid_y > bb_stand.grid_y and \
+                    fops.gt(other_bb_stand.min_y, other_bb_stand.grid_y) and \
+                    not self.grid.aabb_on_ladder(bb_stand.shift(min_y=other_bb_stand.min_y)):
                 return False
             if fops.lte(elev, config.MAX_STEP_HEIGHT):
                 elev = config.MAX_STEP_HEIGHT

@@ -60,7 +60,7 @@ class ProxyServerProtocol(ProxyProtocol):
         self.factory.proxyclient.protocol.dataReceived("")
 
     def connectionLost(self, reason):
-        self.log.msg("Lost connection from server")
+        self.log.msg("Lost connection from server: %s" % reason)
         self.factory.proxyclient.protocol.transport.loseConnection()
 
     def parse_stream(self, bytestream):
@@ -165,7 +165,7 @@ class ProxyClientProtocol(ProxyProtocol):
         d.addErrback(logbot.exit_on_error, "Server network error")
 
     def connectionLost(self, reason):
-        self.log.msg("Lost connection from client")
+        self.log.msg("Lost connection from client: %s" % reason)
         if self.proxyserver.protocol:
             self.proxyserver.protocol.transport.loseConnection()
 

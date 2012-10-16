@@ -96,8 +96,6 @@ class Bot(object):
     def shutdown(self):
         """ save anything that needs to be saved and shutdown"""
         log.msg("Gracefully shutting down.......")
-        if self.location_received:
-            self.timer.stop()
 
     def startup(self):
         """ load anything that needs to be loaded """
@@ -466,7 +464,7 @@ class Bot(object):
         else:
             return not self.grid.is_any_liquid(bb)
 
-    def do_respawn(self, ignore):
+    def do_respawn(self):
         self.send_packet("client statuses", {"status": 1})
 
     def health_update(self, health, food, food_saturation):

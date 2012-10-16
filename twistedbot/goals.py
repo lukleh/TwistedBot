@@ -156,7 +156,6 @@ class WalkSignsGoal(GoalBase):
         self.bot.world.navgrid.sign_waypoints.reset_group(self.group)
 
     def from_child(self, status):
-        print 'finished', status, self.signpoint
         is_ok = self.manager.grid.check_sign(self.signpoint.coords)
         if not is_ok:
             self.self.manager.not_running()
@@ -179,7 +178,6 @@ class WalkSignsGoal(GoalBase):
 
     def do(self):
         self.signpoint = self.next_sign(self.group)
-        print 'WALK to', self.signpoint
         if self.signpoint is not None:
             self.manager.add_subgoal(
                 TravelToGoal, coords=self.signpoint.nav_coords)
@@ -315,7 +313,7 @@ class MoveToGoal(GoalBase):
             return Status.finished
         if self.bot.aabb.horizontal_distance(bb_stand) < self.bot.current_motion:
             self.was_at_target = True
-            if self.bot.on_ground:
+            if fops.eq(elev, 0):
                 return Status.finished
         if self.bot.on_ground and self.bot.horizontally_blocked:
             gs = GridSpace(self.grid, bb=self.bot.aabb)
@@ -326,16 +324,21 @@ class MoveToGoal(GoalBase):
         return Status.not_finished
 
     def do(self):
+        col_distance, col_bb = self.grid.min_collision_between(self.bot.aabb,
+                                                               self.target_space.bb_stand,
+                                                               horizontal=True,
+                                                               max_height=True)
         if self.bot.is_on_ladder:
             elev = self.target_space.bb_stand.min_y - self.bot.aabb.min_y
             if fops.gt(elev, 0):
                 self.jump()
-            self.move()
+                self.move()
+            elif fops.lt(elev, 0):
+                if col_distance is None:
+                    self.move()
+            else:
+                self.move()
         elif self.bot.is_standing:
-            col_distance, col_bb = self.grid.min_collision_between(self.bot.aabb,
-                                                                   self.target_space.bb_stand,
-                                                                   horizontal=True,
-                                                                   max_height=True)
             if col_distance is None:
                 self.move()
             else:
