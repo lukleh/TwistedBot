@@ -11,7 +11,7 @@ import fops
 import blocks
 import goals
 from statistics import Statistics
-from aabb import AABB
+from axisbox import AABB
 from chat import Chat
 from entity import EntityBot
 
@@ -28,8 +28,11 @@ class StatusDiff(object):
         self.logger = logbot.getlogger("BOT_ENTITY_STATUS")
 
     def log(self):
-        if self.node_count != self.world.navgrid.graph.node_count or self.edge_count != self.world.navgrid.graph.edge_count:
-            self.logger.msg("navgrid having %d nodes and %d edges" % (self.world.navgrid.graph.node_count, self.world.navgrid.graph.edge_count))
+        if self.node_count != self.world.navgrid.graph.node_count or \
+                self.edge_count != self.world.navgrid.graph.edge_count:
+            self.logger.msg("navgrid having %d nodes and %d edges" %
+                            (self.world.navgrid.graph.node_count,
+                             self.world.navgrid.graph.edge_count))
             self.node_count = self.world.navgrid.graph.node_count
             self.edge_count = self.world.navgrid.graph.edge_count
         #self.logger.msg("received %d packets" % self.packets_in)
@@ -53,12 +56,13 @@ class Bot(object):
         self.grid = self.world.grid
         self.velocities = [0.0, 0.0, 0.0]
         self.direction = [0, 0]
-        self._x = 0
-        self._y = 0
+        self.x = 0
+        self.y = 0
+        self.z = 0
         self.ticks = 0
         self.chunks_ready = False
         self.goal_manager = goals.Manager(self)
-        self.stance = None
+        self.stance_diff = config.PLAYER_EYELEVEL
         self.pitch = None
         self.yaw = None
         self.on_ground = False
@@ -103,13 +107,13 @@ class Bot(object):
         self.x = kw["x"]
         self.y = kw["y"]
         self.z = kw["z"]
-        self.stance = kw["stance"]
+        self.stance_diff = kw["stance"] - kw["y"]
         self.on_ground = kw["grounded"]
         self.yaw = kw["yaw"]
         self.pitch = kw["pitch"]
         self.velocities = [0.0, 0.0, 0.0]
         self.check_location_received = True
-        if self.location_received == False:
+        if self.location_received is False:
             self.location_received = True
         if not self.in_complete_chunks:
             log.msg("Server send location into incomplete chunks")
@@ -128,33 +132,12 @@ class Bot(object):
         return (self.x, self.y_eyelevel, self.z)
 
     @property
-    def x(self):
-        return self._x
-
-    @x.setter
-    def x(self, v):
-        self._x = v
-
-    @property
-    def y(self):
-        return self._y
-
-    @property
     def y_eyelevel(self):
         return self.y + config.PLAYER_EYELEVEL
 
-    @y.setter
-    def y(self, v):
-        self._y = v
-        self.stance = v + config.PLAYER_EYELEVEL
-
     @property
-    def z(self):
-        return self._z
-
-    @z.setter
-    def z(self, v):
-        self._z = v
+    def stance(self):
+        return self.y + self.stance_diff
 
     @property
     def grid_x(self):
@@ -188,7 +171,7 @@ class Bot(object):
     def iterate(self):
         iter_start = datetime.now()
         self.ticks += 1
-        if self.location_received == False:
+        if self.location_received is False:
             self.last_iterate_time = iter_start
             tools.do_later(config.TIME_STEP, self.iterate)
             return
@@ -222,11 +205,15 @@ class Bot(object):
 
     def send_location(self):
         self.send_packet("player position&look", {
-            "position": packets.Container(x=self.x, y=self.y, z=self.z, stance=self.stance),
+            "position": packets.Container(x=self.x, y=self.y, z=self.z,
+                                          stance=self.stance),
             "orientation": packets.Container(yaw=self.yaw, pitch=self.pitch),
             "grounded": packets.Container(grounded=self.on_ground)})
 
-    def set_action(self, action_id):  # sneaking, not sneaking, leave bed, start sprinting, stop sprinting
+    def set_action(self, action_id):
+        """
+        sneaking, not sneaking, leave bed, start sprinting, stop sprinting
+        """
         if self.action != action_id:
             self.action = action_id
         self.send_packet(
@@ -338,7 +325,10 @@ class Bot(object):
         return is_in_water, water_current
 
     def handle_lava_movement(self):
-        for blk in self.grid.blocks_in_aabb(self.aabb.expand(-0.10000000149011612, -0.4000000059604645, -0.10000000149011612)):
+        for blk in self.grid.blocks_in_aabb(
+                self.aabb.expand(-0.10000000149011612,
+                                 -0.4000000059604645,
+                                 -0.10000000149011612)):
             if isinstance(blk, blocks.BlockLava):
                 return True
         return False
@@ -356,7 +346,9 @@ class Bot(object):
                 self.velocities[1] = config.SPEED_CLIMB
             self.is_jumping = False
         if self.is_in_water:
-            self.velocities = [self.velocities[0] + water_current[0], self.velocities[1] + water_current[1], self.velocities[2] + water_current[2]]
+            self.velocities = [self.velocities[0] + water_current[0],
+                               self.velocities[1] + water_current[1],
+                               self.velocities[2] + water_current[2]]
             orig_y = self.y
             self.update_directional_speed(
                 direction, 0.02, influence=water_current)
@@ -365,7 +357,11 @@ class Bot(object):
             self.velocities[1] *= 0.800000011920929
             self.velocities[2] *= 0.800000011920929
             self.velocities[1] -= 0.02
-            if self.is_collided_horizontally and self.is_offset_in_liquid(self.velocities[0], self.velocities[1] + 0.6000000238418579 - self.y + orig_y, self.velocities[2]):
+            if self.is_collided_horizontally and \
+                    self.is_offset_in_liquid(self.velocities[0],
+                                             self.velocities[1] + 0.6 -
+                                             self.y + orig_y,
+                                             self.velocities[2]):
                 self.velocities[1] = 0.30000001192092896
             self.is_floating = True
         elif self.is_in_lava:
@@ -376,7 +372,11 @@ class Bot(object):
             self.velocities[1] *= 0.5
             self.velocities[2] *= 0.5
             self.velocities[1] -= 0.02
-            if self.is_collided_horizontally and self.is_offset_in_liquid(self.velocities[0], self.velocities[1] + 0.6000000238418579 - self.y + orig_y, self.velocities[2]):
+            if self.is_collided_horizontally and \
+                    self.is_offset_in_liquid(self.velocities[0],
+                                             self.velocities[1] + 0.6 -
+                                             self.y + orig_y,
+                                             self.velocities[2]):
                 self.velocities[1] = 0.30000001192092896
         else:
             slowdown = self.current_slowdown
@@ -397,7 +397,8 @@ class Bot(object):
         return dx, dz
 
     def update_directional_speed(self, direction, speedf, influence=None):
-        #TODO recalculate so final velocities have possibly same direction as 'direction'
+        #TODO recalculate so final velocities have possibly
+        #     same direction as 'direction'
         x, z = self.directional_speed(direction, speedf)
         self.velocities[0] += x
         self.velocities[2] += z
@@ -474,11 +475,13 @@ class Bot(object):
         if health <= 0:
             self.on_death()
 
-    def login_data(self, eid, level_type, mode, dimension, difficulty, players):
+    def login_data(self, eid, level_type, mode,
+                   dimension, difficulty, players):
         self.eid = eid
         self.world.entities.entities[eid] = EntityBot(eid=eid, x=0, y=0, z=0)
 
-    def respawn_data(self, dimension, difficulty, mode, world_height, level_type):
+    def respawn_data(self, dimension, difficulty,
+                     mode, world_height, level_type):
         # TODO
         # ignore the details now
         # should clear the world(chunks, entities, etc.)

@@ -1,19 +1,19 @@
 
-import argparse
 
 import syspath_fix
+syspath_fix.update_sys_path()
+
+import argparse
 
 from twisted.internet import reactor
 
 from twistedbot.factory import MineCraftFactory
 from twistedbot.world import World
 from twistedbot.botentity import Bot
-import twistedbot.logbot as logbot
 import twistedbot.config as config
 
 
 def start():
-    log = logbot.getlogger("TOP")
 
     parser = argparse.ArgumentParser(description='Bot arguments.')
     parser.add_argument('--serverhost', default=config.SERVER_HOST,

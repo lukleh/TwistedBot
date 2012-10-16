@@ -1,15 +1,11 @@
 ﻿
 from collections import defaultdict, OrderedDict
 
-from twisted.internet import reactor
 from twisted.internet.task import cooperate
 
-import config
 import tools
 import logbot
-import blocks
 from signwaypoints import SignWayPoints
-from pathfinding import AStar
 from gridspace import GridSpace
 
 
@@ -101,7 +97,8 @@ class NavigationGrid(object):
                 self.chunk_borders.add(center_space.coords, tocrd)
                 continue
             if i != 0 and j != 0:
-                if not self.grid.chunk_complete_at((crd[0] >> 4, (crd[2] + j) >> 4)) or not self.grid.chunk_complete_at(((crd[0] + i) >> 4, crd[2] >> 4)):
+                if not self.grid.chunk_complete_at((crd[0] >> 4, (crd[2] + j) >> 4)) or \
+                        not self.grid.chunk_complete_at(((crd[0] + i) >> 4, crd[2] >> 4)):
                     continue
             gs = GridSpace(self.grid, coords=tocrd)
             if gs.can_stand_on:
@@ -205,9 +202,6 @@ class NavigationGrid(object):
             self.chunk_borders.remove(crd)
 
     def block_change(self, old_block, new_block):
-        # log.msg("block change %s %s %s => %s %s" % \
-        #     (new_block.coords, old_block.name if old_block is not None else "none", tools.meta2str(old_block.meta) if old_block is not None else "none", \
-        #         new_block.name, tools.meta2str(new_block.meta)))
         coords = new_block.coords
         gs = GridSpace(self.grid, coords=coords)
         if gs.can_stand_on:

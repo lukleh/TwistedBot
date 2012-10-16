@@ -1,13 +1,10 @@
 
 import re
 import math
-import time
 import functools
-from collections import namedtuple
 
 from twisted.internet import defer, reactor
 
-import config
 import logbot
 
 
@@ -168,7 +165,8 @@ class OrderedLinkedList(object):
         return self.length
 
     def __str__(self):
-        return "%s [%s]" % (self.name, ",".join([str((o.order, o.obj)) for o in self.iter()]))
+        return "%s [%s]" % \
+            (self.name, ",".join([str((o.order, o.obj)) for o in self.iter()]))
 
     def iter(self):
         if self.head is not None:
@@ -356,7 +354,8 @@ class Sign(object):
         return self.coords == sgn.coords
 
     def __str__(self):
-        return "$%s %s %s %s$" % (str(self.coords), self.group, self.value, self.name)
+        return "$%s %s %s %s$" % \
+            (str(self.coords), self.group, self.value, self.name)
 
     def __repr__(self):
         return self.__str__()

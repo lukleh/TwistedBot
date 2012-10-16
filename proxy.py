@@ -1,15 +1,13 @@
 
 
 import syspath_fix
+syspath_fix.update_sys_path()
 
 import argparse
-import sys
-from datetime import datetime
 
 from twisted.internet import reactor
 from twisted.internet.protocol import Protocol, Factory
 from twisted.internet.endpoints import TCP4ServerEndpoint, TCP4ClientEndpoint
-from twisted.python import log
 
 from twistedbot.packets import make_packet, parse_packets, packets
 from twistedbot import encryption
@@ -89,7 +87,9 @@ class ProxyServerProtocol(ProxyProtocol):
 
     def on_encryption_key_request(self, c):
         """
-        STEP 2.1: decode encryption request from the server, use it for the server side
+        STEP 2.1:
+        decode encryption request from the server
+        use it for the server side
         """
         aes_key = encryption.get_random_bytes()
         self.cipher = encryption.make_aes(aes_key, aes_key)
@@ -103,15 +103,18 @@ class ProxyServerProtocol(ProxyProtocol):
         STEP 3.2: send the server our AES key
         """
         data = make_packet(
-            "encryption key response", {"shared_length": len(self.enc_shared_sercet),
-                                        "shared_secret": self.enc_shared_sercet,
-                                        "token_length": len(self.enc_4bytes),
-                                        "token_secret": self.enc_4bytes})
+            "encryption key response",
+            {"shared_length": len(self.enc_shared_sercet),
+            "shared_secret": self.enc_shared_sercet,
+            "token_length": len(self.enc_4bytes),
+            "token_secret": self.enc_4bytes})
         self.sendData(data)
 
     def send_handshake(self, c):
         """
-        STEP 1: alter the received handshake packet from client and send it to the server
+        STEP 1:
+        alter the received handshake packet from client
+        and send it to the server
         """
         c.server_host = self.factory.proxyclient.host
         c.server_port = self.factory.proxyclient.port
@@ -246,7 +249,7 @@ if __name__ == '__main__':
     parser.add_argument('--processor',
                         default='default',
                         dest='processor',
-                        help='Processor for packets, to print, save, analyze...')
+                        help='Processor for packets, to print, save, analyze')
     parser.add_argument('--log2file',
                         action='store_true',
                         help='Save log data to file')
@@ -255,7 +258,8 @@ if __name__ == '__main__':
                         dest='ignore_packets',
                         nargs='+',
                         type=int,
-                        help='Ignore there packets IDs for processor. ex. 0 4 11 12 13 24 28 29 30 31 32 33 34 35 62')
+                        help='Ignore there packets IDs for processor. \
+                            ex. 0 4 11 12 13 24 28 29 30 31 32 33 34 35 62')
     parser.add_argument('--filter_packets',
                         default=[],
                         dest='filter_packets',

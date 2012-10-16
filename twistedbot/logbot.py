@@ -24,7 +24,9 @@ class MinecraftLogObserver(object):
         return t.strftime("%H:%M:%S.%f")
 
     def emit(self, eventDict):
-        if "isError" in eventDict and eventDict["isError"] and "header" not in eventDict:
+        if "isError" in eventDict and \
+                eventDict["isError"] and \
+                "header" not in eventDict:
             eventDict["header"] = "-"
         if "header" not in eventDict:
             return

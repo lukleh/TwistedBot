@@ -2,9 +2,7 @@
 import heapq
 
 import config
-import fops
 import logbot
-import tools
 
 
 log = logbot.getlogger("ASTAR")
@@ -21,7 +19,8 @@ class PathNode(object):
         self.hash = hash(self.coords)
 
     def __str__(self):
-        return "%s:%s:g%s:h%s:f%s" % (str(self.coords), self.cost, self.g, self.h, self.f)
+        return "%s:%s:g%s:h%s:f%s" % \
+            (str(self.coords), self.cost, self.g, self.h, self.f)
 
     def __repr__(self):
         return self.__str__()
@@ -50,7 +49,6 @@ class Path(object):
         self.nodes = []
         self.reconstruct_path(self.goal)
         self.step_index = len(self.nodes)
-        #log.msg("Path broken %s nodes %s" % (self.broken, [str(p) for p in self.nodes]))
 
     def __str__(self):
         return "Path nodes %s" % [str(n) for n in self.nodes]

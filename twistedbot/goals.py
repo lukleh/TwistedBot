@@ -1,17 +1,15 @@
 ﻿
 import math
-from collections import deque
 
 from twisted.internet.task import cooperate
 
 import config
 import tools
-import pathfinding
+
 import logbot
 import fops
-from aabb import AABB
 from gridspace import GridSpace
-
+from pathfinding import AStar
 
 log = logbot.getlogger("GOALS")
 
@@ -145,9 +143,11 @@ class WalkSignsGoal(GoalBase):
         self.group = kwargs.get("group")
         self.walk_type = kwargs.get("type")
         if self.walk_type == "circulate":
-            self.next_sign = self.bot.world.navgrid.sign_waypoints.get_groupnext_circulate
+            self.next_sign = \
+                self.bot.world.navgrid.sign_waypoints.get_groupnext_circulate
         elif self.walk_type == "rotate":
-            self.next_sign = self.bot.world.navgrid.sign_waypoints.get_groupnext_rotate
+            self.next_sign = \
+                self.bot.world.navgrid.sign_waypoints.get_groupnext_rotate
         else:
             raise Exception("unknown walk type")
         self.name = '%s signs in %s' % (
@@ -171,7 +171,7 @@ class WalkSignsGoal(GoalBase):
                 self.manager_goal_return(Status.finished)
 
     def check_state(self):
-        if not self.bot.world.navgrid.sign_waypoints.has_name_group(self.group):
+        if not self.bot.world.navgrid.sign_waypoints.has_group(self.group):
             self.bot.chat_message("no group named %s" % self.group)
             return Status.impossible
         else:
@@ -237,7 +237,9 @@ class TravelToGoal(GoalBase):
 
     def calculate_path(self):
         if self.bot.standing_on_block is not None:
-            cootask = cooperate(pathfinding.AStar(self.bot.world.navgrid, self.bot.standing_on_block.coords, self.travel_coords))
+            cootask = cooperate(AStar(self.bot.world.navgrid,
+                                      self.bot.standing_on_block.coords,
+                                      self.travel_coords))
             d = cootask.whenDone()
             d.addCallback(self.pathfind_finished)
             d.addErrback(logbot.exit_on_error)
@@ -298,17 +300,20 @@ class MoveToGoal(GoalBase):
         #log.msg(self.name)
 
     def check_state(self):
-        elev = self.target_space.bb_stand.min_y - self.bot.aabb.min_y
+        bb_stand = self.target_space.bb_stand
+        elev = bb_stand.min_y - self.bot.aabb.min_y
         if fops.gt(elev, config.MAX_JUMP_HEIGHT):
             return Status.broken
         if not self.target_space._can_stand_on():
             self.grid.navgrid.delete_node(self.target_space.coords)
             return Status.impossible
-        if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) > 2:  # too far from the next step, better try again
+        if self.bot.aabb.horizontal_distance(bb_stand) > 2:
+            # too far from the next step, better try again
             return Status.broken
-        if self.bot.position_grid == self.target_space.coords and self.bot.is_on_ladder:
+        if self.bot.position_grid == self.target_space.coords and \
+                self.bot.is_on_ladder:
             return Status.finished
-        if self.bot.aabb.horizontal_distance_to(self.target_space.bb_stand) < self.bot.current_motion:
+        if self.bot.aabb.horizontal_distance(bb_stand) < self.bot.current_motion:
             self.was_at_target = True
             if self.bot.on_ground:
                 return Status.finished
@@ -327,7 +332,10 @@ class MoveToGoal(GoalBase):
                 self.jump()
             self.move()
         elif self.bot.is_standing:
-            col_distance, col_bb = self.grid.min_collision_between(self.bot.aabb, self.target_space.bb_stand, horizontal=True, max_height=True)
+            col_distance, col_bb = self.grid.min_collision_between(self.bot.aabb,
+                                                                   self.target_space.bb_stand,
+                                                                   horizontal=True,
+                                                                   max_height=True)
             if col_distance is None:
                 self.move()
             else:

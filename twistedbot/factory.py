@@ -85,7 +85,10 @@ class MineCraftProtocol(Protocol):
 
     def connectionMade(self):
         log.msg("sending HANDSHAKE")
-        self.send_packet("handshake", {"protocol": config.PROTOCOL_VERSION, "username": config.USERNAME, "server_host": config.SERVER_HOST, "server_port": config.SERVER_PORT})
+        self.send_packet("handshake", {"protocol": config.PROTOCOL_VERSION,
+                                       "username": config.USERNAME,
+                                       "server_host": config.SERVER_HOST,
+                                       "server_port": config.SERVER_PORT})
 
     def connectionLost(self, reason):
         self.packets = deque()
@@ -150,7 +153,10 @@ class MineCraftProtocol(Protocol):
         self.send_packet("keep alive", {"pid": pid})
 
     def p_login(self, c):
-        log.msg("LOGIN DATA eid %s level type: %s mode: %s dimension: %s difficulty: %s max players: %s" % (c.eid, c.level_type, c.mode, c.dimension, c.difficulty, c.players))
+        log.msg("LOGIN DATA eid %s level type: %s mode: %s \
+                dimension: %s difficulty: %s max players: %s" %
+                (c.eid, c.level_type, c.mode,
+                 c.dimension, c.difficulty, c.players))
         self.bot.login_data(c.eid, c.level_type, c.mode,
                             c.dimension, c.difficulty, c.players)
 
@@ -178,38 +184,65 @@ class MineCraftProtocol(Protocol):
                               c.game_mode, c.world_height, c.level_type)
 
     def p_location(self, c):
-        log.msg("received LOCATION X:%f Y:%f Z:%f STANCE:%f GROUNDED:%s" % (c.position.x, c.position.stance, c.position.z, c.position.y, c.grounded.grounded))
+        log.msg("received LOCATION X:%f Y:%f Z:%f STANCE:%f GROUNDED:%s" %
+                (c.position.x, c.position.stance, c.position.z,
+                 c.position.y, c.grounded.grounded))
         s = c.position.y
         c.position.y = c.position.stance
         c.position.stance = s
         self.send_packet("player position&look", c)
-        self.bot.set_location({"x": c.position.x, "y": c.position.y, "z": c.position.z, "stance": c.position.stance, "grounded": c.grounded.grounded, "yaw": c.orientation.yaw, "pitch": c.orientation.pitch})
+        self.bot.set_location({"x": c.position.x,
+                               "y": c.position.y,
+                               "z": c.position.z,
+                               "stance": c.position.stance,
+                               "grounded": c.grounded.grounded,
+                               "yaw": c.orientation.yaw,
+                               "pitch": c.orientation.pitch})
 
     def p_use_bed(self, c):
-        # if ever will use bed, then deal with it. possibly also if commander uses bed.
+        """
+        if ever will use bed, then deal with it.
+        possibly also if commander uses bed.
+        """
         devnull()
 
     def p_animate(self, c):
-        # TODO this is two way, client uses only value 1 (swing arm). probably needed. devnull for now
+        # TODO this is two way, client uses only value 1 (swing arm).
+        # probably needed. devnull for now
         devnull()
 
     def p_player(self, c):
-        self.world.entities.new_player(eid=c.eid, username=c.username, held_item=c.item, yaw=c.yaw, pitch=c.pitch, x=c.x, y=c.y, z=c.z)
+        self.world.entities.new_player(eid=c.eid, username=c.username,
+                                       held_item=c.item, yaw=c.yaw,
+                                       pitch=c.pitch, x=c.x, y=c.y, z=c.z)
 
     def p_dropped_item(self, c):
-        self.world.entities.new_dropped_item(eid=c.eid, count=c.count, item=c.item, data=c.data, x=c.x, y=c.y, z=c.z, yaw=c.yaw, pitch=c.pitch, roll=c.roll)
+        self.world.entities.new_dropped_item(eid=c.eid, count=c.count,
+                                             item=c.item, data=c.data, x=c.x,
+                                             y=c.y, z=c.z, yaw=c.yaw,
+                                             pitch=c.pitch, roll=c.roll)
 
     def p_collect(self, c):
-        # can be safely ignored, for animation purposes only
+        """ can be safely ignored, for animation purposes only """
         devnull()
 
     def p_vehicle(self, c):
+        vel = {"x": c.velocity.x,
+               "y": c.velocity.y,
+               "z": c.velocity.z} if c.object_data > 0 else None
         self.world.entities.new_vehicle(eid=c.eid, etype=c.type,
-                                        x=c.x, y=c.y, z=c.z, object_data=c.object_data,
-                                        velocity={"x": c.velocity.x, "y": c.velocity.y, "z": c.velocity.z} if c.object_data > 0 else None)
+                                        x=c.x, y=c.y, z=c.z,
+                                        object_data=c.object_data,
+                                        velocity=vel)
 
     def p_mob(self, c):
-        self.world.entities.new_mob(eid=c.eid, etype=c.type, x=c.x, y=c.y, z=c.z, yaw=c.yaw, pitch=c.pitch, head_yaw=c.head_yaw, velocity_x=c.velocity_x, velocity_y=c.velocity_y, velocity_z=c.velocity_z, metadata=c.metadata)
+        self.world.entities.new_mob(eid=c.eid, etype=c.type, x=c.x, y=c.y,
+                                    z=c.z, yaw=c.yaw, pitch=c.pitch,
+                                    head_yaw=c.head_yaw,
+                                    velocity_x=c.velocity_x,
+                                    velocity_y=c.velocity_y,
+                                    velocity_z=c.velocity_z,
+                                    metadata=c.metadata)
 
     def p_experience_orb(self, c):
         self.world.entities.new_experience_orb(
@@ -262,7 +295,9 @@ class MineCraftProtocol(Protocol):
         self.world.grid.block_change(c.x, c.y, c.z, c.type, c.meta)
 
     def p_block_action(self, c):
-        """ implement if necessary according to http://wiki.vg/Block_Actions """
+        """
+        implement if necessary according to http://wiki.vg/Block_Actions
+        """
         pass
 
     def p_block_break_animation(self, c):
@@ -270,7 +305,6 @@ class MineCraftProtocol(Protocol):
         devnull()
 
     def p_bulk_chunk(self, c):
-        #log.msg("bulk chunk %s" % c.count)
         self.world.grid.load_bulk_chunk(c.meta, c.data.decode('zlib'))
 
     def p_explosion(self, c):
@@ -330,14 +364,17 @@ class MineCraftProtocol(Protocol):
         enc_shared_sercet = encryption.encrypt(key16, public_key)
         enc_4bytes = encryption.encrypt(c.verify_token, public_key)
         self.send_packet(
-            "encryption key response", {"shared_length": len(enc_shared_sercet),
-                                        "shared_secret": enc_shared_sercet,
-                                        "token_length": len(enc_4bytes),
-                                        "token_secret": enc_4bytes})
+            "encryption key response",
+            {"shared_length": len(enc_shared_sercet),
+             "shared_secret": enc_shared_sercet,
+             "token_length": len(enc_4bytes),
+             "token_secret": enc_4bytes})
 
     def p_error(self, container):
+        # TODO possibly implement error parsing and subsequent action
+        # reactor.stop kills everything
         log.msg("Server kicked me out with message: %s" % container.message)
-        reactor.stop()  # TODO possibly implement error parsing and subsequent action, reactor.stop kills everything
+        reactor.stop()
 
 
 class MineCraftFactory(ReconnectingClientFactory):

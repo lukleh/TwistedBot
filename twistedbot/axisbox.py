@@ -1,4 +1,5 @@
 ﻿
+
 import math
 
 import config
@@ -7,6 +8,7 @@ import tools
 
 
 class AABB(object):
+    """ Axis aligned bounding box """
     def __init__(self, min_x, min_y, min_z, max_x, max_y, max_z):
         self.min_x = min_x
         self.min_y = min_y
@@ -24,14 +26,20 @@ class AABB(object):
         return self.offset(-o[0], -o[1], -o[2])
 
     def __str__(self):
-        return "AABB [%s, %s, %s : %s, %s, %s]" % (self.min_x, self.min_y, self.min_z, self.max_x, self.max_y, self.max_z)
+        return "AABB [%s, %s, %s : %s, %s, %s]" % \
+            (self.min_x, self.min_y, self.min_z,
+             self.max_x, self.max_y, self.max_z)
 
     def __repr__(self):
         return self.__str__()
 
     def __eq__(self, o):
-        return self.min_x == o.min_x and self.min_y == o.min_y and self.min_z == o.min_z \
-            and self.max_x == o.max_x and self.max_y == o.max_y and self.max_z == o.max_z
+        return self.min_x == o.min_x and \
+            self.min_y == o.min_y and \
+            self.min_z == o.min_z and \
+            self.max_x == o.max_x and \
+            self.max_y == o.max_y and \
+            self.max_z == o.max_z
 
     @classmethod
     def from_player_coords(cls, xyz):
@@ -39,8 +47,12 @@ class AABB(object):
         y = xyz[1]
         z = xyz[2]
         return cls(
-            x - config.PLAYER_BODY_EXTEND, y, z - config.PLAYER_BODY_EXTEND,
-            x + config.PLAYER_BODY_EXTEND, y + config.PLAYER_HEIGHT, z + config.PLAYER_BODY_EXTEND)
+            x - config.PLAYER_BODY_EXTEND,
+            y,
+            z - config.PLAYER_BODY_EXTEND,
+            x + config.PLAYER_BODY_EXTEND,
+            y + config.PLAYER_HEIGHT,
+            z + config.PLAYER_BODY_EXTEND)
 
     @classmethod
     def from_block_coords(cls, xyz):
@@ -60,22 +72,29 @@ class AABB(object):
 
     def face(self, dx=0, dy=0, dz=0):
         if dx < 0:
-            return AABB(self.min_x, self.min_y, self.min_z, self.min_x, self.max_y, self.max_z)
+            return AABB(self.min_x, self.min_y, self.min_z,
+                        self.min_x, self.max_y, self.max_z)
         elif dx > 0:
-            return AABB(self.max_x, self.min_y, self.min_z, self.max_x, self.max_y, self.max_z)
+            return AABB(self.max_x, self.min_y, self.min_z,
+                        self.max_x, self.max_y, self.max_z)
         elif dy < 0:
-            return AABB(self.min_x, self.min_y, self.min_z, self.max_x, self.min_y, self.max_z)
+            return AABB(self.min_x, self.min_y, self.min_z,
+                        self.max_x, self.min_y, self.max_z)
         elif dy > 0:
-            return AABB(self.min_x, self.max_y, self.min_z, self.max_x, self.max_y, self.max_z)
+            return AABB(self.min_x, self.max_y, self.min_z,
+                        self.max_x, self.max_y, self.max_z)
         elif dz < 0:
-            return AABB(self.min_x, self.min_y, self.min_z, self.max_x, self.max_y, self.min_z)
+            return AABB(self.min_x, self.min_y, self.min_z,
+                        self.max_x, self.max_y, self.min_z)
         elif dz > 0:
-            return AABB(self.min_x, self.min_y, self.max_z, self.max_x, self.max_y, self.max_z)
+            return AABB(self.min_x, self.min_y, self.max_z,
+                        self.max_x, self.max_y, self.max_z)
         raise Exception("no face choosen in AABB")
 
     def collides(self, bb):
         for i in xrange(3):
-            if fops.lte(self.maxs[i], bb.mins[i]) or fops.gte(self.mins[i], bb.maxs[i]):
+            if fops.lte(self.maxs[i], bb.mins[i]) or \
+                    fops.gte(self.mins[i], bb.maxs[i]):
                 return False
         return True
 
@@ -83,13 +102,16 @@ class AABB(object):
         if not (x or y or z):
             raise Exception("axes not set in collides_on_axes")
         if x:
-            if fops.lte(self.max_x, bb.min_x) or fops.gte(self.min_x, bb.max_x):
+            if fops.lte(self.max_x, bb.min_x) or \
+                    fops.gte(self.min_x, bb.max_x):
                 return False
         if y:
-            if fops.lte(self.max_y, bb.min_y) or fops.gte(self.min_y, bb.max_y):
+            if fops.lte(self.max_y, bb.min_y) or \
+                    fops.gte(self.min_y, bb.max_y):
                 return False
         if z:
-            if fops.lte(self.max_z, bb.min_z) or fops.gte(self.min_z, bb.max_z):
+            if fops.lte(self.max_z, bb.min_z) or \
+                    fops.gte(self.min_z, bb.max_z):
                 return False
         return True
 
@@ -97,7 +119,8 @@ class AABB(object):
         for i in xrange(3):
             if i == axis:
                 continue
-            if fops.lte(self.maxs[i], collidee.mins[i]) or fops.gte(self.mins[i], collidee.maxs[i]):
+            if fops.lte(self.maxs[i], collidee.mins[i]) or \
+                    fops.gte(self.mins[i], collidee.maxs[i]):
                 return None
         p = None
         if direction < 0:
@@ -115,7 +138,8 @@ class AABB(object):
     def set_to(self, max_y=None):
         if max_y is None:
             raise Exception("AABB set_to wrong parameters")
-        return AABB(self.min_x, self.min_y, self.min_z, self.max_x, max_y, self.max_z)
+        return AABB(self.min_x, self.min_y, self.min_z,
+                    self.max_x, max_y, self.max_z)
 
     def offset(self, dx=0, dy=0, dz=0):
         return AABB(self.min_x + dx,
@@ -133,7 +157,8 @@ class AABB(object):
                     min_x if min_x is not None else self.max_x,
                     self.max_y - self.min_y +
                     min_y if min_y is not None else self.max_y,
-                    self.max_z - self.min_z + min_z if min_z is not None else self.max_z)
+                    self.max_z - self.min_z +
+                    min_z if min_z is not None else self.max_z)
 
     def extend_to(self, dx=0, dy=0, dz=0):
         return AABB(self.min_x if dx == 0 or dx > 0 else self.min_x + dx,
@@ -214,7 +239,7 @@ class AABB(object):
         x, y, z = self.vector_to(bb)
         return math.sqrt(x * x + y * y + z * z)
 
-    def horizontal_distance_to(self, bb):
+    def horizontal_distance(self, bb):
         x, _, z = self.vector_to(bb)
         return math.hypot(x, z)
 
@@ -231,8 +256,8 @@ class AABB(object):
 
     def sweep_collision(self, collidee, v, debug=False):
         """
-            self moving by v, collidee stationery
-            based on http://www.gamasutra.com/view/feature/3383/simple_intersection_tests_for_games.php?page=3
+        self moving by v, collidee stationery
+        based on http://bit.ly/3grWzs
         """
         u_0 = [2, 2, 2]
         u_1 = [1, 1, 1]
@@ -246,9 +271,12 @@ class AABB(object):
                 d = collidee.maxs[i] - self.mins[i]
                 dists[i] = d
                 u_0[i] = d / v[i]
-            elif fops.eq(v[i], 0) and not(fops.lte(self.maxs[i], collidee.mins[i]) or fops.gte(self.mins[i], collidee.maxs[i])):
+            elif fops.eq(v[i], 0) and \
+                    not(fops.lte(self.maxs[i], collidee.mins[i]) or
+                        fops.gte(self.mins[i], collidee.maxs[i])):
                 u_0[i] = 0
-            elif not(fops.lte(self.maxs[i], collidee.mins[i]) or fops.gte(self.mins[i], collidee.maxs[i])):
+            elif not(fops.lte(self.maxs[i], collidee.mins[i]) or
+                     fops.gte(self.mins[i], collidee.maxs[i])):
                 u_0[i] = 0
             if fops.gte(collidee.maxs[i], self.mins[i]) and fops.gt(v[i], 0):
                 d = collidee.maxs[i] - self.mins[i]
@@ -273,7 +301,8 @@ class AABB(object):
         for i in xrange(3):
             if i == axis:
                 continue
-            if fops.lte(self.maxs[i], collidee.mins[i]) or fops.gte(self.mins[i], collidee.maxs[i]):
+            if fops.lte(self.maxs[i], collidee.mins[i]) or \
+                    fops.gte(self.mins[i], collidee.maxs[i]):
                 return d
         if d < 0 and fops.lte(collidee.maxs[axis], self.mins[axis]):
             dout = collidee.maxs[axis] - self.mins[axis]
@@ -297,9 +326,9 @@ class AABB(object):
             truth += 1
         if truth != 2:
             raise Exception("set exactly two axes to True in collides_on_axes")
-        inter = []
         if x:
-            if fops.lte(self.max_x, bb.min_x) or fops.gte(self.min_x, bb.max_x):
+            if fops.lte(self.max_x, bb.min_x) or \
+                    fops.gte(self.min_x, bb.max_x):
                 return None
             else:
                 min_x = self.min_x if self.min_x > bb.min_x else bb.min_x
@@ -308,7 +337,8 @@ class AABB(object):
             min_x = self.min_x
             max_x = self.max_x
         if y:
-            if fops.lte(self.max_y, bb.min_y) or fops.gte(self.min_y, bb.max_y):
+            if fops.lte(self.max_y, bb.min_y) or \
+                    fops.gte(self.min_y, bb.max_y):
                 return None
             else:
                 min_y = self.min_y if self.min_y > bb.min_y else bb.min_y
@@ -317,7 +347,8 @@ class AABB(object):
             min_y = self.min_y
             max_y = self.max_y
         if z:
-            if fops.lte(self.max_z, bb.min_z) or fops.gte(self.min_z, bb.max_z):
+            if fops.lte(self.max_z, bb.min_z) or \
+                    fops.gte(self.min_z, bb.max_z):
                 return None
             else:
                 min_z = self.min_z if self.min_z > bb.min_z else bb.min_z
@@ -395,7 +426,8 @@ class Line(object):
         return self.__str__()
 
     def has_point(self, p):
-        return fops.eq(abs(self.a), abs(self.a1 - p[0])) and fops.eq(abs(self.b), abs(self.b1 - p[1]))
+        return fops.eq(abs(self.a), abs(self.a1 - p[0])) and \
+            fops.eq(abs(self.b), abs(self.b1 - p[1]))
 
     def set_direction_towards(self, point, debug=False):
         if fops.lt(self.distance_to(point), 0):
@@ -403,7 +435,9 @@ class Line(object):
             self.b *= -1
 
     def distance_to(self, point):
-        return abs(self.a * (self.b1 - point[1]) - (self.a1 - point[0]) * self.b) / self.length
+        return abs(self.a * (self.b1 - point[1]) -
+                   self.b * (self.a1 - point[0])) / self.length
 
     def distance_parallel(self, line):
-        return abs(self.a * (self.b1 - line.b1) - (self.a1 - line.a1) * self.b) / self.length
+        return abs(self.a * (self.b1 - line.b1) -
+                   self.b * (self.a1 - line.a1)) / self.length

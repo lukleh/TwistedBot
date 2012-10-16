@@ -1,11 +1,10 @@
 
-from math import copysign
 
 import fops
 import logbot
 import blocks
 import config
-from aabb import AABB
+from axisbox import AABB
 
 
 log = logbot.getlogger("GRIDSPACE")
@@ -198,11 +197,11 @@ class GridSpace(object):
             return False
         if fops.lte(elev, config.MAX_STEP_HEIGHT) and fops.gte(elev, -config.MAX_STEP_HEIGHT):
             edge_cost += config.COST_DIRECT * \
-                bb_from.horizontal_distance_to(bb_to)
+                bb_from.horizontal_distance(bb_to)
         else:
             edge_cost += config.COST_FALL * \
-                bb_from.horizontal_distance_to(bb_to)
-            vd = bb_from.horizontal_distance_to(bb_to)
+                bb_from.horizontal_distance(bb_to)
+            vd = bb_from.horizontal_distance(bb_to)
             if vd < 0:
                 edge_cost += config.COST_FALL * vd
             else:

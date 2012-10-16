@@ -1,7 +1,5 @@
 
 
-from collections import deque, namedtuple, defaultdict
-
 import logbot
 import tools
 
@@ -16,7 +14,7 @@ class SignWayPoints(object):
         self.crd_to_sign = {}
         self.ordered_sign_groups = {}
 
-    def has_name_group(self, group):
+    def has_group(self, group):
         return group in self.ordered_sign_groups
 
     def has_name_point(self, name):
@@ -59,7 +57,7 @@ class SignWayPoints(object):
             return None
 
     def get_groupnext_rotate(self, group):
-        if not self.has_name_group(group):
+        if not self.has_group(group):
             return None
         group = self.ordered_sign_groups[group]
         cs = group.current_point()
@@ -74,7 +72,7 @@ class SignWayPoints(object):
                 return s
 
     def get_groupnext_circulate(self, group):
-        if not self.has_name_group(group):
+        if not self.has_group(group):
             return None
         group = self.ordered_sign_groups[group]
         cs = group.current_point()
@@ -92,7 +90,7 @@ class SignWayPoints(object):
                 return s
 
     def reset_group(self, group):
-        if not self.has_name_group(group):
+        if not self.has_group(group):
             return
         else:
             self.ordered_sign_groups[group].reset()

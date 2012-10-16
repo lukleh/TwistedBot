@@ -1,6 +1,6 @@
 ﻿
 
-from aabb import AABB
+from axisbox import AABB
 
 
 class Entity(object):

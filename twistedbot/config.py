@@ -22,7 +22,8 @@ PLAYER_BODY_DIAMETER = 0.6
 
 MAX_JUMP_HEIGHT = 1.25
 MAX_STEP_HEIGHT = 0.5
-G = 27.0  # or 0.08 block/tick - drag 0.02 blk/tick (used as final multiply by 0.98)
+G = 27.0
+# or 0.08 block/tick - drag 0.02 blk/tick (used as final multiply by 0.98)
 
 BLOCK_FALL = 0.08
 DRAG = 0.98

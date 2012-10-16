@@ -3,14 +3,12 @@ import StringIO
 import array
 
 
-import packets
 import tools
 import blocks
 import config
 import logbot
 import fops
-from chunk import Chunk
-from aabb import AABB
+from axisbox import AABB
 
 
 log = logbot.getlogger("GRID")
@@ -141,7 +139,7 @@ class Grid(object):
             if add_bit >> i & 1:
                 data_str = data.read(2048)
                 data_count += 2048
-                ndata = array.array('B', half_bytes_from_string(data_str))
+                ndata = array.array('B', self.half_bytes_from_string(data_str))
                 log.msg("Add data %s" % ndata)
         if continuous:
             data_str = data.read(256)
@@ -170,8 +168,8 @@ class Grid(object):
     def change_block_to(self, x, y, z, block_type, meta):
         current_block = self.get_block(x, y, z)
         if current_block is None:
-            log.err("change_block chunk %s block %s type %s meta %s is None" %
-                    (chunk, (x, y, z), block_type, meta))
+            log.err("change_block block %s type %s meta %s is None" %
+                    ((x, y, z), block_type, meta))
             return None, None
         if current_block.is_sign and not current_block.number == block_type:
             self.navgrid.sign_waypoints.remove(current_block.coords)
@@ -333,7 +331,7 @@ class Grid(object):
         for chunk in self.aabb_in_chunks(bb):
             if chunk is None:
                 return False
-            elif chunk.complete == False:
+            elif chunk.complete is False:
                 return False
         return True
 

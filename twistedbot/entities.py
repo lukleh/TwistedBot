@@ -1,12 +1,10 @@
 
 
-import config
 import logbot
-import tools
-import pathfinding
 from gridspace import GridSpace
-from entity import EntityMob, EntityPlayer, EntityVehicle, EntityExperienceOrb, EntityDroppedItem
-from aabb import AABB
+from entity import EntityMob, EntityPlayer, EntityVehicle, \
+    EntityExperienceOrb, EntityDroppedItem
+from axisbox import AABB
 
 
 log = logbot.getlogger("ENTITIES")
@@ -35,11 +33,15 @@ class Entities(object):
         if block is None:
             return
         lpos = self.world.bot.commander.last_possition
-        if lpos is not None and (block.coords == lpos or block.coords == (lpos[0], lpos[1] - 1, lpos[2])):
+        if lpos is not None and \
+                (block.coords == lpos or
+                 block.coords == (lpos[0], lpos[1] - 1, lpos[2])):
             return
         in_nodes = self.world.navgrid.graph.has_node(block.coords)
         gs = GridSpace(self.world.grid, block=block)
-        msg = "P in nm %s on %s aabb %s nm nodes %d\n" % (in_nodes, block, block.grid_bounding_box, self.world.navgrid.graph.node_count)
+        msg = "P in nm %s on %s aabb %s nm nodes %d\n" % \
+            (in_nodes, block, block.grid_bounding_box,
+             self.world.navgrid.graph.node_count)
         msg += "gs_stand %s" % str(gs.bb_stand)
         if lpos is not None:
             gsl = GridSpace(self.world.grid, coords=lpos)
@@ -51,8 +53,12 @@ class Entities(object):
                 if gsl.can_stand_on:
                     lpos = gsl.coords
             if not(gsl.bb_stand is None or gs.bb_stand is None):
-                msg += "\ncost from %s to %s %s\n" % (lpos, block.coords, self.world.navgrid.graph.get_edge(lpos, block.coords))
-                msg += "last stand %s now stand %s from %s to %s\n" % (gsl.can_stand_on, gs.can_stand_on, gsl.bb_stand, gs.bb_stand)
+                msg += "\ncost from %s to %s %s\n" % \
+                    (lpos, block.coords,
+                     self.world.navgrid.graph.get_edge(lpos, block.coords))
+                msg += "last stand %s now stand %s from %s to %s\n" % \
+                    (gsl.can_stand_on, gs.can_stand_on,
+                     gsl.bb_stand, gs.bb_stand)
                 if gsl.can_go_between(gs, debug=True):
                     msg += "can go True with cost %s\n" % gsl.edge_cost
                 else:
@@ -66,7 +72,9 @@ class Entities(object):
         def f(self, *args, **kwargs):
             eid = args[0]
             entity = self.get_entity(eid)
-            if entity is None:  # received entity update packet for entity that was not initialized with new_*, this should not happen
+            if entity is None:
+                # received entity update packet for entity
+                # that was not initialized with new_*, this should not happen
                 log.msg("do not have entity %d registered" % eid)
                 return
             if entity.is_bot:
