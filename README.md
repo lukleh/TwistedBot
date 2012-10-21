@@ -11,8 +11,8 @@
 - Client side artificial player for Minecraft that runs on vanilla server in offline mode. No modification on server/client side needed.
 - Basic pathfinding
 - Solid block awareness
-- Avoiding water, lava, web and cactus
-- Reasonable usage of vines and ladders
+- Avoiding lava, web and cactus
+- Reasonable handeling of vines, ladders and water
 - No active interaction with the world. That is no digging, placing blocks, open/close doors, etc.
 - Use signs to set up points to rotate  -> details below
 - Configure using command line arguments or modifying twistedbot/config.py

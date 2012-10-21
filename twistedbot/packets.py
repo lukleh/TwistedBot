@@ -133,8 +133,8 @@ slotdata = Struct("slotdata",
 
 
 Metadata = namedtuple("Metadata", "type value")
-metadata_types = ["byte", "short", "int", "float", "string", "unused1",
-                  "unused2"]
+metadata_types = ["byte", "short", "int", "float", "string16", "short_tup",
+                  "int_tup"]
 
 # Metadata adaptor.
 
@@ -161,20 +161,20 @@ class MetadataAdapter(Adapter):
 
 # Metadata inner container.
 metadata_switch = {
-    0: UBInt8("value"),
-    1: UBInt16("value"),
-    2: UBInt32("value"),
+    0: SBInt8("value"),
+    1: SBInt16("value"),
+    2: SBInt32("value"),
     3: BFloat32("value"),
     4: AlphaString("value"),
-    5: Struct("unused1",
-              UBInt16("primary"),
-              UBInt8("count"),
-              UBInt16("secondary"),
+    5: Struct("short_tup",
+              SBInt16("primary"),
+              SBInt8("count"),
+              SBInt16("secondary"),
               ),
-    6: Struct("unused2",
-              UBInt32("x"),
-              UBInt32("y"),
-              UBInt32("z"),
+    6: Struct("int_tup",
+              SBInt32("x"),
+              SBInt32("y"),
+              SBInt32("z"),
               ),
 }
 
@@ -191,7 +191,7 @@ entity_metadata = MetadataAdapter(
                                   "value", lambda context: context[
                                       "id"]["first"],
                               metadata_switch),
-                              Peek(UBInt8("peeked")),
+                              Peek(SBInt8("peeked")),
                               ),
                        ),
            Const(UBInt8("terminator"), 0x7f),

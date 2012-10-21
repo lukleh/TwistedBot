@@ -66,6 +66,10 @@ class Block(object):
             (isinstance(self, FenceGate) and not self.is_open)
 
     @property
+    def is_water(self):
+        return isinstance(self, BlockWater)
+
+    @property
     def is_ladder_vine(self):
         return isinstance(self, Ladders) or isinstance(self, Vines)
         #return False
@@ -110,6 +114,9 @@ class Block(object):
 
     def is_solid_block(self, blk, v):
         return blk.material.is_solid
+
+    def on_entity_collided(self, entity):
+        pass
 
 
 class BlockNonSolid(Block):
@@ -241,10 +248,11 @@ class BlockWater(BlockFluid):
                 v = [v[0], v[1] - 6.0, v[2]]
         return tools.normalize(v)
 
-    def velocity_to_add_to(self, v):
+    def add_velocity_to(self, v):
         fv = self.flow_vector
         return (v[0] + fv[0], v[1] + fv[1], v[2] + fv[2])
 
+    @property
     def height_percent(self):
         if self.meta >= 8:
             return 1 / 9.0
@@ -1176,6 +1184,10 @@ class SoulSand(Block):
     def stand_type(self):
         return (self.number, )
 
+    def on_entity_collided(self, entity):
+        entity.velocities[0] *= 0.4
+        entity.velocities[2] *= 0.4
+
 
 class GlowstoneBlock(Block):
     number = 89
@@ -1370,9 +1382,7 @@ class FenceGate(Block):
 
     def sweep_collision(self, bb, vect, debug=False, max_height=False):
         if not self.is_open:
-            col, d = bb.sweep_collision(self.grid_bounding_box,
-                                        vect, debug=debug)
-            return col, d, self.grid_bounding_box
+            return super(FenceGate, self).sweep_collision(bb, vect, debug=debug, max_height=max_height)
         else:
             return False, None, self.grid_bounding_box
 

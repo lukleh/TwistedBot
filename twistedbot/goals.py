@@ -328,7 +328,7 @@ class MoveToGoal(GoalBase):
                                                                self.target_space.bb_stand,
                                                                horizontal=True,
                                                                max_height=True)
-        if self.bot.is_on_ladder:
+        if self.bot.is_on_ladder or self.grid.aabb_in_water(self.bot.aabb):
             elev = self.target_space.bb_stand.min_y - self.bot.aabb.min_y
             if fops.gt(elev, 0):
                 self.jump()

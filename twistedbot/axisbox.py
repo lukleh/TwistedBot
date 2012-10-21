@@ -185,10 +185,6 @@ class AABB(object):
                     self.max_z if self.max_z > bb.max_z else bb.max_z,)
 
     @property
-    def snap_to_grid(self):
-        return AABB(*self.grid_box)
-
-    @property
     def grid_box(self):
         return [int(math.floor(self.min_x)),
                 int(math.floor(self.min_y)),

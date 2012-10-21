@@ -51,8 +51,15 @@ def lower_y(o, diff=-1):
     return (o[0], o[1] + diff, o[2])
 
 
-def vector_size(tup):
-    return math.sqrt(tup[0] * tup[0] + tup[1] * tup[1] + tup[2] * tup[2])
+def vector_size(v):
+    return math.sqrt(sum([p * p for p in v]))
+
+
+def normalize(v):
+    d = vector_size(v)
+    if d < 0.0001:
+        return [0] * len(v)
+    return [p / d for p in v]
 
 
 def yaw_pitch_between(p1, p2):

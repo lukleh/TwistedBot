@@ -237,8 +237,13 @@ class Grid(object):
         return out
 
     def is_any_liquid(self, bb):  # mcp has --val is val < 0
-        minius_one_x, minius_one_y, minius_one_z = (-1 if bb.min_x < 0 else 0, -1 if bb.min_y < 0 else 0, -1 if bb.min_z < 0 else 0)
-        for blk in self.blocks_in_aabb(bb.extend_to(minius_one_x, minius_one_y, minius_one_z)):
+        minus_one_x, minus_one_y, minus_one_z = (-1 if bb.min_x < 0 else 0, -1 if bb.min_y < 0 else 0, -1 if bb.min_z < 0 else 0)
+        for blk in self.blocks_in_aabb(AABB(bb.min_x + minus_one_x,
+                                            bb.min_y + minus_one_y,
+                                            bb.min_z + minus_one_z,
+                                            bb.max_x,
+                                            bb.max_y,
+                                            bb.max_z)):
             if blk.material.is_liquid:
                 return True
         return False
@@ -306,6 +311,12 @@ class Grid(object):
         blk = self.get_block(bb.grid_x, bb.grid_y, bb.grid_z)
         return blk.number == blocks.Ladders.number or blk.number == blocks.Vines.number
 
+    def aabb_in_water(self, bb):
+        for blk in self.blocks_in_aabb(bb):
+            if blk.is_water:
+                return True
+        return False
+
     def standing_on_solidblock(self, bb):
         standing_on = None
         blocks = self.blocks_in_aabb(bb.extend_to(dy=-1))
@@ -341,3 +352,14 @@ class Grid(object):
             self.navgrid.sign_waypoints.remove(crd)
             return False
         return True
+
+    def aabb_eyelevel_inside_water(self, bb, eye_height=config.PLAYER_EYELEVEL):
+        eye_y = bb.min_y + eye_height
+        ey = tools.grid_shift(eye_y)
+        blk = self.get_block(bb.grid_x, ey, bb.grid_z)
+        if blk.is_water:
+            wh = blk.height_percent - 0.11111111
+            surface = ey + 1 - wh
+            return eye_y < surface
+        else:
+            return False

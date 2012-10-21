@@ -135,7 +135,7 @@ class MineCraftProtocol(Protocol):
             packet = ipackets.popleft()
             self.process_packet(packet)
             self.bot.status_diff.packets_in += 1
-            if len(ipackets) < 50:
+            if len(ipackets) < 5:
                 yield None
 
     def process_packet(self, packet):

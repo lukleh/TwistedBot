@@ -52,7 +52,7 @@ class GridSpace(object):
     @classmethod
     def blocks_to_avoid(cls, blks):
         for b in blks:
-            if isinstance(b, blocks.Cobweb) or isinstance(b, blocks.Fire) or isinstance(b, blocks.Cactus) or isinstance(b, blocks.BlockFluid):
+            if isinstance(b, blocks.Cobweb) or isinstance(b, blocks.Fire) or isinstance(b, blocks.BlockLava):
                 return True
         else:
             return False
@@ -83,51 +83,46 @@ class GridSpace(object):
         """
         can stand on top of the center of the block
         """
-        self.grid.can_stand_memory
+        if isinstance(self.block, blocks.Cactus):
+            return False
         under = self.grid.get_block(
             self.coords[0], self.coords[1] - 1, self.coords[2])
-        if self.block.is_ladder_vine:
+        if not self.block.collidable and not under.is_fence and not self.block.is_water and not self.block.is_ladder_vine:
+            return False
+        if self.block.is_ladder_vine or self.block.is_water:
             bb = AABB.from_block_coords(self.block.coords)
-            if (under.is_fence and under.collidable):
+            if under.is_fence:
                 self.bb_stand = bb.shift(min_y=under.grid_bounding_box.max_y)
             else:
                 self.bb_stand = bb
-            if self.blocks_to_avoid(self.grid.blocks_in_aabb(self.bb_stand)):
-                return False
-            if self.grid.aabb_collides(self.bb_stand):
-                return False
             self.stand_block = self.block
             self.platform = self.bb_stand.set_to(max_y=self.bb_stand.min_y)
-            return True
-        if not self.block.collidable and not (under.is_fence and under.collidable):
-            return False
-        if self.blocks_to_avoid([self.block]):
-            return False
-        if under.is_fence and under.collidable:
-            fence_top = under.maxedge_platform(y=1)
-            if self.block.collidable:
-                self.platform = self.block.maxedge_platform(y=1)
-                self.stand_block = self.block
-                if fence_top.min_y > self.platform.min_y:
+        else:
+            if under.is_fence:
+                fence_top = under.maxedge_platform(y=1)
+                if self.block.collidable:
+                    self.platform = self.block.maxedge_platform(y=1)
+                    self.stand_block = self.block
+                    if fence_top.min_y > self.platform.min_y:
+                        self.platform = fence_top
+                        self.stand_block = under
+                else:
                     self.platform = fence_top
                     self.stand_block = under
             else:
-                self.platform = fence_top
-                self.stand_block = under
-        else:
-            self.platform = self.block.maxedge_platform(y=1)
-            self.stand_block = self.block
-        bb = AABB.from_block_coords(self.block.coords)
-        self.bb_stand = bb.offset(dy=self.platform.min_y - bb.min_y)
-        if bb.collides_on_axes(self.platform, x=True, z=True):
-            if self.grid.aabb_collides(self.bb_stand):
+                self.platform = self.block.maxedge_platform(y=1)
+                self.stand_block = self.block
+            bb = AABB.from_block_coords(self.block.coords)
+            self.bb_stand = bb.offset(dy=self.platform.min_y - bb.min_y)
+            if not self.bb_stand.collides_on_axes(self.platform, x=True, z=True):
                 return False
-            elif self.blocks_to_avoid(self.grid.blocks_in_aabb(self.bb_stand)):
-                return False
-            else:
-                return True
-        else:
+        if self.grid.aabb_collides(self.bb_stand):
             return False
+        if self.blocks_to_avoid(self.grid.blocks_in_aabb(self.bb_stand)):
+            return False
+        if self.grid.aabb_eyelevel_inside_water(self.bb_stand):
+            return False
+        return True
 
     def can_go(self, gs, update_to_bb_stand=False):
         if not self.can_stand_between(gs):
@@ -138,6 +133,8 @@ class GridSpace(object):
 
     def can_stand_between(self, gs, debug=False):
         if self.block.is_ladder_vine or gs.block.is_ladder_vine:
+            return True
+        if self.block.is_water or gs.block.is_water:
             return True
         if fops.gt(abs(self.platform.min_y - gs.platform.min_y), config.MAX_STEP_HEIGHT):
             return True
@@ -158,27 +155,36 @@ class GridSpace(object):
         edge_cost = 0
         bb_stand = self.bb_stand
         other_bb_stand = gs.bb_stand
-        if fops.gt(other_bb_stand.min_y - bb_stand.min_y, config.MAX_JUMP_HEIGHT):
-            return False
         if fops.gt(bb_stand.min_y, other_bb_stand.min_y):
             elev = bb_stand.min_y - other_bb_stand.min_y
             elev_bb = other_bb_stand.extend_to(dy=elev)
             bb_from = bb_stand
             bb_to = other_bb_stand.offset(dy=elev)
         elif fops.lt(bb_stand.min_y, other_bb_stand.min_y):
+            if fops.lte(bb_stand.grid_y + 2, other_bb_stand.min_y):
+                return False
             elev = other_bb_stand.min_y - bb_stand.min_y
-            if fops.gt(elev, config.MAX_JUMP_HEIGHT):
+            if self.grid.aabb_in_water(bb_stand) and \
+                    other_bb_stand.grid_y > bb_stand.grid_y and \
+                    fops.gt(other_bb_stand.min_y, other_bb_stand.grid_y) and \
+                    not self.grid.aabb_in_water(bb_stand.shift(min_y=other_bb_stand.min_y)) and \
+                    fops.gte(other_bb_stand.min_y - (bb_stand.grid_y + 1), config.MAX_WATER_JUMP_HEIGHT - 0.15):
                 return False
             if self.grid.aabb_on_ladder(bb_stand) and \
                     other_bb_stand.grid_y > bb_stand.grid_y and \
                     fops.gt(other_bb_stand.min_y, other_bb_stand.grid_y) and \
-                    not self.grid.aabb_on_ladder(bb_stand.shift(min_y=other_bb_stand.min_y)):
+                    not self.grid.aabb_on_ladder(bb_stand.shift(min_y=other_bb_stand.min_y)) and \
+                    fops.gte(other_bb_stand.min_y - (bb_stand.grid_y + 1), config.MAX_VINE_JUMP_HEIGHT - 0.2):
+                return False
+            if fops.gt(elev, config.MAX_JUMP_HEIGHT):
                 return False
             if fops.lte(elev, config.MAX_STEP_HEIGHT):
                 elev = config.MAX_STEP_HEIGHT
                 aabbs = self.grid.aabbs_in(bb_stand.extend_to(0, elev, 0))
                 for bb in aabbs:
                     elev = bb_stand.calculate_axis_offset(bb, elev, 1)
+                if fops.lt(bb_stand.min_y + elev, other_bb_stand.min_y):
+                    return False
             elev_bb = bb_stand.extend_to(dy=elev)
             bb_from = bb_stand.offset(dy=elev)
             bb_to = other_bb_stand

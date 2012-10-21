@@ -283,6 +283,7 @@ class Bot(object):
         self.update_position(b_bb.posx, b_bb.min_y, b_bb.posz, onground)
         if zero_vels:
             self.velocities = [0, 0, 0]
+        self.do_block_collision()
 
     def clip_abs_velocities(self):
         out = list(self.velocities)
@@ -304,18 +305,20 @@ class Bot(object):
             out[1] = 0
         return out
 
-    def handle_water_movement(self):
+    def handle_water_movement(self, aabb=None):
+        if aabb is None:
+            aabb = self.aabb
         is_in_water = False
         water_current = (0, 0, 0)
-        bb = self.aabb.expand(-0.001, -0.4010000059604645, -0.001)
-        max_y = bb.snap_to_grid.max_y + 1
+        bb = aabb.expand(-0.001, -0.4010000059604645, -0.001)
+        top_y = tools.grid_shift(bb.max_y) + 1
         for blk in self.grid.blocks_in_aabb(bb):
             if isinstance(blk, blocks.BlockWater):
                 wy = blk.y + 1 - blk.height_percent
-                if max_y >= wy:
+                if top_y >= wy:
                     is_in_water = True
-                    water_current = blk.velocity_to_add_to(water_current)
-        if max(water_current) > 0:
+                    water_current = blk.add_velocity_to(water_current)
+        if tools.normalize(water_current) > 0:
             water_current = tools.normalize(water_current)
             wconst = 0.014
             water_current = (water_current[0] * wconst, water_current[
@@ -395,8 +398,20 @@ class Bot(object):
         return dx, dz
 
     def update_directional_speed(self, direction, speedf, influence=None):
-        #TODO recalculate so final velocities have possibly
-        #     same direction as 'direction'
+        #print 'UDS', 'dir', direction, 'wcur', influence, 'vels', self.velocities
+        if influence is not None and (direction[0] != 0 or direction[1] != 0):
+            perpedicular_dir = (- direction[1], direction[0])
+            dot = influence[0] * perpedicular_dir[0] + influence[2] * perpedicular_dir[1]
+            if dot < 0:
+                dot *= -1
+                perpedicular_dir = (direction[1], - direction[0])
+            direction = (direction[0] - perpedicular_dir[0] * dot, direction[1] - perpedicular_dir[1] * dot)
+            direction = tools.normalize(direction)
+            #self.turn_to()
+            #print 'corrected', direction
+        else:
+            #print
+            pass
         x, z = self.directional_speed(direction, speedf)
         self.velocities[0] += x
         self.velocities[2] += z
@@ -446,6 +461,15 @@ class Bot(object):
             if isinstance(blk, blocks.Cobweb):
                 return True
         return False
+
+    @property
+    def head_inside_water(self):
+        return self.grid.aabb_eyelevel_inside_water(self.aabb)
+
+    def do_block_collision(self):
+        bb = self.aabb.expand(-0.001, -0.001, -0.001)
+        for blk in self.grid.blocks_in_aabb(bb):
+            blk.on_entity_collided(self)
 
     @property
     def is_sneaking(self):
