@@ -84,6 +84,7 @@ class Bot(object):
         self.action = 2  # normal
         self.is_jumping = False
         self.is_floating = True
+        self.turn_to_setup = None
 
     def connection_lost(self):
         self.protocol = None
@@ -239,6 +240,9 @@ class Bot(object):
         self.z = z
         self.on_ground = onground
 
+    def set_turn_to(self, point, elevation=False):
+        self.turn_to_setup = (point, elevation)
+
     def set_jumpstep(self, v=config.MAX_STEP_HEIGHT):
         self.velocities[1] = 0
         aabbs = self.grid.aabbs_in(self.aabb.extend_to(0, v, 0))
@@ -339,6 +343,7 @@ class Bot(object):
         self.is_in_water, water_current = self.handle_water_movement()
         self.is_in_lava = self.handle_lava_movement()
         if self.is_jumping:
+            print 'JUMP',self.velocities[1]
             if self.is_in_water or self.is_in_lava:
                 self.velocities[1] += config.SPEED_LIQUID_JUMP
             elif self.on_ground:
@@ -346,13 +351,15 @@ class Bot(object):
             elif self.is_on_ladder:
                 self.velocities[1] = config.SPEED_CLIMB
             self.is_jumping = False
+            print 'JUMP after',self.velocities[1]
         if self.is_in_water:
             self.velocities = [self.velocities[0] + water_current[0],
                                self.velocities[1] + water_current[1],
                                self.velocities[2] + water_current[2]]
             orig_y = self.y
+            #print 'water current', water_current, self.velocities
             self.update_directional_speed(
-                direction, 0.02, influence=water_current)
+                direction, 0.02, balance=True)
             self.do_move()
             self.velocities[0] *= 0.800000011920929
             self.velocities[1] *= 0.800000011920929
@@ -363,6 +370,7 @@ class Bot(object):
                                              self.velocities[1] + 0.6 -
                                              self.y + orig_y,
                                              self.velocities[2]):
+                print "OUT OF WATER JUMP"
                 self.velocities[1] = 0.30000001192092896
             self.is_floating = True
         elif self.is_in_lava:
@@ -397,21 +405,26 @@ class Bot(object):
         dz = z * speedf
         return dx, dz
 
-    def update_directional_speed(self, direction, speedf, influence=None):
-        #print 'UDS', 'dir', direction, 'wcur', influence, 'vels', self.velocities
-        if influence is not None and (direction[0] != 0 or direction[1] != 0):
+    def turn_direction(self, x, z):
+        if x == 0 and z == 0:
+            return
+        yaw, _ = tools.yaw_pitch_to_vector(x, 0, z)
+        self.yaw = yaw
+
+    def update_directional_speed(self, direction, speedf, balance=False):
+        if self.turn_to_setup is not None:
+            self.turn_to(*self.turn_to_setup)
+            self.turn_to_setup = None
+        if balance:
             perpedicular_dir = (- direction[1], direction[0])
-            dot = influence[0] * perpedicular_dir[0] + influence[2] * perpedicular_dir[1]
+            dot = self.velocities[0] * perpedicular_dir[0] + self.velocities[2] * perpedicular_dir[1]
             if dot < 0:
                 dot *= -1
                 perpedicular_dir = (direction[1], - direction[0])
             direction = (direction[0] - perpedicular_dir[0] * dot, direction[1] - perpedicular_dir[1] * dot)
             direction = tools.normalize(direction)
-            #self.turn_to()
-            #print 'corrected', direction
-        else:
-            #print
-            pass
+            self.turn_direction(*direction)
+            print "BALANCE DIRECTION", direction
         x, z = self.directional_speed(direction, speedf)
         self.velocities[0] += x
         self.velocities[2] += z

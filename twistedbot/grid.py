@@ -241,9 +241,9 @@ class Grid(object):
         for blk in self.blocks_in_aabb(AABB(bb.min_x + minus_one_x,
                                             bb.min_y + minus_one_y,
                                             bb.min_z + minus_one_z,
-                                            bb.max_x,
-                                            bb.max_y,
-                                            bb.max_z)):
+                                            bb.max_x + 1,
+                                            bb.max_y + 1,
+                                            bb.max_z + 1)):
             if blk.material.is_liquid:
                 return True
         return False

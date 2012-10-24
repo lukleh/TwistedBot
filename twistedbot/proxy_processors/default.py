@@ -104,7 +104,7 @@ def finish():
     combined = defaultdict(int)
     for ptype in statistics.keys():
         psum = 0
-        log.msg(ptype)
+        log.msg('from %s' % ptype)
         sorted_p = sorted(statistics[ptype].iteritems(), key=operator.itemgetter(1), reverse=True)
         for pid, pcount in sorted_p:
             log.msg("\tid:\t%d\tcount\t%d\t%s" % (pid, pcount, packets[pid].name))

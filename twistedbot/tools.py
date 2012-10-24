@@ -64,6 +64,9 @@ def normalize(v):
 
 def yaw_pitch_between(p1, p2):
     x, y, z = p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]
+    return yaw_pitch_to_vector(x, y, z)
+
+def yaw_pitch_to_vector(x, y, z):
     xz = math.hypot(x, z)
     if xz == 0:
         pitch = 0
@@ -255,10 +258,9 @@ class OrderedLinkedList(object):
             current = current.next
 
     def next_circulate(self):
-        if self.length < 2:
-            return None
         if self.pointer is None:
             self.pointer = self.head
+            return self.current_point()
         if self.head_to_tail:
             if self.pointer.next is None:
                 self.head_to_tail = False
@@ -274,8 +276,9 @@ class OrderedLinkedList(object):
         return self.current_point()
 
     def next_rotate(self):
-        if self.length < 2:
-            return None
+        if self.pointer is None:
+            self.pointer = self.head
+            return self.current_point()
         if self.pointer.next is None:
             self.pointer = self.head
         else:
@@ -361,7 +364,7 @@ class Sign(object):
         return self.coords == sgn.coords
 
     def __str__(self):
-        return "$%s %s %s %s$" % \
+        return "$coords:%s groups:%s value:%s name:%s$" % \
             (str(self.coords), self.group, self.value, self.name)
 
     def __repr__(self):

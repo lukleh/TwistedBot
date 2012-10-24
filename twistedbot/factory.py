@@ -10,6 +10,7 @@ import config
 import encryption
 import logbot
 import proxy_processors.default
+import tools
 from packets import parse_packets, make_packet, packets_by_name, Container
 from tools import devnull
 from proxy_processors.default import process_packets as packet_printout
@@ -148,6 +149,9 @@ class MineCraftProtocol(Protocol):
             log.msg("Unknown packet %d" % pid)
             reactor.stop()
 
+    def send_locale(self, **kwargs):
+        self.send_packet("locale view distance", kwargs)
+
     def p_ping(self, c):
         pid = c.pid
         self.send_packet("keep alive", {"pid": pid})
@@ -159,12 +163,13 @@ class MineCraftProtocol(Protocol):
                  c.dimension, c.difficulty, c.players))
         self.bot.login_data(c.eid, c.level_type, c.mode,
                             c.dimension, c.difficulty, c.players)
+        tools.do_now(self.send_locale, locale='en_GB', view_distance=2, chat_flags=0, difficulty=0, show_cape=False)
 
     def p_chat(self, c):
         self.bot.chat.process(c.message)
 
     def p_time(self, c):
-        self.world.s_time = c.timestamp
+        self.world.s_time = c.time
 
     def p_entity_equipment(self, c):
         devnull()

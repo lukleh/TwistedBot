@@ -50,10 +50,11 @@ class Manager(object):
 
     def goal_return(self, goal, status):
         self.current_goal.cancel()
-        self.goalq.pop()
+        g = self.goalq.pop()
         if self.goalq:
             self.current_goal.from_child(status)
         else:
+            self.bot.chat_message("Finished: %s" % g.name)
             self.not_running()
 
     def not_running(self):
@@ -68,7 +69,7 @@ class Manager(object):
         self.cancel_goal()
         self.goalq.append(goal(self, self.bot, *args, **kwargs))
         self.running = False
-        log.msg("Added command goal %s" % self.current_goal)
+        log.msg("Added command goal %s" % self.current_goal.name)
 
 
 class GoalBase(object):
@@ -132,7 +133,7 @@ class LookAtPlayerGoal(GoalBase):
         if player is None:
             return
         p = player.position
-        self.bot.turn_to(
+        self.bot.set_turn_to(
             (p[0], p[1] + config.PLAYER_EYELEVEL, p[2]), elevation=True)
 
 
@@ -150,7 +151,7 @@ class WalkSignsGoal(GoalBase):
                 self.bot.world.navgrid.sign_waypoints.get_groupnext_rotate
         else:
             raise Exception("unknown walk type")
-        self.name = '%s signs in %s' % (
+        self.name = '%s signs in group "%s"' % (
             self.walk_type.capitalize(), self.group)
         log.msg(self.name)
         self.bot.world.navgrid.sign_waypoints.reset_group(self.group)
@@ -158,7 +159,7 @@ class WalkSignsGoal(GoalBase):
     def from_child(self, status):
         is_ok = self.manager.grid.check_sign(self.signpoint.coords)
         if not is_ok:
-            self.self.manager.not_running()
+            self.manager.not_running()
             return
         if status == Status.finished or status == Status.impossible:
             self.do()
@@ -171,7 +172,7 @@ class WalkSignsGoal(GoalBase):
 
     def check_state(self):
         if not self.bot.world.navgrid.sign_waypoints.has_group(self.group):
-            self.bot.chat_message("no group named %s" % self.group)
+            self.bot.chat_message("cannnot %s group named %s" % (self.walk_type, self.group))
             return Status.impossible
         else:
             return Status.not_finished
@@ -225,7 +226,7 @@ class TravelToGoal(GoalBase):
         self.current_step = None
         self.last_step = None
         self.name = 'Travel to %s' % str(self.travel_coords)
-        #log.msg(self.name)
+        log.msg(self.name)
 
     def activate(self):
         if not self.ready:
@@ -295,21 +296,21 @@ class MoveToGoal(GoalBase):
         self.target_space = kwargs["target_space"]
         self.was_at_target = False
         self.name = 'Move to %s' % str(self.target_space.coords)
-        #log.msg(self.name)
+        log.msg(self.name)
 
     def check_state(self):
         bb_stand = self.target_space.bb_stand
         elev = bb_stand.min_y - self.bot.aabb.min_y
         if fops.gt(elev, config.MAX_JUMP_HEIGHT):
-            return Status.broken
+            return Status.impossible
         if not self.target_space._can_stand_on():
             self.grid.navgrid.delete_node(self.target_space.coords)
             return Status.impossible
         if self.bot.aabb.horizontal_distance(bb_stand) > 2:
             # too far from the next step, better try again
-            return Status.broken
+            return Status.impossible
         if self.bot.position_grid == self.target_space.coords and \
-                self.bot.is_on_ladder:
+                (self.bot.is_on_ladder or self.grid.aabb_in_water(self.bot.aabb)):
             return Status.finished
         if self.bot.aabb.horizontal_distance(bb_stand) < self.bot.current_motion:
             self.was_at_target = True
@@ -373,7 +374,7 @@ class MoveToGoal(GoalBase):
             towards = self.target_space.bb_stand
         direction = self.bot.aabb.horizontal_direction_to(towards)
         if not self.was_at_target:
-            self.bot.turn_to(self.target_space.bb_stand.bottom_center)
+            self.bot.set_turn_to(self.target_space.bb_stand.bottom_center)
         self.bot.set_direction(direction)
 
     def jump(self, height=0):

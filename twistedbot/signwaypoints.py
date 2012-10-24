@@ -59,13 +59,13 @@ class SignWayPoints(object):
     def get_groupnext_rotate(self, group):
         if not self.has_group(group):
             return None
-        group = self.ordered_sign_groups[group]
-        cs = group.current_point()
+        sgroup = self.ordered_sign_groups[group]
+        cs = sgroup.current_point()
         if cs is None:
-            group.start()
-            return group.current_point()
+            sgroup.start()
+            return sgroup.current_point()
         while True:
-            s = group.next_rotate()
+            s = sgroup.next_rotate()
             if s == cs:
                 return None
             if self.navgrid.graph.has_node(tools.lower_y(s.coords)):
@@ -74,14 +74,14 @@ class SignWayPoints(object):
     def get_groupnext_circulate(self, group):
         if not self.has_group(group):
             return None
-        group = self.ordered_sign_groups[group]
-        cs = group.current_point()
+        sgroup = self.ordered_sign_groups[group]
+        cs = sgroup.current_point()
         if cs is None:
-            group.start()
-            return group.current_point()
+            sgroup.start()
+            return sgroup.current_point()
         n_pass = 0
         while True:
-            s = group.next_circulate()
+            s = sgroup.next_circulate()
             if s == cs:
                 n_pass += 1
                 if n_pass == 2:
