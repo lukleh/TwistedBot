@@ -66,6 +66,7 @@ def yaw_pitch_between(p1, p2):
     x, y, z = p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]
     return yaw_pitch_to_vector(x, y, z)
 
+
 def yaw_pitch_to_vector(x, y, z):
     xz = math.hypot(x, z)
     if xz == 0:

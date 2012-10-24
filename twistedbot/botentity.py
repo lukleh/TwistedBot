@@ -343,7 +343,7 @@ class Bot(object):
         self.is_in_water, water_current = self.handle_water_movement()
         self.is_in_lava = self.handle_lava_movement()
         if self.is_jumping:
-            print 'JUMP',self.velocities[1]
+            print 'JUMP', self.velocities[1]
             if self.is_in_water or self.is_in_lava:
                 self.velocities[1] += config.SPEED_LIQUID_JUMP
             elif self.on_ground:
@@ -351,7 +351,7 @@ class Bot(object):
             elif self.is_on_ladder:
                 self.velocities[1] = config.SPEED_CLIMB
             self.is_jumping = False
-            print 'JUMP after',self.velocities[1]
+            print 'JUMP after', self.velocities[1]
         if self.is_in_water:
             self.velocities = [self.velocities[0] + water_current[0],
                                self.velocities[1] + water_current[1],
@@ -403,7 +403,7 @@ class Bot(object):
         x, z = direction
         dx = x * speedf
         dz = z * speedf
-        return dx, dz
+        return (dx, dz)
 
     def turn_direction(self, x, z):
         if x == 0 and z == 0:
@@ -412,22 +412,22 @@ class Bot(object):
         self.yaw = yaw
 
     def update_directional_speed(self, direction, speedf, balance=False):
+        direction = self.directional_speed(direction, speedf)
         if self.turn_to_setup is not None:
             self.turn_to(*self.turn_to_setup)
             self.turn_to_setup = None
-        if balance:
+        if balance and tools.vector_size(direction) > 0:
             perpedicular_dir = (- direction[1], direction[0])
-            dot = self.velocities[0] * perpedicular_dir[0] + self.velocities[2] * perpedicular_dir[1]
+            dot = (self.velocities[0] * perpedicular_dir[0] + self.velocities[2] * perpedicular_dir[1]) / \
+                (perpedicular_dir[0] * perpedicular_dir[0] + perpedicular_dir[1] * perpedicular_dir[1])
             if dot < 0:
                 dot *= -1
                 perpedicular_dir = (direction[1], - direction[0])
             direction = (direction[0] - perpedicular_dir[0] * dot, direction[1] - perpedicular_dir[1] * dot)
-            direction = tools.normalize(direction)
             self.turn_direction(*direction)
             print "BALANCE DIRECTION", direction
-        x, z = self.directional_speed(direction, speedf)
-        self.velocities[0] += x
-        self.velocities[2] += z
+        self.velocities[0] += direction[0]
+        self.velocities[2] += direction[1]
 
     def set_direction(self, direction):
         self.direction = direction
