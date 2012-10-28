@@ -32,7 +32,7 @@ If your username (commander) is set, then you can use chat to send commands to b
 - "look at me" stands still and looks at you
 - "rotate 'group'" rotates (after the end, goes back to the beginning) between signs -> details below
 - "circulate 'group'" circulates (at the end, goes backward towards the beginnings) between signs -> details below
-- "go 'name'" go to specific waypoint identified by name
+- "go 'name'" go to specific waypoint identified by name, or if name is group and order separated with space
 - "cancel" cancel current activity
 
 #### Sign waypoints
