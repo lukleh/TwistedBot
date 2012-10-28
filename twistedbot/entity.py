@@ -92,7 +92,5 @@ class EntityExperienceOrb(Entity):
 class EntityDroppedItem(Entity):
     def __init__(self, **kwargs):
         super(EntityDroppedItem, self).__init__(**kwargs)
-        self.count = kwargs["count"]
-        self.item = kwargs["item"]
-        self.data = kwargs["data"]
+        self.nbt = kwargs["slotdata"]
         #ignoring yaw, pitch and roll for now

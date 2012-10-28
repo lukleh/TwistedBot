@@ -22,7 +22,9 @@ class GridSpace(object):
             self.block = self.grid.get_block(coords[0], coords[1], coords[2])
         elif bb is not None:
             self.bb_stand = bb
-            self.block = self.grid.standing_on_solidblock(bb)
+            self.block = self.grid.standing_on_block(bb)
+            if self.block is None:
+                self.block = self.grid.get_block(*bb.grid_bottom_center)
             self.coords = self.block.coords
         else:
             raise Exception("Empty gridspace object")
@@ -58,26 +60,18 @@ class GridSpace(object):
             return False
 
     def compute(self):
-        s = [self.grid.get_block(self.coords[0], self.coords[1] + i, self.coords[2]).stand_type for i in (-1, 0, 1, 2)]
-        m = self.grid.can_stand_memory[s]
-        s2 = [self.grid.get_block(self.coords[0], self.coords[1] + i, self.coords[2]).stand_number for i in (-1, 0, 1, 2)]
-        m2 = self.grid.can_stand_memory2[s2]
         can = self._can_stand_on()
-        if m is None:
-            #print 'self.grid.can_stand_memory count', self.grid.can_stand_memory.count, 'can', can, 's', s
-            m = (can, self.bb_stand, self.platform, self.stand_block)
-            self.grid.can_stand_memory[s] = (
-                can, self.bb_stand, self.platform, self.stand_block)
-        if m2 is None:
-            #print 'self.grid.can_stand_memory count', self.grid.can_stand_memory.count, 'can', can, 's', s
-            m2 = (can, self.bb_stand, self.platform, self.stand_block)
-            self.grid.can_stand_memory2[s2] = (
-                can, self.bb_stand, self.platform, self.stand_block)
-        #else:
-        #    can, self.bb_stand, self.platform, self.stand_block = m
-        #if m[0] != m2[0] or can != m[0] or can != m2[0]:
-        #    print can, m[0], m2[0], s, s2, [str(self.grid.get_block(self.coords[0], self.coords[1] + i, self.coords[2])) for i in (-1, 0, 1, 2)]
+        self.grid.can_stand_memory[[b.identifier for b in self.blocks3]] = can
         return can
+
+    def can_be_in(self, bb):
+        if self.grid.aabb_collides(bb):
+            return False
+        if self.blocks_to_avoid(self.grid.blocks_in_aabb(bb)):
+            return False
+        if self.grid.aabb_eyelevel_inside_water(bb):
+            return False
+        return True
 
     def _can_stand_on(self):
         """
@@ -92,8 +86,12 @@ class GridSpace(object):
         if self.block.is_ladder_vine or self.block.is_water:
             bb = AABB.from_block_coords(self.block.coords)
             if under.is_fence:
-                self.bb_stand = bb.shift(min_y=under.grid_bounding_box.max_y)
+                self.bb_stand = bb.shift(min_y=under.max_y)
             else:
+                if not under.collidable or (under.collidable and fops.lt(under.max_y, bb.min_y)):
+                    bb1 = bb.offset(dy=0.5)
+                    if self.can_be_in(bb1):
+                        bb = bb1
                 self.bb_stand = bb
             self.stand_block = self.block
             self.platform = self.bb_stand.set_to(max_y=self.bb_stand.min_y)
@@ -116,13 +114,7 @@ class GridSpace(object):
             self.bb_stand = bb.offset(dy=self.platform.min_y - bb.min_y)
             if not self.bb_stand.collides_on_axes(self.platform, x=True, z=True):
                 return False
-        if self.grid.aabb_collides(self.bb_stand):
-            return False
-        if self.blocks_to_avoid(self.grid.blocks_in_aabb(self.bb_stand)):
-            return False
-        if self.grid.aabb_eyelevel_inside_water(self.bb_stand):
-            return False
-        return True
+        return self.can_be_in(self.bb_stand)
 
     def can_go(self, gs, update_to_bb_stand=False):
         if not self.can_stand_between(gs):
@@ -155,6 +147,9 @@ class GridSpace(object):
         edge_cost = 0
         bb_stand = self.bb_stand
         other_bb_stand = gs.bb_stand
+        if bb_stand.horizontal_distance(other_bb_stand) > 2:
+            # too far from the next step
+            return False
         if fops.gt(bb_stand.min_y, other_bb_stand.min_y):
             elev = bb_stand.min_y - other_bb_stand.min_y
             elev_bb = other_bb_stand.extend_to(dy=elev)
@@ -162,13 +157,18 @@ class GridSpace(object):
             bb_to = other_bb_stand.offset(dy=elev)
         elif fops.lt(bb_stand.min_y, other_bb_stand.min_y):
             if fops.lte(bb_stand.grid_y + 2, other_bb_stand.min_y):
+                if debug:
+                    print 'over 2 high difference',
                 return False
             elev = other_bb_stand.min_y - bb_stand.min_y
-            if self.grid.aabb_in_water(bb_stand) and \
+            in_water = self.grid.aabb_in_water(bb_stand)
+            if in_water and \
                     other_bb_stand.grid_y > bb_stand.grid_y and \
                     fops.gt(other_bb_stand.min_y, other_bb_stand.grid_y) and \
                     not self.grid.aabb_in_water(bb_stand.shift(min_y=other_bb_stand.min_y)) and \
                     fops.gte(other_bb_stand.min_y - (bb_stand.grid_y + 1), config.MAX_WATER_JUMP_HEIGHT - 0.15):
+                if debug:
+                    print 'water cannot go',
                 return False
             if self.grid.aabb_on_ladder(bb_stand) and \
                     other_bb_stand.grid_y > bb_stand.grid_y and \
@@ -176,7 +176,7 @@ class GridSpace(object):
                     not self.grid.aabb_on_ladder(bb_stand.shift(min_y=other_bb_stand.min_y)) and \
                     fops.gte(other_bb_stand.min_y - (bb_stand.grid_y + 1), config.MAX_VINE_JUMP_HEIGHT - 0.2):
                 return False
-            if fops.gt(elev, config.MAX_JUMP_HEIGHT):
+            if fops.gt(elev, config.MAX_JUMP_HEIGHT) and not in_water:
                 return False
             if fops.lte(elev, config.MAX_STEP_HEIGHT):
                 elev = config.MAX_STEP_HEIGHT

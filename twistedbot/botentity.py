@@ -28,6 +28,7 @@ class StatusDiff(object):
         self.logger = logbot.getlogger("BOT_ENTITY_STATUS")
 
     def log(self):
+        return
         if self.node_count != self.world.navgrid.graph.node_count or \
                 self.edge_count != self.world.navgrid.graph.edge_count:
             self.logger.msg("navgrid having %d nodes and %d edges" %
@@ -44,6 +45,7 @@ class Commander(object):
         self.name = name
         self.eid = None
         self.last_possition = None
+        self.last_block = None
 
 
 class Bot(object):
@@ -83,7 +85,7 @@ class Bot(object):
         self.is_in_lava = False
         self.action = 2  # normal
         self.is_jumping = False
-        self.is_floating = True
+        self.floating_flag = True
         self.turn_to_setup = None
 
     def connection_lost(self):
@@ -163,7 +165,6 @@ class Bot(object):
         return self.world.grid.aabb_in_complete_chunks(self.aabb)
 
     def every_n_ticks(self, n=100):
-        return
         if self.ticks % n == 0:
             self.status_diff.log()
 
@@ -183,14 +184,13 @@ class Bot(object):
         self.move(direction=self.direction)
         self.direction = [0, 0]
         self.send_location()
-        tools.do_later(0, self.goal_manager.run_goal)
-        tools.do_later(0, self.every_n_ticks)
         tools.do_later(0, self.on_standing_ready)
+        tools.do_later(0, self.every_n_ticks)
+        tools.do_later(0, self.goal_manager.run_goal)
         iter_end = datetime.now()
-        d_run = (iter_end - iter_start).total_seconds()
+        d_run = (iter_end - iter_start).total_seconds()  # time this step took
         t = config.TIME_STEP - d_run  # decreased by computation in iterate
-        d_iter = (iter_start - self.last_iterate_time).total_seconds(
-        )  # real iterate period
+        d_iter = (iter_start - self.last_iterate_time).total_seconds()  # real iterate period
         r_over = d_iter - self.period_time_estimation  # diff from scheduled by
         t -= r_over
         t = max(0, t)  # cannot delay into past
@@ -276,8 +276,7 @@ class Bot(object):
         onground = self.velocities[1] != dy and self.velocities[1] < 0
         self.is_collided_horizontally = dx != self.velocities[
             0] or dz != self.velocities[2]
-        self.horizontally_blocked = dx != self.velocities[
-            0] and dz != self.velocities[2]
+        self.horizontally_blocked = dx != self.velocities[0] and dz != self.velocities[2]
         if self.velocities[0] != dx:
             self.velocities[0] = 0
         if self.velocities[1] != dy:
@@ -322,7 +321,7 @@ class Bot(object):
                 if top_y >= wy:
                     is_in_water = True
                     water_current = blk.add_velocity_to(water_current)
-        if tools.normalize(water_current) > 0:
+        if tools.vector_size(water_current) > 0:
             water_current = tools.normalize(water_current)
             wconst = 0.014
             water_current = (water_current[0] * wconst, water_current[
@@ -343,7 +342,6 @@ class Bot(object):
         self.is_in_water, water_current = self.handle_water_movement()
         self.is_in_lava = self.handle_lava_movement()
         if self.is_jumping:
-            print 'JUMP', self.velocities[1]
             if self.is_in_water or self.is_in_lava:
                 self.velocities[1] += config.SPEED_LIQUID_JUMP
             elif self.on_ground:
@@ -351,13 +349,19 @@ class Bot(object):
             elif self.is_on_ladder:
                 self.velocities[1] = config.SPEED_CLIMB
             self.is_jumping = False
-            print 'JUMP after', self.velocities[1]
         if self.is_in_water:
+            if self.floating_flag:
+                if self.head_inside_water:
+                    self.velocities[1] += config.SPEED_LIQUID_JUMP
+                else:
+                    blk = self.grid.get_block(*self.aabb.grid_bottom_center)
+                    if blk.is_water:
+                        fops.gt(blk.y + 0.5, self.aabb.min_y)
+                        self.velocities[1] += config.SPEED_LIQUID_JUMP
             self.velocities = [self.velocities[0] + water_current[0],
                                self.velocities[1] + water_current[1],
                                self.velocities[2] + water_current[2]]
             orig_y = self.y
-            #print 'water current', water_current, self.velocities
             self.update_directional_speed(
                 direction, 0.02, balance=True)
             self.do_move()
@@ -370,9 +374,7 @@ class Bot(object):
                                              self.velocities[1] + 0.6 -
                                              self.y + orig_y,
                                              self.velocities[2]):
-                print "OUT OF WATER JUMP"
                 self.velocities[1] = 0.30000001192092896
-            self.is_floating = True
         elif self.is_in_lava:
             orig_y = self.y
             self.update_directional_speed(direction, 0.02)
@@ -425,7 +427,6 @@ class Bot(object):
                 perpedicular_dir = (direction[1], - direction[0])
             direction = (direction[0] - perpedicular_dir[0] * dot, direction[1] - perpedicular_dir[1] * dot)
             self.turn_direction(*direction)
-            print "BALANCE DIRECTION", direction
         self.velocities[0] += direction[0]
         self.velocities[2] += direction[1]
 
@@ -531,7 +532,7 @@ class Bot(object):
 
     @property
     def standing_on_block(self):
-        return self.grid.standing_on_solidblock(self.aabb)
+        return self.grid.standing_on_block(self.aabb)
 
     @property
     def is_standing(self):

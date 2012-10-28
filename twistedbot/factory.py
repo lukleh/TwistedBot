@@ -222,8 +222,7 @@ class MineCraftProtocol(Protocol):
                                        pitch=c.pitch, x=c.x, y=c.y, z=c.z)
 
     def p_dropped_item(self, c):
-        self.world.entities.new_dropped_item(eid=c.eid, count=c.count,
-                                             item=c.item, data=c.data, x=c.x,
+        self.world.entities.new_dropped_item(eid=c.eid, slotdata=c.slotdata, x=c.x,
                                              y=c.y, z=c.z, yaw=c.yaw,
                                              pitch=c.pitch, roll=c.roll)
 
@@ -289,7 +288,6 @@ class MineCraftProtocol(Protocol):
         self.bot.s_total_experience = c.total
 
     def p_chunk(self, c):
-        #log.msg("chunk %s %s" % (c.x, c.z))
         self.world.grid.load_chunk(c.x, c.z, c.continuous, c.primary_bitmap,
                                    c.add_bitmap, c.data.decode('zlib'))
 
@@ -324,7 +322,6 @@ class MineCraftProtocol(Protocol):
         devnull(c)
 
     def p_state(self, c):
-        #log.msg("New state %s" % c.state)
         pass
 
     def p_thunderbolt(self, c):

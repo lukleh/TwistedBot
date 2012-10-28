@@ -44,4 +44,4 @@ COST_LADDER = 0.21 / \
 COST_FALL = 1.1
 COST_DIRECT = 1
 COST_DIAGONAL = math.sqrt(2) * COST_DIRECT
-ASTAR_LIMIT = 100  # roughly 50 blocks
+PATHFIND_LIMIT = 50  # roughly 50 blocks

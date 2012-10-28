@@ -56,6 +56,20 @@ class SignWayPoints(object):
         else:
             return None
 
+    def get_name_from_group(self, name):
+        group, _, order = name.rpartition(' ')
+        if not self.has_group(group):
+            return None
+        try:
+            order = float(order)
+        except ValueError:
+            return None
+        sgroup = self.ordered_sign_groups[group]
+        for o in sgroup.iter():
+            if o.order == order:
+                return o.obj
+        return None
+
     def get_groupnext_rotate(self, group):
         if not self.has_group(group):
             return None

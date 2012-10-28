@@ -1,5 +1,5 @@
 # Bot/Proxy for Minecraft
-- Support for 1.4.1 protocol version 47
+- Support for 1.4.2 protocol version 47
 - Running under [PyPy](http://pypy.org/ "PyPy"). You can try [CPython](http://python.org/ "CPython"), if you want
 - flake8 clean with long lines
 

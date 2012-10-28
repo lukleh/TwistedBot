@@ -15,7 +15,8 @@ class PathNode(object):
         self.g = 0
         self.h = 0
         self.f = 0
-        self.parent = None
+        self.step = 0
+        self._parent = None
         self.hash = hash(self.coords)
 
     def __str__(self):
@@ -36,6 +37,15 @@ class PathNode(object):
 
     def __getitem__(self, i):
         return self.coords[i]
+
+    @property
+    def parent(self):
+        return self._parent
+
+    @parent.setter
+    def parent(self, p):
+        self._parent = p
+        self.step = p.step + 1
 
     def set_score(self, g, h):
         self.g = g
@@ -80,7 +90,7 @@ class Path(object):
 
 
 class AStar(object):
-    def __init__(self, navgrid, start, goal, max_cost=config.ASTAR_LIMIT):
+    def __init__(self, navgrid, start, goal, max_cost=config.PATHFIND_LIMIT):
         self.navgrid = navgrid
         self.succesors = self.navgrid.graph.get_succ
         self.get_node = self.navgrid.graph.get_node
@@ -139,6 +149,6 @@ class AStar(object):
                 if y not in self.open_set:
                     heapq.heappush(self.open_heap, y)
                     self.open_set.add(y)
-                if y.g > self.max_cost:
+                if y.step > self.max_cost:
                     log.err("pathfinding too wide")
                     raise StopIteration()

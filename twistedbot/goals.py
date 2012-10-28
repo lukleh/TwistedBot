@@ -81,9 +81,11 @@ class GoalBase(object):
         self.ready = False
         self.mark_manager_stop = False
         self.cancelled = False
+        self.floating_flag = True
 
     def activate(self):
         self.ready = True
+        self.bot.floating_flag = self.floating_flag
 
     def perform(self):
         self.activate()
@@ -207,8 +209,10 @@ class GoToSignGoal(GoalBase):
         self.signpoint = self.bot.world.navgrid.sign_waypoints.get_namepoint(
             self.sign_name)
         if self.signpoint is None:
+            self.signpoint = self.bot.world.navgrid.sign_waypoints.get_name_from_group(self.sign_name)
+        if self.signpoint is None:
             self.bot.chat_message(
-                "don't have sign with name %s" % self.sign_name)
+                "cannot idetify sign with name %s" % self.sign_name)
             return Status.impossible
         else:
             return Status.not_finished
@@ -225,8 +229,11 @@ class TravelToGoal(GoalBase):
         self.calculating = False
         self.current_step = None
         self.last_step = None
-        self.name = 'Travel to %s' % str(self.travel_coords)
         log.msg(self.name)
+
+    @property
+    def name(self):
+        return 'Travel to %s from %s' % (str(self.travel_coords), self.bot.standing_on_block)
 
     def activate(self):
         if not self.ready:
@@ -295,28 +302,26 @@ class MoveToGoal(GoalBase):
         self.mark_manager_stop = True
         self.target_space = kwargs["target_space"]
         self.was_at_target = False
+        self.floating_flag = False
         self.name = 'Move to %s' % str(self.target_space.coords)
         log.msg(self.name)
 
     def check_state(self):
         bb_stand = self.target_space.bb_stand
         elev = bb_stand.min_y - self.bot.aabb.min_y
-        if fops.gt(elev, config.MAX_JUMP_HEIGHT):
-            return Status.impossible
         if not self.target_space._can_stand_on():
             self.grid.navgrid.delete_node(self.target_space.coords)
             return Status.impossible
-        if self.bot.aabb.horizontal_distance(bb_stand) > 2:
-            # too far from the next step, better try again
+        if not gs.can_go(self.target_space):
             return Status.impossible
-        if self.bot.position_grid == self.target_space.coords and \
-                (self.bot.is_on_ladder or self.grid.aabb_in_water(self.bot.aabb)):
-            return Status.finished
+        if self.bot.is_on_ladder or self.grid.aabb_in_water(self.bot.aabb):
+            if self.bot.position_grid == self.target_space.coords:
+                return Status.finished
         if self.bot.aabb.horizontal_distance(bb_stand) < self.bot.current_motion:
             self.was_at_target = True
             if fops.eq(elev, 0):
                 return Status.finished
-        if self.bot.on_ground and self.bot.horizontally_blocked:
+        if self.bot.horizontally_blocked and self.bot.on_ground:
             gs = GridSpace(self.grid, bb=self.bot.aabb)
             if not gs.can_go(self.target_space):
                 log.msg("I am stuck, let's try again? vels %s" %
@@ -378,9 +383,7 @@ class MoveToGoal(GoalBase):
         self.bot.set_direction(direction)
 
     def jump(self, height=0):
-        #log.msg("JUMP")
         self.bot.is_jumping = True
 
     def jumpstep(self, h=config.MAX_STEP_HEIGHT):
-        #log.msg("JUMPSTEP")
         self.bot.set_jumpstep(h)

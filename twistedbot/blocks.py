@@ -29,6 +29,9 @@ class Block(object):
         self.z = z
         self.meta = meta
 
+    def __eq__(self, o):
+        return self.x == o.x and self.y == o.y and self.z == o.z and self.meta == o.meta
+
     def __str__(self):
         return "%d %d %d %s %s" % \
             (self.x, self.y, self.z, self.name, tools.meta2str(self.meta))
@@ -45,12 +48,8 @@ class Block(object):
             return self.z
 
     @property
-    def stand_type(self):
-        return (-1,)
-
-    @property
-    def stand_number(self):
-        return (self.number,)
+    def identifier(self):
+        return (self.number, self.meta)
 
     @property
     def collidable(self):
@@ -72,7 +71,10 @@ class Block(object):
     @property
     def is_ladder_vine(self):
         return isinstance(self, Ladders) or isinstance(self, Vines)
-        #return False
+
+    @property
+    def is_stairs(self):
+        return isinstance(self, BlockStairs)
 
     @property
     def coords(self):
@@ -87,6 +89,10 @@ class Block(object):
     @property
     def grid_bounding_box(self):
         return self.bounding_box + self.coords
+
+    @property
+    def max_y(self):
+        return self.grid_bounding_box.max_y
 
     def add_grid_bounding_boxes_to(self, out):
         out.append(self.grid_bounding_box)
@@ -124,10 +130,6 @@ class BlockNonSolid(Block):
     is_opaque_cube = False
 
     @property
-    def stand_type(self):
-        return (0,)
-
-    @property
     def collidable(self):
         return False
 
@@ -161,10 +163,6 @@ class BlockFluid(BlockNonSolid):
 
 class BlockWater(BlockFluid):
     material = materials.water
-
-    @property
-    def stand_type(self):
-        return (-2,)
 
     def is_solid_block(self, blk, v):
         if self.material == blk.material:
@@ -263,10 +261,6 @@ class BlockWater(BlockFluid):
 class BlockLava(BlockFluid):
     material = materials.lava
 
-    @property
-    def stand_type(self):
-        return (-3,)
-
 
 class BlockFlower(BlockNonSolid):
     material = materials.plants
@@ -285,10 +279,6 @@ class RedstoneRepeater(Block):
     material = materials.circuits
     render_as_normal_block = False
     is_opaque_cube = False
-
-    @property
-    def stand_type(self):
-        return (-4,)
 
 
 class BlockMultiBox(Block):
@@ -345,6 +335,10 @@ class BlockMultiBox(Block):
                     max_face = max_face.union(max_faces[i + 1])
             return max_face
 
+    @property
+    def max_y(self):
+        return max(bb.max_y for bb in self.grid_bounding_box)
+
     def collides_with(self, bb):
         for box in self.grid_bounding_box:
             if bb.collides(box):
@@ -368,28 +362,146 @@ class BlockStairs(BlockMultiBox):
     render_as_normal_block = False
     is_opaque_cube = False
     bounding_box_half = AABB(0.0, 0.0, 0.0, 1.0, 0.5, 1.0)
-    bounding_box_quarter = [AABB(0.5, 0.5, 0.0, 1.0, 1.0, 1.0),
-                            AABB(0.0, 0.5, 0.0, 0.5, 1.0, 1.0),
-                            AABB(0.0, 0.5, 0.5, 1.0, 1.0, 1.0),
-                            AABB(0.0, 0.5, 0.0, 1.0, 1.0, 0.5)]
     bounding_box_up_half = AABB(0.0, 0.5, 0.0, 1.0, 1.0, 1.0)
-    bounding_box_up_quarter = [AABB(0.5, 0.0, 0.0, 1.0, 0.5, 1.0),
-                               AABB(0.0, 0.0, 0.0, 0.5, 0.5, 1.0),
-                               AABB(0.0, 0.0, 0.5, 1.0, 0.5, 1.0),
-                               AABB(0.0, 0.0, 0.0, 1.0, 0.5, 0.5)]
 
     @property
-    def stand_type(self):
-        return (-5, )
+    def is_upsite_down(self):
+        return (self.meta & 4) != 0
+
+    def similar_stairs(self, blk):
+        return blk.is_stairs and self.is_upsite_down == blk.is_upsite_down
+
+    def add_bounding_box_step(self, box_array):
+        var9 = 0.0
+        var10 = 0.5
+        var11 = 0.5
+        var12 = 1.0
+        if self.is_upsite_down:
+            var7 = 0
+            var8 = 0.5
+        else:
+            var7 = 0.5
+            var8 = 1
+        var13 = True
+        dirc = self.meta & 3
+        if dirc == 0:
+            blk = self.grid.get_block(self.x + 1, self.y, self.z)
+            var9 = 0.5
+            var12 = 1.0
+            if self.similar_stairs(blk):
+                m3 = blk.meta & 3
+                if m3 == 3 and not self.grid.get_block(self.x, self.y, self.z + 1).meta == self.meta:
+                    var12 = 0.5
+                    var13 = False
+                elif m3 == 2 and not self.grid.get_block(self.x, self.y, self.z - 1).meta == self.meta:
+                    var11 = 0.5
+                    var13 = False
+        elif dirc == 1:
+            blk = self.grid.get_block(self.x - 1, self.y, self.z)
+            var10 = 0.5
+            var12 = 1.0
+            if self.similar_stairs(blk):
+                m3 = blk.meta & 3
+                if m3 == 3 and not self.grid.get_block(self.x, self.y, self.z + 1).meta == self.meta:
+                    var12 = 0.5
+                    var13 = False
+                elif m3 == 2 and not self.grid.get_block(self.x, self.y, self.z - 1).meta == self.meta:
+                    var11 = 0.5
+                    var13 = False
+        elif dirc == 2:
+            blk = self.grid.get_block(self.x, self.y, self.z + 1)
+            var11 = 0.5
+            var12 = 1.0
+            if self.similar_stairs(blk):
+                m3 = blk.meta & 3
+                if m3 == 1 and not self.grid.get_block(self.x + 1, self.y, self.z).meta == self.meta:
+                    var10 = 0.5
+                    var13 = False
+                elif m3 == 0 and not self.grid.get_block(self.x - 1, self.y, self.z).meta == self.meta:
+                    var9 = 0.5
+                    var13 = False
+        elif dirc == 3:
+            blk = self.grid.get_block(self.x, self.y, self.z - 1)
+            if self.similar_stairs(blk):
+                m3 = blk.meta & 3
+                if m3 == 1 and not self.grid.get_block(self.x + 1, self.y, self.z).meta == self.meta:
+                    var10 = 0.5
+                    var13 = False
+                elif m3 == 0 and not self.grid.get_block(self.x - 1, self.y, self.z).meta == self.meta:
+                    var9 = 0.5
+                    var13 = False
+        box_array.append(AABB(var9, var7, var11, var10, var8, var12))
+        if var13:
+            var9 = 0.0
+            var10 = 0.5
+            var11 = 0.5
+            var12 = 1.0
+            if self.is_upsite_down:
+                var7 = 0
+                var8 = 0.5
+            else:
+                var7 = 0.5
+                var8 = 1
+            var13 = False
+            if dirc == 0:
+                blk = self.grid.get_block(self.x - 1, self.y, self.z)
+                if self.similar_stairs(blk):
+                    m3 = blk.meta & 3
+                    if m3 == 3 and not self.grid.get_block(self.x, self.y, self.z - 1).meta == self.meta:
+                        var11 = 0.0
+                        var12 = 0.5
+                        var13 = True
+                    elif m3 == 2 and not self.grid.get_block(self.x, self.y, self.z + 1).meta == self.meta:
+                        var11 = 0.5
+                        var12 = 1.0
+                        var13 = True
+            elif dirc == 1:
+                blk = self.grid.get_block(self.x + 1, self.y, self.z)
+                if self.similar_stairs(blk):
+                    m3 = blk.meta & 3
+                    var9 = 0.0
+                    var10 = 0.5
+                    if m3 == 3 and not self.grid.get_block(self.x, self.y, self.z - 1).meta == self.meta:
+                        var11 = 0.0
+                        var12 = 0.5
+                        var13 = True
+                    elif m3 == 2 and not self.grid.get_block(self.x, self.y, self.z + 1).meta == self.meta:
+                        var11 = 0.5
+                        var12 = 1.0
+                        var13 = True
+            elif dirc == 2:
+                blk = self.grid.get_block(self.x, self.y, self.z - 1)
+                if self.similar_stairs(blk):
+                    m3 = blk.meta & 3
+                    var11 = 0.0
+                    var12 = 0.5
+                    if m3 == 1 and not self.grid.get_block(self.x - 1, self.y, self.z).meta == self.meta:
+                        var13 = True
+                    elif m3 == 0 and not self.grid.get_block(self.x + 1, self.y, self.z).meta == self.meta:
+                        var9 = 0.5
+                        var10 = 1.0
+                        var13 = True
+            elif dirc == 3:
+                blk = self.grid.get_block(self.x, self.y, self.z + 1)
+                if self.similar_stairs(blk):
+                    m3 = blk.meta & 3
+                    if m3 == 1 and not self.grid.get_block(self.x - 1, self.y, self.z).meta == self.meta:
+                        var13 = True
+                    elif m3 == 0 and not self.grid.get_block(self.x + 1, self.y, self.z).meta == self.meta:
+                        var9 = 0.5
+                        var10 = 1.0
+                        var13 = True
+            if var13:
+                box_array.append(AABB(var9, var7, var11, var10, var8, var12))
 
     @property
     def grid_bounding_box(self):
-        if self.meta >= 4:
-            return [self.bounding_box_up_half + self.coords,
-                    self.bounding_box_up_quarter[self.meta - 4] + self.coords]
+        if self.is_upsite_down:
+            gbb = [self.bounding_box_up_half]
         else:
-            return [self.bounding_box_half + self.coords,
-                    self.bounding_box_quarter[self.meta] + self.coords]
+            gbb = [self.bounding_box_half]
+        self.add_bounding_box_step(gbb)
+        return [box + self.coords for box in gbb]
 
 
 class BlockDoor(Block):
@@ -401,10 +513,6 @@ class BlockDoor(Block):
                       AABB(0.0, 0.0, 0.8125, 1.0, 1.0, 1.0)]
     top_part = None
     bottom_part = None
-
-    @property
-    def stand_type(self):
-        return (-6, self.bounding_boxes_index)
 
     @property
     def stand_number(self):
@@ -508,10 +616,6 @@ class BlockFence(Block):
     render_as_normal_block = False
 
     @property
-    def stand_type(self):
-        return (-7, )
-
-    @property
     def grid_bounding_box(self):
         if self.can_connect_to(self.x, self.y, self.z - 1):
             minz = 0.0
@@ -553,10 +657,6 @@ class BlockSingleSlab(Block):
     bounding_box_higher = AABB(0.0, 0.5, 0.0, 1.0, 1.0, 1.0)
     render_as_normal_block = False
     is_opaque_cube = False
-
-    @property
-    def stand_type(self):
-        return (-8, self.lower_part)
 
     @property
     def stand_number(self):
@@ -732,10 +832,6 @@ class Bed(Block):
     render_as_normal_block = False
     is_opaque_cube = False
 
-    @property
-    def stand_type(self):
-        return (self.number, )
-
 
 class PoweredRail(BlockNonSolid):
     number = 27
@@ -759,10 +855,6 @@ class Cobweb(BlockNonSolid):
     number = 30
     name = "Cobweb"
     material = materials.web
-
-    @property
-    def stand_type(self):
-        return (self.number, )
 
 
 class TallGrass(BlockFlower):
@@ -891,10 +983,6 @@ class Fire(BlockNonSolid):
     name = "Fire"
     material = materials.fire
 
-    @property
-    def stand_type(self):
-        return (self.number, )
-
 
 class MonsterSpawner(Block):
     number = 52
@@ -987,14 +1075,6 @@ class Ladders(Block):
                     AABB(0.0, 0.0, 0.0, 1.0, 1.0, 0.125),
                     AABB(0.875, 0.0, 0.0, 1.0, 1.0, 1.0),
                     AABB(0.0, 0.0, 0.0, 0.125, 1.0, 1.0)]
-
-    @property
-    def stand_type(self):
-        return (self.number, self.meta)
-
-    @property
-    def stand_number(self):
-        return self.stand_type
 
     @property
     def grid_bounding_box(self):
@@ -1090,14 +1170,6 @@ class Snow(Block):
     bounding_box = None
 
     @property
-    def stand_type(self):
-        return (self.number, self.meta)
-
-    @property
-    def stand_number(self):
-        return self.stand_type
-
-    @property
     def collidable(self):
         return (self.meta & 7) >= 3
 
@@ -1132,10 +1204,6 @@ class Cactus(Block):
     is_opaque_cube = False
     bounding_box = AABB(0.0625, 0.0, 0.0625,
                         1.0 - 0.0625, 1.0 - 0.0625, 1.0 - 0.0625)
-
-    @property
-    def stand_type(self):
-        return (self.number, )
 
 
 class ClayBlock(Block):
@@ -1180,10 +1248,6 @@ class SoulSand(Block):
     material = materials.sand
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 1.0 - 0.125, 1.0)
 
-    @property
-    def stand_type(self):
-        return (self.number, )
-
     def on_entity_collided(self, entity):
         entity.velocities[0] *= 0.4
         entity.velocities[2] *= 0.4
@@ -1213,14 +1277,6 @@ class Cake(Block):
     material = materials.cake
     render_as_normal_block = False
     is_opaque_cube = False
-
-    @property
-    def stand_type(self):
-        return (self.number, self.meta)
-
-    @property
-    def stand_number(self):
-        return self.stand_type
 
     @property
     def grid_bounding_box(self):
@@ -1256,14 +1312,6 @@ class Trapdoor(Block):
                       AABB(0.0, 0.0, 0.0, 0.1875, 1.0, 1.0)]
     render_as_normal_block = False
     is_opaque_cube = False
-
-    @property
-    def stand_type(self):
-        return (self.number, self.is_closed)
-
-    @property
-    def stand_number(self):
-        return self.stand_type
 
     @property
     def is_closed(self):
@@ -1334,10 +1382,6 @@ class Vines(BlockNonSolid):
     name = "Vines"
     material = materials.vine
 
-    @property
-    def stand_type(self):
-        return (self.number, )
-
 
 class FenceGate(Block):
     number = 107
@@ -1347,14 +1391,6 @@ class FenceGate(Block):
     bounding_box_east_west = AABB(0, 0, 0.375, 1.0, 1.5, 0.625)
     is_opaque_cube = False
     render_as_normal_block = False
-
-    @property
-    def stand_type(self):
-        return (self.number, self.is_open)
-
-    @property
-    def stand_number(self):
-        return self.stand_type
 
     @property
     def collidable(self):
@@ -1429,10 +1465,6 @@ class LilyPad(Block):
     is_opaque_cube = False
     render_as_normal_block = False
 
-    @property
-    def stand_type(self):
-        return (self.number, )
-
 
 class NetherBrick(Block):
     number = 112
@@ -1465,10 +1497,6 @@ class EnchantmentTable(Block):
     render_as_normal_block = False
     is_opaque_cube = False
 
-    @property
-    def stand_type(self):
-        return (self.number, )
-
 
 class BrewingStand(BlockMultiBox):
     number = 117
@@ -1478,10 +1506,6 @@ class BrewingStand(BlockMultiBox):
     bounding_box_base = AABB(0.0, 0.0, 0.0, 1.0, 0.125, 1.0)
     render_as_normal_block = False
     is_opaque_cube = False
-
-    @property
-    def stand_type(self):
-        return (self.number, )
 
     @property
     def grid_bounding_box(self):
@@ -1512,14 +1536,6 @@ class EndPortalFrame(BlockMultiBox):
     bounding_box_eye_inserted = AABB(0.3125, 0.8125, 0.3125,
                                      0.6875, 1.0, 0.6875)
     is_opaque_cube = False
-
-    @property
-    def stand_type(self):
-        return (self.number, self.eye_inserted)
-
-    @property
-    def stand_number(self):
-        return self.stand_type
 
     @property
     def eye_inserted(self):
@@ -1660,7 +1676,6 @@ class JungleWoodStairs(BlockStairs):
     material = WoodenPlanks.material
 
 
-#TODO just guessing the materials and bounding boxes, need to wait for MCP
 class CommandBlock(Block):
     number = 137
     name = "Command Block"
@@ -1670,19 +1685,26 @@ class CommandBlock(Block):
 class Beacon(Block):
     number = 138
     name = "Beacon"
-    material = materials.iron
+    material = materials.glass
+    render_as_normal_block = False
+    is_opaque_cube = False
 
 
 class CobblestoneWall(BlockFence):
     number = 139
     name = "Cobblestone Wall"
-    material = materials.rock
+    material = Cobblestone.material
 
 
 class FlowerPot(Block):
     number = 140
     name = "Flower Pot"
-    material = materials.wood
+    material = materials.circuits
+    render_as_normal_block = False
+    is_opaque_cube = False
+    b1 = 0.375
+    b2 = b1 / 2.0
+    bounding_box = AABB(0.5 - b2, 0.0, 0.5 - b2, 0.5 + b2, b1, 0.5 + b2)
 
 
 class Carrots(BlockFlower):
@@ -1701,10 +1723,22 @@ class WoodenButton(BlockNonSolid):
     material = materials.circuits
 
 
-class Head(Block):
+class Skull(Block):
     number = 144
-    name = "Head"
-    material = materials.rock
+    name = "Skull"
+    material = materials.circuits
+    render_as_normal_block = False
+    is_opaque_cube = False
+    bounding_box = AABB(0.25, 0.0, 0.25, 0.75, 0.5, 0.75)
+
+
+class Anvil(Block):
+    number = 145
+    name = "Anvil"
+    material = materials.iron
+    render_as_normal_block = False
+    is_opaque_cube = False
+    bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.75, 1.0)
 
 
 block_map = [None for _ in xrange(256)]

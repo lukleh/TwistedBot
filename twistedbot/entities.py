@@ -19,30 +19,37 @@ class Entities(object):
         if eid in self.entities:
             return self.entities[eid]
         else:
-            #log.msg("Entity %d not in mobs list" % eid)
+            log.msg("Entity %d not in mobs list" % eid)
             return None
 
     def maybe_commander(self, entity):
         if self.world.bot.commander.eid != entity.eid:
             return
         gpos = entity.grid_position
-        if self.world.bot.commander.last_possition == gpos:
-            return
-        block = self.world.grid.standing_on_solidblock(
+        #if self.world.bot.commander.last_possition == gpos:
+        #    return
+        block = self.world.grid.standing_on_block(
             AABB.from_player_coords(entity.position))
         if block is None:
             return
-        lpos = self.world.bot.commander.last_possition
-        if lpos is not None and \
-                (block.coords == lpos or
-                 block.coords == (lpos[0], lpos[1] - 1, lpos[2])):
+        if self.world.bot.commander.last_block is not None and self.world.bot.commander.last_block == block:
             return
+        self.world.bot.commander.last_block = block
+        lpos = self.world.bot.commander.last_possition
+        # if lpos is not None and \
+        #         (block.coords == lpos or
+        #          block.coords == (lpos[0], lpos[1] - 1, lpos[2])):
+        #     return
         in_nodes = self.world.navgrid.graph.has_node(block.coords)
         gs = GridSpace(self.world.grid, block=block)
         msg = "P in nm %s on %s aabb %s nm nodes %d\n" % \
             (in_nodes, block, block.grid_bounding_box,
              self.world.navgrid.graph.node_count)
         msg += "gs_stand %s" % str(gs.bb_stand)
+        try:
+            msg += "\nsucessors %s" % str(self.world.navgrid.graph.get_succ(block.coords))
+        except:
+            pass
         if lpos is not None:
             gsl = GridSpace(self.world.grid, coords=lpos)
             if gsl.can_stand_on:
@@ -65,7 +72,8 @@ class Entities(object):
                     msg += "can go False\n"
                 msg += "can stand between %s intersection %s" % (
                     gsl.can_stand_between(gs, debug=True), gsl.intersection)
-        #log.msg(msg)
+
+        log.msg(msg)
         self.world.bot.commander.last_possition = gpos
 
     def entityupdate(fn):

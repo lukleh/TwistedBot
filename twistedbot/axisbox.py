@@ -67,8 +67,8 @@ class AABB(object):
         return (self.posx, self.posy, self.posz)
 
     @property
-    def center(self):
-        return self.bottom_center
+    def grid_bottom_center(self):
+        return (self.grid_x, self.grid_y, self.grid_z)
 
     def face(self, dx=0, dy=0, dz=0):
         if dx < 0:
@@ -392,8 +392,6 @@ class AABB(object):
         lsorted = sorted(ds, key=lambda el: el[0])
         line1 = lsorted[-1][1]
         line2 = lsorted[-2][1]
-        #line1.set_direction_towards(this_center, debug=debug)
-        #line2.set_direction_towards(this_center, debug=debug)
         width = line1.distance_parallel(line2)  # / 3.0 * 2
         is_inside = fops.lte(line1.distance_to(
             center), width) and fops.lte(line2.distance_to(center), width)

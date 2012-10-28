@@ -176,8 +176,8 @@ class OrderedLinkedList(object):
         return self.length
 
     def __str__(self):
-        return "%s [%s]" % \
-            (self.name, ",".join([str((o.order, o.obj)) for o in self.iter()]))
+        return "%s %s [%s]" % \
+            (self.name, self.length, ",".join([str((o.order, o.obj)) for o in self.iter()]))
 
     def iter(self):
         if self.head is not None:
@@ -203,6 +203,7 @@ class OrderedLinkedList(object):
             self.head = LLNode(None, None, order, obj)
             self.pointer = self.head
             self.tail = self.head
+            self.length += 1
             return
         current = self.head
         while True:

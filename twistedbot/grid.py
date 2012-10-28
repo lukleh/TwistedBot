@@ -46,7 +46,6 @@ class Grid(object):
         self.chunks_loaded = 0
         self.spawn_position = None
         self.can_stand_memory = tools.TreeMemory()
-        self.can_stand_memory2 = tools.TreeMemory()
 
     def in_spawn_area(self, coords):
         return abs(coords[0] - self.spawn_position[0]) <= 16 or abs(coords[2] - self.spawn_position[2]) <= 16
@@ -236,14 +235,8 @@ class Grid(object):
                 out.append(blk)
         return out
 
-    def is_any_liquid(self, bb):  # mcp has --val is val < 0
-        minus_one_x, minus_one_y, minus_one_z = (-1 if bb.min_x < 0 else 0, -1 if bb.min_y < 0 else 0, -1 if bb.min_z < 0 else 0)
-        for blk in self.blocks_in_aabb(AABB(bb.min_x + minus_one_x,
-                                            bb.min_y + minus_one_y,
-                                            bb.min_z + minus_one_z,
-                                            bb.max_x + 1,
-                                            bb.max_y + 1,
-                                            bb.max_z + 1)):
+    def is_any_liquid(self, bb):
+        for blk in self.blocks_in_aabb(bb):
             if blk.material.is_liquid:
                 return True
         return False
@@ -327,8 +320,15 @@ class Grid(object):
                 standing_on = blk
                 if standing_on.x == bb.grid_x and standing_on.z == bb.grid_z:
                     break
+        return standing_on
+
+    def standing_on_block(self, bb):
+        standing_on = self.standing_on_solidblock(bb)
         if standing_on is None:
             if self.aabb_on_ladder(bb):
+                standing_on = self.get_block(bb.grid_x, bb.grid_y, bb.grid_z)
+        if standing_on is None:
+            if self.aabb_in_water(bb):
                 standing_on = self.get_block(bb.grid_x, bb.grid_y, bb.grid_z)
         return standing_on
 
