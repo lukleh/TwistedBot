@@ -280,7 +280,8 @@ class TravelToGoal(GoalBase):
                 self.manager.not_running()
 
     def from_child(self, status):
-        log.msg('Travel to child returned status %s' % Status.name(status))
+        if status != Status.finished:
+            log.msg('Travel to child returned status %s' % Status.name(status))
         if status == Status.finished:
             self.do()
         elif status == Status.broken or status == Status.impossible:
@@ -309,7 +310,7 @@ class MoveToGoal(GoalBase):
         self.was_at_target = False
         self.floating_flag = False
         self.name = 'Move to %s' % str(self.target_space.coords)
-        log.msg(self.name)
+        #log.msg(self.name)
 
     def check_state(self):
         bb_stand = self.target_space.bb_stand

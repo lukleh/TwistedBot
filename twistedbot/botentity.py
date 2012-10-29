@@ -359,10 +359,9 @@ class Bot(object):
                     b_down = self.grid.get_block(x, y - 1, z)
                     b_cent = self.grid.get_block(x, y, z)
                     no_up = not b_up.is_water and b_down.collidable and fops.eq(b_down.max_y, y)
-                    if not no_up and b_cent.is_water:
-                        fops.gt(b_cent.y + 0.5, self.aabb.min_y)
+                    if not no_up and b_cent.is_water and fops.gt(b_cent.y + 0.5, self.aabb.min_y):
                         self.velocities[1] += config.SPEED_LIQUID_JUMP
-            #print 'WATER CURRENT', water_current
+            print 'WATER CURRENT', water_current
             self.velocities = [self.velocities[0] + water_current[0],
                                self.velocities[1] + water_current[1],
                                self.velocities[2] + water_current[2]]
