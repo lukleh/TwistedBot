@@ -14,6 +14,7 @@ class GridSpace(object):
 
     def __init__(self, grid, coords=None, block=None, bb=None):
         self.grid = grid
+        self.bb_stand = None
         if block is not None:
             self.block = block
             self.coords = self.block.coords
@@ -32,11 +33,10 @@ class GridSpace(object):
                         self.grid.get_block(self.coords[0], self.coords[
                                             1] + 1, self.coords[2]),
                         self.grid.get_block(self.coords[0], self.coords[1] + 2, self.coords[2]))
-        self.bb_stand = None
+        self._can_stand_on_value = None
         self.stand_block = None
         self.platform = None
         self.intersection = None
-        self.can_stand_on = self.compute()
 
     def __unicode__(self):
         return unicode(self.block)
@@ -51,13 +51,18 @@ class GridSpace(object):
     def b3(self):
         return "%s %s" % (self.block.coords, ", ".join([b.name for b in self.blocks3]))
 
-    @classmethod
-    def blocks_to_avoid(cls, blks):
+    def blocks_to_avoid(self, blks):
         for b in blks:
             if isinstance(b, blocks.Cobweb) or isinstance(b, blocks.Fire) or isinstance(b, blocks.BlockLava):
                 return True
         else:
             return False
+
+    @property
+    def can_stand_on(self):
+        if self._can_stand_on_value is None:
+            self._can_stand_on_value = self.compute()
+        return self._can_stand_on_value
 
     def compute(self):
         can = self._can_stand_on()
@@ -117,6 +122,7 @@ class GridSpace(object):
         return self.can_be_in(self.bb_stand)
 
     def can_go(self, gs, update_to_bb_stand=False):
+        self.can_stand_on
         if not self.can_stand_between(gs):
             return False
         if not self.can_go_between(gs, update_to_bb_stand=update_to_bb_stand):

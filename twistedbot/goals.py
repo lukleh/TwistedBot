@@ -20,6 +20,15 @@ class Status(object):
     broken = 30
     impossible = 40
 
+    names = {not_finished : 'not_finished',
+             finished : 'finished',
+             broken : 'broken',
+             impossible : 'impossible'}
+
+    @classmethod
+    def name(cls, st):
+        return cls.names[st]
+
 
 class Manager(object):
     def __init__(self, bot):
@@ -225,6 +234,7 @@ class GoToSignGoal(GoalBase):
 class TravelToGoal(GoalBase):
     def __init__(self, *args, **kwargs):
         super(TravelToGoal, self).__init__(*args)
+        self.mark_manager_stop = True
         self.travel_coords = kwargs["coords"]
         self.calculating = False
         self.current_step = None
@@ -236,15 +246,19 @@ class TravelToGoal(GoalBase):
         return 'Travel to %s from %s' % (str(self.travel_coords), self.bot.standing_on_block)
 
     def activate(self):
+        if self.bot.standing_on_block is None:
+            return
         if not self.ready:
             if not self.calculating:
                 tools.do_later(0, self.calculate_path)
                 self.calculating = True
 
     def calculate_path(self):
-        if self.bot.standing_on_block is not None:
+        sb = self.bot.standing_on_block
+        if sb is not None:
+            log.msg("Search path between %s %s" % (sb.coords, self.travel_coords))
             cootask = cooperate(AStar(self.bot.world.navgrid,
-                                      self.bot.standing_on_block.coords,
+                                      sb.coords,
                                       self.travel_coords))
             d = cootask.whenDone()
             d.addCallback(self.pathfind_finished)
@@ -266,32 +280,23 @@ class TravelToGoal(GoalBase):
                 self.manager.not_running()
 
     def from_child(self, status):
+        log.msg('Travel to child returned status %s' % Status.name(status))
         if status == Status.finished:
-            self.last_step = self.current_step
             self.do()
-        elif status == Status.broken:
-            self._do()
-        elif status == Status.impossible:
-            self.manager_goal_return(Status.broken)
+        elif status == Status.broken or status == Status.impossible:
+            self.ready = False
+            self.manager.not_running()
         else:
             raise Exception('Wrong status')
 
-    def _do(self):
-        gs = GridSpace(self.manager.grid, coords=self.current_step)
-        if not gs.can_stand_on:
-            self.manager_goal_return(Status.broken)
-            return
-        elif self.last_step is not None:
-            last_gs = GridSpace(self.manager.grid, coords=self.last_step)
-            if not last_gs.can_go(gs):
-                self.manager_goal_return(Status.broken)
-                return
-        self.manager.add_subgoal(MoveToGoal, target_space=gs)
-
     def do(self):
         if self.path.has_next():
-            self.current_step = self.path.next_step().coords
-            self._do()
+            gs = GridSpace(self.grid, coords=self.path.next_step().coords)
+            if gs.can_stand_on:
+                self.manager.add_subgoal(MoveToGoal, target_space=gs)
+            else:
+                self.ready = False
+                self.manager.not_running()
         else:
             self.manager_goal_return(Status.finished)
 
@@ -309,10 +314,11 @@ class MoveToGoal(GoalBase):
     def check_state(self):
         bb_stand = self.target_space.bb_stand
         elev = bb_stand.min_y - self.bot.aabb.min_y
+        gs = GridSpace(self.grid, bb=self.bot.aabb)
         if not self.target_space._can_stand_on():
             self.grid.navgrid.delete_node(self.target_space.coords)
             return Status.impossible
-        if not gs.can_go(self.target_space):
+        if not gs.can_go_between(self.target_space):
             return Status.impossible
         if self.bot.is_on_ladder or self.grid.aabb_in_water(self.bot.aabb):
             if self.bot.position_grid == self.target_space.coords:
@@ -322,7 +328,6 @@ class MoveToGoal(GoalBase):
             if fops.eq(elev, 0):
                 return Status.finished
         if self.bot.horizontally_blocked and self.bot.on_ground:
-            gs = GridSpace(self.grid, bb=self.bot.aabb)
             if not gs.can_go(self.target_space):
                 log.msg("I am stuck, let's try again? vels %s" %
                         str(self.bot.velocities))

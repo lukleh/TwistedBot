@@ -65,5 +65,22 @@ class Chat(object):
                 self.bot.chat_message("look at what?")
         elif verb == "cancel":
             self.bot.goal_manager.cancel_goal()
+        elif verb == "show":
+            if subject:
+                sign = self.bot.world.navgrid.sign_waypoints.get_namepoint(subject)
+                if sign is not None:
+                    self.bot.chat_message(str(sign))
+                    return
+                sign = self.bot.world.navgrid.sign_waypoints.get_name_from_group(subject)
+                if sign is not None:
+                    self.bot.chat_message(str(sign))
+                    return
+                if not self.bot.world.navgrid.sign_waypoints.has_group(subject):
+                    self.bot.chat_message("no group named %s" % subject)
+                    return
+                for sign in self.bot.world.navgrid.sign_waypoints.ordered_sign_groups[subject].iter():
+                    self.bot.chat_message(str(sign))
+            else:
+                self.bot.chat_message("show what?")
         else:
             log.msg("Unknown command: %s" % self.clean_msg)

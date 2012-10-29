@@ -58,7 +58,6 @@ class Grid(object):
             self.chunks[coords] = chunk
             return chunk
         else:
-            #log.err("chunk %s not initialized" % str(coords))
             return None
 
     def get_block(self, x, y, z):
@@ -99,8 +98,10 @@ class Grid(object):
 
     def load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array, update_after=True):
         if primary_bit == 0:
-            #log.msg("Received erase packet for %s, %s" % (x, z))
-            return  # TODO actually remove this chunk....
+            #log.msg("Received chunk erase packet for %s, %s" % (x, z))
+            if (x, z) in self.chunks:
+                del self.chunks[(x, z)]
+            return
         self.chunks_loaded += 1
         if (x, z) not in self.chunks:
             chunk = Chunk((x, z))

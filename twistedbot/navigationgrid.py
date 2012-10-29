@@ -100,50 +100,50 @@ class NavigationGrid(object):
                 if not self.grid.chunk_complete_at((crd[0] >> 4, (crd[2] + j) >> 4)) or \
                         not self.grid.chunk_complete_at(((crd[0] + i) >> 4, crd[2] >> 4)):
                     continue
-            gs = GridSpace(self.grid, coords=tocrd)
-            if gs.can_stand_on:
-                self.make_node(center_space, gs)
-                continue
-            gs = GridSpace(
-                self.grid, coords=(crd[0] + i, crd[1] + 1, crd[2] + j))
-            if gs.can_stand_on:
-                self.make_node(center_space, gs)
-                continue
-            gs = GridSpace(
-                self.grid, coords=(crd[0] + i, crd[1] + 2, crd[2] + j))
-            if gs.can_stand_on:
-                self.make_node(center_space, gs)
-                continue
-            for k in [-1, -2, -3]:
-                gs = GridSpace(
-                    self.grid, coords=(crd[0] + i, crd[1] + k, crd[2] + j))
+            if not self.graph.has_edge(center_space.coords, tocrd):
+                gs = GridSpace(self.grid, coords=tocrd)
                 if gs.can_stand_on:
                     self.make_node(center_space, gs)
-                    break
+                    continue
+            tocrd = (crd[0] + i, crd[1] + 1, crd[2] + j)
+            if not self.graph.has_edge(center_space.coords, tocrd):
+                gs = GridSpace(
+                    self.grid, coords=tocrd)
+                if gs.can_stand_on:
+                    self.make_node(center_space, gs)
+                    continue
+            tocrd = (crd[0] + i, crd[1] + 2, crd[2] + j)
+            if not self.graph.has_edge(center_space.coords, tocrd):
+                gs = GridSpace(
+                    self.grid, coords=tocrd)
+                if gs.can_stand_on:
+                    self.make_node(center_space, gs)
+                    continue
+            for k in [-1, -2, -3]:
+                tocrd = (crd[0] + i, crd[1] + k, crd[2] + j)
+                if not self.graph.has_edge(center_space.coords, tocrd):
+                    gs = GridSpace(
+                        self.grid, coords=tocrd)
+                    if gs.can_stand_on:
+                        self.make_node(center_space, gs)
+                        break
         for k in [-1, 1, 2]:  # climb, descend
-            gs = GridSpace(self.grid, coords=(crd[0], crd[1] + k, crd[2]))
-            if gs.can_stand_on:
-                self.make_node(center_space, gs)
+            tocrd = (crd[0], crd[1] + k, crd[2])
+            if not self.graph.has_edge(center_space.coords, tocrd):
+                gs = GridSpace(self.grid, coords=tocrd)
+                if gs.can_stand_on:
+                    self.make_node(center_space, gs)
 
     def make_node(self, center_space, possible_space):
-        is_new = False
         if not self.graph.has_node(possible_space.coords):
             self.compute(possible_space.coords)
-            is_new = True
-        self.graph.add_node(
-            possible_space.coords, miny=possible_space.bb_stand.min_y)
+            self.graph.add_node(
+                possible_space.coords, miny=possible_space.bb_stand.min_y)
         if center_space.can_go(possible_space):
             self.graph.add_edge(center_space.coords, possible_space.coords,
                                 center_space.edge_cost)
         else:
             self.graph.remove_edge(center_space.coords, possible_space.coords)
-        if not is_new:
-            if possible_space.can_go(center_space):
-                self.graph.add_edge(possible_space.coords, center_space.coords,
-                                    possible_space.edge_cost)
-            else:
-                self.graph.remove_edge(
-                    possible_space.coords, center_space.coords)
 
     def check_path(self, path):
         if path is None:
@@ -164,28 +164,11 @@ class NavigationGrid(object):
             last_one = gs
         return ok
 
-    def check_edges_of(self, nodes):
-        spaces = []
-        for n in nodes:
-            gs = GridSpace(self.grid, coords=n)
-            if not gs.can_stand_on:
-                self.delete_node(n)
-            else:
-                spaces.append(gs)
-        for s1 in spaces:
-            for s2 in spaces:
-                if s1 == s2:
-                    continue
-                if self.graph.has_edge(s1.coords, s2.coords):
-                    if not s1.can_go(s2):
-                        self.graph.remove_edge(s1.coords, s2.coords)
-
     def delete_node(self, crd):
         if self.graph.has_node(crd):
             affected = self.graph.remove_node(crd)
             for aff in affected:
                 self.compute(aff)
-            self.check_edges_of(affected)
             self.chunk_borders.remove(crd)
         try:
             del self.incomplete_nodes[crd]
