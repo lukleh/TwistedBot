@@ -2,6 +2,7 @@
 import math
 
 DEBUG = False
+USE_ENCRYPTION = False
 
 COMMANDER = "lukleh"
 

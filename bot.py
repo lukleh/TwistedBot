@@ -13,6 +13,7 @@ from twistedbot.factory import MineCraftFactory
 from twistedbot.world import World
 from twistedbot.botentity import Bot
 import twistedbot.config as config
+import twistedbot.logbot as logbot
 
 
 class ConsoleChat(basic.LineReceiver):
@@ -22,7 +23,10 @@ class ConsoleChat(basic.LineReceiver):
         self.bot = bot
         
     def lineReceived(self, line):
-        self.bot.chat.process_command(line)
+        try:
+            self.bot.chat.process_command(line)
+        except Exception as e:
+            logbot.exit_on_error(e)
 
 
 def start():

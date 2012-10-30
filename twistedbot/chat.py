@@ -26,11 +26,8 @@ class Chat(object):
         return self.commander_re.match(msg)
 
     def get_command(self, msg):
-        name_end = msg.find(">")
-        if name_end > 0:
-            msg = msg[name_end + 2:]
+        msg = msg[msg.find(">") + 2:]
         msg = self.wspace_re.sub(" ", msg)
-        log.msg("Possible command >%s<" % msg)
         return msg
 
     def get_verb(self, msg):
@@ -42,10 +39,13 @@ class Chat(object):
     def process(self, msg):
         msg = self.clean(msg)
         if self.from_commander(msg):
-            self.process_command(msg)
+            command = self.get_command(msg)
+            self.process_command(command, msg)
 
-    def process_command(self, msg):
-        command = self.get_command(msg)
+    def process_command(self, command, msg=None):
+        if msg is None:
+            msg = command
+        log.msg("Possible command >%s<" % command)
         verb = self.get_verb(command)
         subject = self.get_subject(command)
         self.parse_command(verb, subject, msg)

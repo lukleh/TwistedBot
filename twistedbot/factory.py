@@ -358,25 +358,27 @@ class MineCraftProtocol(Protocol):
         self.send_packet("client statuses", {"status": 0})
 
     def p_encryption_key_request(self, c):
-        try:
-            raise Exception('avoid encryption? yay!')
-            import encryption
-        except:
-            log.msg('Skipping encryption')
+        if config.USE_ENCRYPTION:
+            try:
+                import encryption
+                key16 = encryption.get_random_bytes()
+                self.cipher = encryption.make_aes(key16, key16)
+                self.decipher = encryption.make_aes(key16, key16)
+                public_key = encryption.load_pubkey(c.public_key)
+                enc_shared_sercet = encryption.encrypt(key16, public_key)
+                enc_4bytes = encryption.encrypt(c.verify_token, public_key)
+                self.send_packet(
+                    "encryption key response",
+                    {"shared_length": len(enc_shared_sercet),
+                     "shared_secret": enc_shared_sercet,
+                     "token_length": len(enc_4bytes),
+                     "token_secret": enc_4bytes})
+            except ImportError:
+                log.msg('PyCrypto not installed, skipping encryption.')
+                self.send_packet("client statuses", {"status": 0})
+        else:
+            log.msg('USE_ENCRYPTION is False, skipping encryption.')
             self.send_packet("client statuses", {"status": 0})
-            return
-        key16 = encryption.get_random_bytes()
-        self.cipher = encryption.make_aes(key16, key16)
-        self.decipher = encryption.make_aes(key16, key16)
-        public_key = encryption.load_pubkey(c.public_key)
-        enc_shared_sercet = encryption.encrypt(key16, public_key)
-        enc_4bytes = encryption.encrypt(c.verify_token, public_key)
-        self.send_packet(
-            "encryption key response",
-            {"shared_length": len(enc_shared_sercet),
-             "shared_secret": enc_shared_sercet,
-             "token_length": len(enc_4bytes),
-             "token_secret": enc_4bytes})
 
     def p_error(self, container):
         # TODO possibly implement error parsing and subsequent action

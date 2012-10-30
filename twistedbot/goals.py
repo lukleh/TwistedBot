@@ -20,10 +20,10 @@ class Status(object):
     broken = 30
     impossible = 40
 
-    names = {not_finished : 'not_finished',
-             finished : 'finished',
-             broken : 'broken',
-             impossible : 'impossible'}
+    names = {not_finished: 'not_finished',
+             finished: 'finished',
+             broken: 'broken',
+             impossible: 'impossible'}
 
     @classmethod
     def name(cls, st):
@@ -97,6 +97,8 @@ class GoalBase(object):
         self.bot.floating_flag = self.floating_flag
 
     def perform(self):
+        if self.cancelled:
+            return
         self.activate()
         if self.ready is False:
             return
@@ -191,7 +193,7 @@ class WalkSignsGoal(GoalBase):
     def do(self):
         self.signpoint = self.next_sign(self.group)
         if self.signpoint is not None:
-            log.msg('Going to sign %s' % self.signpoint)
+            #log.msg('Going to sign %s' % self.signpoint)
             self.manager.add_subgoal(
                 TravelToGoal, coords=self.signpoint.nav_coords)
         else:
@@ -225,7 +227,7 @@ class GoToSignGoal(GoalBase):
                 "cannot idetify sign with name %s" % self.sign_name)
             return Status.impossible
         else:
-            log.msg('Going to sign %s' % self.signpoint)
+            #log.msg('Going to sign %s' % self.signpoint)
             return Status.not_finished
 
     def do(self):
@@ -258,7 +260,7 @@ class TravelToGoal(GoalBase):
     def calculate_path(self):
         sb = self.bot.standing_on_block
         if sb is not None:
-            log.msg("Search path between %s %s" % (sb.coords, self.travel_coords))
+            #log.msg("Search path between %s %s" % (sb.coords, self.travel_coords))
             cootask = cooperate(AStar(self.bot.world.navgrid,
                                       sb.coords,
                                       self.travel_coords))
@@ -271,7 +273,7 @@ class TravelToGoal(GoalBase):
     def pathfind_finished(self, astar):
         self.calculating = False
         if astar.path is None:
-            self.manager.not_running()
+            self.manager_goal_return(Status.impossible)
             return
         else:
             if self.bot.world.navgrid.check_path(astar.path):

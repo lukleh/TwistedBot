@@ -2,9 +2,8 @@
 - Support for 1.4.2 protocol version 47
 - Running under [PyPy](http://pypy.org/ "PyPy"). You can try [CPython](http://python.org/ "CPython"), if you want.
 - flake8 clean with long lines
-
-#### Requirements
-[PyCrypto](https://www.dlitz.net/software/pycrypto/ "PyCrypto") only if you want the datastream to be encrypted. You can easily skip it. Rest of the dependencies is included in "libs" directory. That all makes twistedbot self-contained.
+- Optional [PyCrypto](https://www.dlitz.net/software/pycrypto/ "PyCrypto") dependency if you want the datastream to be encrypted. Also configurable in config.
+- Rest of the dependencies is included in "libs" directory.
 
 ## Bot
 - Client side artificial player for Minecraft that runs on vanilla server in offline mode. No modification on server/client side needed.
