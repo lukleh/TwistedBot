@@ -6,7 +6,6 @@ syspath_fix.update_sys_path()
 import argparse
 
 from twisted.internet import reactor
-from twisted.internet import stdio
 from twisted.protocols import basic
 
 from twistedbot.factory import MineCraftFactory
@@ -43,16 +42,17 @@ def start():
                         dest='commandername',
                         help='your username that you use in Minecraft')
     args = parser.parse_args()
-
     config.USERNAME = args.botname
     config.COMMANDER = args.commandername
     host = args.serverhost
     port = args.serverport
-
     world = World(host, port)
     bot = Bot(world, args.botname, args.commandername)
-    stdio.StandardIO(ConsoleChat(bot))
-
+    try:
+        from twisted.internet import stdio
+        stdio.StandardIO(ConsoleChat(bot))
+    except ImportError:
+        pass
     reactor.addSystemEventTrigger("before", "shutdown", world.shutdown)
     reactor.connectTCP(host, port, MineCraftFactory(bot))
     reactor.run()

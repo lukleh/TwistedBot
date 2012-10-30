@@ -26,8 +26,6 @@ class Entities(object):
         if self.world.bot.commander.eid != entity.eid:
             return
         gpos = entity.grid_position
-        #if self.world.bot.commander.last_possition == gpos:
-        #    return
         block = self.world.grid.standing_on_block(
             AABB.from_player_coords(entity.position))
         if block is None:
@@ -36,16 +34,13 @@ class Entities(object):
             return
         self.world.bot.commander.last_block = block
         lpos = self.world.bot.commander.last_possition
-        # if lpos is not None and \
-        #         (block.coords == lpos or
-        #          block.coords == (lpos[0], lpos[1] - 1, lpos[2])):
-        #     return
         in_nodes = self.world.navgrid.graph.has_node(block.coords)
         gs = GridSpace(self.world.grid, block=block)
-        msg = "P in nm %s on %s aabb %s nm nodes %d\n" % \
-            (in_nodes, block, block.grid_bounding_box,
-             self.world.navgrid.graph.node_count)
-        msg += "gs_stand %s" % str(gs.bb_stand)
+        msg = "P in nm %s nm nodes %d\n" % \
+            (in_nodes, self.world.navgrid.graph.node_count)
+        msg += "gs_stand %s\n" % str(gs.bb_stand)
+        msg += str(block) + '\n'
+        msg += str(block.grid_bounding_box)
         try:
             msg += "\nsucessors %s" % str(self.world.navgrid.graph.get_succ(block.coords))
         except:
@@ -86,8 +81,8 @@ class Entities(object):
                 log.msg("do not have entity %d registered" % eid)
                 return
             if entity.is_bot:
-                log.msg("Server is changing me with %s %s %s" %
-                        (fn.__name__, args, kwargs))
+                #log.msg("Server is changing my %s" % fn.__name__)
+                        #(fn.__name__, args, kwargs))
                 pass
             fn(self, entity, *args[1:], **kwargs)
             self.maybe_commander(entity)

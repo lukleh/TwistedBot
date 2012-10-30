@@ -130,7 +130,7 @@ class AStar(object):
 
     def next(self):
         if not self.open_set:
-            log.err("pathfinding no path")
+            log.err("Did not find path between %s and %s" % (self.start_node.coords, self.goal_node.coords))
             raise StopIteration()
         x = heapq.heappop(self.open_heap)
         if x == self.goal_node:
@@ -150,5 +150,5 @@ class AStar(object):
                     heapq.heappush(self.open_heap, y)
                     self.open_set.add(y)
                 if y.step > self.max_cost:
-                    log.err("pathfinding too wide")
+                    log.err("Finding path over limit between %s and %s" % (self.start_node.coords, self.goal_node.coords))
                     raise StopIteration()

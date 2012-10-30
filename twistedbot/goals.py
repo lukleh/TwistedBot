@@ -46,6 +46,8 @@ class Manager(object):
             return self.default_goal
 
     def cancel_goal(self):
+        if self.goalq:
+            log.msg('Cancelling %s' % self.goalq[0])
         for g in self.goalq:
             g.cancel()
         self.goalq = []
@@ -313,8 +315,8 @@ class MoveToGoal(GoalBase):
         self.target_space = kwargs["target_space"]
         self.was_at_target = False
         self.floating_flag = False
-        self.name = 'Move to %s' % str(self.target_space.coords)
-        #log.msg(self.name)
+        self.name = 'Move to %s' % str(self.target_space.block)
+        #log.msg(self.name + ' from %s' % self.bot.aabb)
 
     def check_state(self):
         bb_stand = self.target_space.bb_stand
@@ -322,8 +324,10 @@ class MoveToGoal(GoalBase):
         gs = GridSpace(self.grid, bb=self.bot.aabb)
         if not self.target_space._can_stand_on():
             self.grid.navgrid.delete_node(self.target_space.coords)
+            log.msg('CANNOT STAND ON %s' % self.target_space)
             return Status.impossible
-        if not gs.can_go_between(self.target_space):
+        if not gs.can_go_between(self.target_space, debug=True):
+            log.msg('CANNOT GO BETWEEN %s AND %s' % (self.bot.aabb, self.target_space))
             return Status.impossible
         if self.bot.is_on_ladder or self.grid.aabb_in_water(self.bot.aabb):
             if self.bot.position_grid == self.target_space.coords:

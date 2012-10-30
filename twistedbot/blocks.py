@@ -186,60 +186,53 @@ class BlockWater(BlockFluid):
     @property
     def flow_vector(self):
         v = [0, 0, 0]
+        this_efd = self.effective_flow_decay
         for i, j in tools.cross:
             blk = self.grid.get_block(self.x + i, self.y, self.z + j)
-            fd = blk.effective_flow_decay
-            if fd < -1:
+            efd = blk.effective_flow_decay
+            if efd < 0:
                 if not blk.material.blocks_movement:
-                    blk_below = self.grid.get_block(
-                        self.x + i, self.y - 1, self.z + j)
-                    if blk_below.effective_flow_decay >= 0:
-                        va = fd - (self.effective_flow_decay - 8)
-                        v = [v[0] + i * va, v[1], v[2] + j * va]
-            elif fd >= 0:
-                va = fd - self.effective_flow_decay
-                v = [v[0] + i * va, v[1], v[2] + j * va]
+                    blk = self.grid.get_block(self.x + i, self.y - 1, self.z + j)
+                    efd = blk.effective_flow_decay
+                    if efd >= 0:
+                        va = efd - (this_efd - 8)
+                        v = [i * va, 0, j * va]
+            elif efd >= 0:
+                va = efd - this_efd
+                v = [i * va, 0, j * va]
         if self.meta >= 8:
             t = False
             if t or self.is_solid_block(self.grid.get_block(self.x,
                                                             self.y,
-                                                            self.z - 1),
-                                        2):
+                                                            self.z - 1), 2):
                 t = True
             if t or self.is_solid_block(self.grid.get_block(self.x,
                                                             self.y,
-                                                            self.z + 1),
-                                        3):
+                                                            self.z + 1), 3):
                 t = True
             if t or self.is_solid_block(self.grid.get_block(self.x - 1,
                                                             self.y,
-                                                            self.z),
-                                        4):
+                                                            self.z), 4):
                 t = True
             if t or self.is_solid_block(self.grid.get_block(self.x + 1,
                                                             self.y,
-                                                            self.z),
-                                        5):
+                                                            self.z), 5):
                 t = True
             if t or self.is_solid_block(self.grid.get_block(self.x,
                                                             self.y + 1,
-                                                            self.z - 1),
-                                        2):
+                                                            self.z - 1), 2):
                 t = True
             if t or self.is_solid_block(self.grid.get_block(self.x,
                                                             self.y + 1,
-                                                            self.z + 1),
-                                        3):
+                                                            self.z + 1), 3):
                 t = True
             if t or self.is_solid_block(self.grid.get_block(self.x - 1,
                                                             self.y + 1,
-                                                            self.z),
-                                        4):
+                                                            self.z), 4):
                 t = True
             if t or self.is_solid_block(self.grid.get_block(self.x + 1,
                                                             self.y + 1,
-                                                            self.z),
-                                        5):
+                                                            self.z), 5):
                 t = True
             if t:
                 v = tools.normalize(v)
@@ -368,140 +361,142 @@ class BlockStairs(BlockMultiBox):
     def is_upsite_down(self):
         return (self.meta & 4) != 0
 
-    def similar_stairs(self, blk):
-        return blk.is_stairs and self.is_upsite_down == blk.is_upsite_down
-
-    def add_bounding_box_step(self, box_array):
-        var9 = 0.0
-        var10 = 0.5
-        var11 = 0.5
-        var12 = 1.0
-        if self.is_upsite_down:
-            var7 = 0
-            var8 = 0.5
-        else:
-            var7 = 0.5
-            var8 = 1
-        var13 = True
-        dirc = self.meta & 3
-        if dirc == 0:
-            blk = self.grid.get_block(self.x + 1, self.y, self.z)
-            var9 = 0.5
-            var12 = 1.0
-            if self.similar_stairs(blk):
-                m3 = blk.meta & 3
-                if m3 == 3 and not self.grid.get_block(self.x, self.y, self.z + 1).meta == self.meta:
-                    var12 = 0.5
-                    var13 = False
-                elif m3 == 2 and not self.grid.get_block(self.x, self.y, self.z - 1).meta == self.meta:
-                    var11 = 0.5
-                    var13 = False
-        elif dirc == 1:
-            blk = self.grid.get_block(self.x - 1, self.y, self.z)
-            var10 = 0.5
-            var12 = 1.0
-            if self.similar_stairs(blk):
-                m3 = blk.meta & 3
-                if m3 == 3 and not self.grid.get_block(self.x, self.y, self.z + 1).meta == self.meta:
-                    var12 = 0.5
-                    var13 = False
-                elif m3 == 2 and not self.grid.get_block(self.x, self.y, self.z - 1).meta == self.meta:
-                    var11 = 0.5
-                    var13 = False
-        elif dirc == 2:
-            blk = self.grid.get_block(self.x, self.y, self.z + 1)
-            var11 = 0.5
-            var12 = 1.0
-            if self.similar_stairs(blk):
-                m3 = blk.meta & 3
-                if m3 == 1 and not self.grid.get_block(self.x + 1, self.y, self.z).meta == self.meta:
-                    var10 = 0.5
-                    var13 = False
-                elif m3 == 0 and not self.grid.get_block(self.x - 1, self.y, self.z).meta == self.meta:
-                    var9 = 0.5
-                    var13 = False
-        elif dirc == 3:
-            blk = self.grid.get_block(self.x, self.y, self.z - 1)
-            if self.similar_stairs(blk):
-                m3 = blk.meta & 3
-                if m3 == 1 and not self.grid.get_block(self.x + 1, self.y, self.z).meta == self.meta:
-                    var10 = 0.5
-                    var13 = False
-                elif m3 == 0 and not self.grid.get_block(self.x - 1, self.y, self.z).meta == self.meta:
-                    var9 = 0.5
-                    var13 = False
-        box_array.append(AABB(var9, var7, var11, var10, var8, var12))
-        if var13:
-            var9 = 0.0
-            var10 = 0.5
-            var11 = 0.5
-            var12 = 1.0
-            if self.is_upsite_down:
-                var7 = 0
-                var8 = 0.5
-            else:
-                var7 = 0.5
-                var8 = 1
-            var13 = False
-            if dirc == 0:
-                blk = self.grid.get_block(self.x - 1, self.y, self.z)
-                if self.similar_stairs(blk):
-                    m3 = blk.meta & 3
-                    if m3 == 3 and not self.grid.get_block(self.x, self.y, self.z - 1).meta == self.meta:
-                        var11 = 0.0
-                        var12 = 0.5
-                        var13 = True
-                    elif m3 == 2 and not self.grid.get_block(self.x, self.y, self.z + 1).meta == self.meta:
-                        var11 = 0.5
-                        var12 = 1.0
-                        var13 = True
-            elif dirc == 1:
-                blk = self.grid.get_block(self.x + 1, self.y, self.z)
-                if self.similar_stairs(blk):
-                    m3 = blk.meta & 3
-                    var9 = 0.0
-                    var10 = 0.5
-                    if m3 == 3 and not self.grid.get_block(self.x, self.y, self.z - 1).meta == self.meta:
-                        var11 = 0.0
-                        var12 = 0.5
-                        var13 = True
-                    elif m3 == 2 and not self.grid.get_block(self.x, self.y, self.z + 1).meta == self.meta:
-                        var11 = 0.5
-                        var12 = 1.0
-                        var13 = True
-            elif dirc == 2:
-                blk = self.grid.get_block(self.x, self.y, self.z - 1)
-                if self.similar_stairs(blk):
-                    m3 = blk.meta & 3
-                    var11 = 0.0
-                    var12 = 0.5
-                    if m3 == 1 and not self.grid.get_block(self.x - 1, self.y, self.z).meta == self.meta:
-                        var13 = True
-                    elif m3 == 0 and not self.grid.get_block(self.x + 1, self.y, self.z).meta == self.meta:
-                        var9 = 0.5
-                        var10 = 1.0
-                        var13 = True
-            elif dirc == 3:
-                blk = self.grid.get_block(self.x, self.y, self.z + 1)
-                if self.similar_stairs(blk):
-                    m3 = blk.meta & 3
-                    if m3 == 1 and not self.grid.get_block(self.x - 1, self.y, self.z).meta == self.meta:
-                        var13 = True
-                    elif m3 == 0 and not self.grid.get_block(self.x + 1, self.y, self.z).meta == self.meta:
-                        var9 = 0.5
-                        var10 = 1.0
-                        var13 = True
-            if var13:
-                box_array.append(AABB(var9, var7, var11, var10, var8, var12))
-
     @property
     def grid_bounding_box(self):
         if self.is_upsite_down:
             gbb = [self.bounding_box_up_half]
         else:
             gbb = [self.bounding_box_half]
-        self.add_bounding_box_step(gbb)
+        self.add_bounding_box(gbb)
         return [box + self.coords for box in gbb]
+
+    def similar_stairs(self, blk):
+        return blk.is_stairs and self.is_upsite_down == blk.is_upsite_down
+
+    def same_orientation(self, x, y, z):
+        blk = self.grid.get_block(x, y, z)
+        return blk.is_stairs and blk.meta == self.meta
+
+    def add_bounding_box(self, box_array):
+        minx = 0.0
+        maxx = 1.0
+        miny = 0.5
+        maxy = 1
+        minz = 0.0
+        maxz = 0.5
+        if self.is_upsite_down:
+            miny = 0
+            maxy = 0.5    
+        next_box = True
+        dirc = self.meta & 3
+        if dirc == 0:
+            blk = self.grid.get_block(self.x + 1, self.y, self.z)
+            minx = 0.5
+            maxz = 1.0
+            if self.similar_stairs(blk):
+                m3 = blk.meta & 3
+                if m3 == 3 and not self.same_orientation(self.x, self.y, self.z + 1):
+                    maxz = 0.5
+                    next_box = False
+                elif m3 == 2 and not self.same_orientation(self.x, self.y, self.z - 1):
+                    minz = 0.5
+                    next_box = False
+        elif dirc == 1:
+            blk = self.grid.get_block(self.x - 1, self.y, self.z)
+            maxx = 0.5
+            maxz = 1.0
+            if self.similar_stairs(blk):
+                m3 = blk.meta & 3
+                if m3 == 3 and not self.same_orientation(self.x, self.y, self.z + 1):
+                    maxz = 0.5
+                    next_box = False
+                elif m3 == 2 and not self.same_orientation(self.x, self.y, self.z - 1):
+                    minz = 0.5
+                    next_box = False
+        elif dirc == 2:
+            blk = self.grid.get_block(self.x, self.y, self.z + 1)
+            minz = 0.5
+            maxz = 1.0
+            if self.similar_stairs(blk):
+                m3 = blk.meta & 3
+                if m3 == 1 and not self.same_orientation(self.x + 1, self.y, self.z):
+                    maxx = 0.5
+                    next_box = False
+                elif m3 == 0 and not self.same_orientation(self.x - 1, self.y, self.z):
+                    minx = 0.5
+                    next_box = False
+        elif dirc == 3:
+            blk = self.grid.get_block(self.x, self.y, self.z - 1)
+            if self.similar_stairs(blk):
+                m3 = blk.meta & 3
+                if m3 == 1 and not self.same_orientation(self.x + 1, self.y, self.z):
+                    maxx = 0.5
+                    next_box = False
+                elif m3 == 0 and not self.same_orientation(self.x - 1, self.y, self.z):
+                    minx = 0.5
+                    next_box = False
+        box_array.append(AABB(minx, miny, minz, maxx, maxy, maxz))
+        if next_box:
+            minx = 0.0
+            maxx = 0.5
+            miny = 0.5
+            maxy = 1
+            minz = 0.5
+            maxz = 1.0
+            if self.is_upsite_down:
+                miny = 0
+                maxy = 0.5
+            next_box = False
+            if dirc == 0:
+                blk = self.grid.get_block(self.x - 1, self.y, self.z)
+                if self.similar_stairs(blk):
+                    m3 = blk.meta & 3
+                    if m3 == 3 and not self.same_orientation(self.x, self.y, self.z - 1):
+                        minz = 0.0
+                        maxz = 0.5
+                        next_box = True
+                    elif m3 == 2 and not self.same_orientation(self.x, self.y, self.z + 1):
+                        minz = 0.5
+                        maxz = 1.0
+                        next_box = True
+            elif dirc == 1:
+                blk = self.grid.get_block(self.x + 1, self.y, self.z)
+                if self.similar_stairs(blk):
+                    m3 = blk.meta & 3
+                    minx = 0.5
+                    maxx = 1.0
+                    if m3 == 3 and not self.same_orientation(self.x, self.y, self.z - 1):
+                        minz = 0.0
+                        maxz = 0.5
+                        next_box = True
+                    elif m3 == 2 and not self.same_orientation(self.x, self.y, self.z + 1):
+                        minz = 0.5
+                        maxz = 1.0
+                        next_box = True
+            elif dirc == 2:
+                blk = self.grid.get_block(self.x, self.y, self.z - 1)
+                if self.similar_stairs(blk):
+                    m3 = blk.meta & 3
+                    minz = 0.0
+                    maxz = 0.5
+                    if m3 == 1 and not self.same_orientation(self.x - 1, self.y, self.z):
+                        next_box = True
+                    elif m3 == 0 and not self.same_orientation(self.x + 1, self.y, self.z):
+                        minx = 0.5
+                        maxx = 1.0
+                        next_box = True
+            elif dirc == 3:
+                blk = self.grid.get_block(self.x, self.y, self.z + 1)
+                if self.similar_stairs(blk):
+                    m3 = blk.meta & 3
+                    if m3 == 1 and not self.same_orientation(self.x - 1, self.y, self.z):
+                        next_box = True
+                    elif m3 == 0 and not self.same_orientation(self.x + 1, self.y, self.z):
+                        minx = 0.5
+                        maxx = 1.0
+                        next_box = True
+            if next_box:
+                box_array.append(AABB(minx, miny, minz, maxx, maxy, maxz))
 
 
 class BlockDoor(Block):

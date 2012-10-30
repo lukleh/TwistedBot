@@ -153,8 +153,9 @@ class GridSpace(object):
         edge_cost = 0
         bb_stand = self.bb_stand
         other_bb_stand = gs.bb_stand
-        if bb_stand.horizontal_distance(other_bb_stand) > 2:
-            # too far from the next step
+        if bb_stand.horizontal_distance(other_bb_stand) > config.HORIZONTAL_MOVE_DISTANCE_LIMIT:
+            if debug:
+                print 'horizontal distance too far', bb_stand.horizontal_distance(other_bb_stand)
             return False
         if fops.gt(bb_stand.min_y, other_bb_stand.min_y):
             elev = bb_stand.min_y - other_bb_stand.min_y
@@ -164,7 +165,7 @@ class GridSpace(object):
         elif fops.lt(bb_stand.min_y, other_bb_stand.min_y):
             if fops.lte(bb_stand.grid_y + 2, other_bb_stand.min_y):
                 if debug:
-                    print 'over 2 high difference',
+                    print 'over 2 high difference'
                 return False
             elev = other_bb_stand.min_y - bb_stand.min_y
             in_water = self.grid.aabb_in_water(bb_stand)
@@ -174,15 +175,19 @@ class GridSpace(object):
                     not self.grid.aabb_in_water(bb_stand.shift(min_y=other_bb_stand.min_y)) and \
                     fops.gte(other_bb_stand.min_y - (bb_stand.grid_y + 1), config.MAX_WATER_JUMP_HEIGHT - 0.15):
                 if debug:
-                    print 'water cannot go',
+                    print 'water cannot go'
                 return False
             if self.grid.aabb_on_ladder(bb_stand) and \
                     other_bb_stand.grid_y > bb_stand.grid_y and \
                     fops.gt(other_bb_stand.min_y, other_bb_stand.grid_y) and \
                     not self.grid.aabb_on_ladder(bb_stand.shift(min_y=other_bb_stand.min_y)) and \
                     fops.gte(other_bb_stand.min_y - (bb_stand.grid_y + 1), config.MAX_VINE_JUMP_HEIGHT - 0.2):
+                if debug:
+                    print 'ladder cannot go'
                 return False
             if fops.gt(elev, config.MAX_JUMP_HEIGHT) and not in_water:
+                if debug:
+                    print 'too high'
                 return False
             if fops.lte(elev, config.MAX_STEP_HEIGHT):
                 elev = config.MAX_STEP_HEIGHT
@@ -190,6 +195,8 @@ class GridSpace(object):
                 for bb in aabbs:
                     elev = bb_stand.calculate_axis_offset(bb, elev, 1)
                 if fops.lt(bb_stand.min_y + elev, other_bb_stand.min_y):
+                    if debug:
+                        print 'cannot make step'
                     return False
             elev_bb = bb_stand.extend_to(dy=elev)
             bb_from = bb_stand.offset(dy=elev)
@@ -201,12 +208,20 @@ class GridSpace(object):
             bb_to = other_bb_stand
         if elev_bb is not None:
             if self.grid.aabb_collides(elev_bb):
+                if debug:
+                    print 'elevation collision'
                 return False
             if self.blocks_to_avoid(self.grid.blocks_in_aabb(elev_bb)):
+                if debug:
+                    print 'elevation hitting avoid block'
                 return False
         if self.grid.collision_between(bb_from, bb_to, debug=debug):
+            if debug:
+                print 'horizontal collision'
             return False
         if self.blocks_to_avoid(self.grid.passing_blocks_between(bb_from, bb_to)):
+            if debug:
+                print 'hitting avoid block'
             return False
         if fops.lte(elev, config.MAX_STEP_HEIGHT) and fops.gte(elev, -config.MAX_STEP_HEIGHT):
             edge_cost += config.COST_DIRECT * \

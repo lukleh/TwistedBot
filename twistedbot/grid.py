@@ -360,7 +360,6 @@ class Grid(object):
         blk = self.get_block(bb.grid_x, ey, bb.grid_z)
         if blk.is_water:
             wh = blk.height_percent - 0.11111111
-            surface = ey + 1 - wh
-            return eye_y < surface
+            return eye_y < (ey + 1 - wh)
         else:
             return False

@@ -113,15 +113,8 @@ class MineCraftProtocol(Protocol):
         if config.DEBUG:
             packet_printout(
                 "SERVER", parsed_packets, self.encryption_on, self.leftover)
-        if not self.packets:
-            cootask = cooperate(self.packet_iter(self.packets))
-            d = cootask.whenDone()
-            d.addErrback(logbot.exit_on_error)
-        elif len(self.packets) > 100:
-            #log.msg("Did not consume %d packets" % len(self.packets))
-            if len(self.packets) > 10000:
-                reactor.stop()
         self.packets.extend(parsed_packets)
+        self.packet_iter(self.packets)
 
     def send_packet(self, name, payload):
         p = make_packet(name, payload)
@@ -135,8 +128,6 @@ class MineCraftProtocol(Protocol):
             packet = ipackets.popleft()
             self.process_packet(packet)
             self.bot.status_diff.packets_in += 1
-            if len(ipackets) < 5:
-                yield None
 
     def process_packet(self, packet):
         pid = packet[0]

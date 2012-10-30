@@ -314,11 +314,10 @@ class Bot(object):
         is_in_water = False
         water_current = (0, 0, 0)
         bb = aabb.expand(-0.001, -0.4010000059604645, -0.001)
-        top_y = tools.grid_shift(bb.max_y) + 1
+        top_y = tools.grid_shift(bb.max_y + 1)
         for blk in self.grid.blocks_in_aabb(bb):
             if isinstance(blk, blocks.BlockWater):
-                wy = blk.y + 1 - blk.height_percent
-                if top_y >= wy:
+                if top_y >= (blk.y + 1 - blk.height_percent):
                     is_in_water = True
                     water_current = blk.add_velocity_to(water_current)
         if tools.vector_size(water_current) > 0:
@@ -359,9 +358,8 @@ class Bot(object):
                     b_down = self.grid.get_block(x, y - 1, z)
                     b_cent = self.grid.get_block(x, y, z)
                     no_up = not b_up.is_water and b_down.collidable and fops.eq(b_down.max_y, y)
-                    if not no_up and b_cent.is_water and fops.gt(b_cent.y + 0.5, self.aabb.min_y):
+                    if (not no_up and b_cent.is_water and fops.gt(b_cent.y + 0.5, self.aabb.min_y)) or isinstance(b_up, blocks.StillWater):
                         self.velocities[1] += config.SPEED_LIQUID_JUMP
-            print 'WATER CURRENT', water_current
             self.velocities = [self.velocities[0] + water_current[0],
                                self.velocities[1] + water_current[1],
                                self.velocities[2] + water_current[2]]
