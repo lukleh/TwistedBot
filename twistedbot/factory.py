@@ -7,7 +7,6 @@ from twisted.internet.task import cooperate
 from twisted.internet import reactor, defer
 
 import config
-import encryption
 import logbot
 import proxy_processors.default
 import tools
@@ -359,6 +358,13 @@ class MineCraftProtocol(Protocol):
         self.send_packet("client statuses", {"status": 0})
 
     def p_encryption_key_request(self, c):
+        try:
+            raise Exception('avoid encryption? yay!')
+            import encryption
+        except:
+            log.msg('Skipping encryption')
+            self.send_packet("client statuses", {"status": 0})
+            return
         key16 = encryption.get_random_bytes()
         self.cipher = encryption.make_aes(key16, key16)
         self.decipher = encryption.make_aes(key16, key16)

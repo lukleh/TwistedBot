@@ -68,23 +68,23 @@ class NavigationGrid(object):
     def check_node_resources(self, crd):
         pass
 
-    def compute(self, node):
+    def compute(self, node, recheck=False):
         if self.incomplete_nodes:
-            self.incomplete_nodes[node] = node
+            self.incomplete_nodes[node] = recheck
         else:
-            self.incomplete_nodes[node] = node
+            self.incomplete_nodes[node] = recheck
             cootask = cooperate(self.do_incomplete_nodes())
             d = cootask.whenDone()
             d.addErrback(logbot.exit_on_error)
 
     def do_incomplete_nodes(self):
         while self.incomplete_nodes:
-            crd = self.incomplete_nodes.popitem(last=False)[1]
-            self.do_incomplete_node(crd)
+            crd, recheck = self.incomplete_nodes.popitem(last=False)
+            self.do_incomplete_node(crd, recheck)
             self.check_node_resources(crd)
             yield None
 
-    def do_incomplete_node(self, crd):
+    def do_incomplete_node(self, crd, recheck):
         center_space = GridSpace(self.grid, coords=crd)
         if not center_space.can_stand_on:
             self.delete_node(crd)
@@ -100,20 +100,20 @@ class NavigationGrid(object):
                 if not self.grid.chunk_complete_at((crd[0] >> 4, (crd[2] + j) >> 4)) or \
                         not self.grid.chunk_complete_at(((crd[0] + i) >> 4, crd[2] >> 4)):
                     continue
-            if not self.graph.has_edge(center_space.coords, tocrd):
+            if recheck or not self.graph.has_edge(center_space.coords, tocrd):
                 gs = GridSpace(self.grid, coords=tocrd)
                 if gs.can_stand_on:
                     self.make_node(center_space, gs)
                     continue
             tocrd = (crd[0] + i, crd[1] + 1, crd[2] + j)
-            if not self.graph.has_edge(center_space.coords, tocrd):
+            if recheck or not self.graph.has_edge(center_space.coords, tocrd):
                 gs = GridSpace(
                     self.grid, coords=tocrd)
                 if gs.can_stand_on:
                     self.make_node(center_space, gs)
                     continue
             tocrd = (crd[0] + i, crd[1] + 2, crd[2] + j)
-            if not self.graph.has_edge(center_space.coords, tocrd):
+            if recheck or not self.graph.has_edge(center_space.coords, tocrd):
                 gs = GridSpace(
                     self.grid, coords=tocrd)
                 if gs.can_stand_on:
@@ -121,7 +121,7 @@ class NavigationGrid(object):
                     continue
             for k in [-1, -2, -3]:
                 tocrd = (crd[0] + i, crd[1] + k, crd[2] + j)
-                if not self.graph.has_edge(center_space.coords, tocrd):
+                if recheck or not self.graph.has_edge(center_space.coords, tocrd):
                     gs = GridSpace(
                         self.grid, coords=tocrd)
                     if gs.can_stand_on:
@@ -129,7 +129,7 @@ class NavigationGrid(object):
                         break
         for k in [-1, 1, 2]:  # climb, descend
             tocrd = (crd[0], crd[1] + k, crd[2])
-            if not self.graph.has_edge(center_space.coords, tocrd):
+            if recheck or not self.graph.has_edge(center_space.coords, tocrd):
                 gs = GridSpace(self.grid, coords=tocrd)
                 if gs.can_stand_on:
                     self.make_node(center_space, gs)
@@ -175,9 +175,12 @@ class NavigationGrid(object):
         except KeyError:
             pass
 
-    def insert_node(self, coords, gspace=None):
-        self.compute(coords)
-        self.graph.add_node(coords, miny=gspace.bb_stand.min_y)
+    def insert_node(self, coords, gspace):
+        if self.graph.has_node(coords):
+            self.compute(coords, recheck=True)
+        else:
+            self.compute(coords)
+            self.graph.add_node(coords, miny=gspace.bb_stand.min_y)
 
     def incomplete_on_chunk_border(self, chunk_from, chunk_to):
         for crd in self.chunk_borders.between(chunk_from, chunk_to):

@@ -6,11 +6,23 @@ syspath_fix.update_sys_path()
 import argparse
 
 from twisted.internet import reactor
+from twisted.internet import stdio
+from twisted.protocols import basic
 
 from twistedbot.factory import MineCraftFactory
 from twistedbot.world import World
 from twistedbot.botentity import Bot
 import twistedbot.config as config
+
+
+class ConsoleChat(basic.LineReceiver):
+    from os import linesep as delimiter
+
+    def __init__(self, bot):
+        self.bot = bot
+        
+    def lineReceived(self, line):
+        self.bot.chat.process_command(line)
 
 
 def start():
@@ -35,6 +47,7 @@ def start():
 
     world = World(host, port)
     bot = Bot(world, args.botname, args.commandername)
+    stdio.StandardIO(ConsoleChat(bot))
 
     reactor.addSystemEventTrigger("before", "shutdown", world.shutdown)
     reactor.connectTCP(host, port, MineCraftFactory(bot))

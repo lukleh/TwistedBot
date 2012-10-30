@@ -191,6 +191,7 @@ class WalkSignsGoal(GoalBase):
     def do(self):
         self.signpoint = self.next_sign(self.group)
         if self.signpoint is not None:
+            log.msg('Going to sign %s' % self.signpoint)
             self.manager.add_subgoal(
                 TravelToGoal, coords=self.signpoint.nav_coords)
         else:
@@ -224,6 +225,7 @@ class GoToSignGoal(GoalBase):
                 "cannot idetify sign with name %s" % self.sign_name)
             return Status.impossible
         else:
+            log.msg('Going to sign %s' % self.signpoint)
             return Status.not_finished
 
     def do(self):

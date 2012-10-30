@@ -26,7 +26,9 @@ class Chat(object):
         return self.commander_re.match(msg)
 
     def get_command(self, msg):
-        msg = msg[msg.find(">") + 2:]
+        name_end = msg.find(">")
+        if name_end > 0:
+            msg = msg[name_end + 2:]
         msg = self.wspace_re.sub(" ", msg)
         log.msg("Possible command >%s<" % msg)
         return msg
@@ -38,14 +40,17 @@ class Chat(object):
         return msg.partition(" ")[2]
 
     def process(self, msg):
-        self.clean_msg = self.clean(msg)
-        if self.from_commander(self.clean_msg):
-            command = self.get_command(self.clean_msg)
-            verb = self.get_verb(command)
-            subject = self.get_subject(command)
-            self.parse_command(verb, subject)
+        msg = self.clean(msg)
+        if self.from_commander(msg):
+            self.process_command(msg)
 
-    def parse_command(self, verb, subject):
+    def process_command(self, msg):
+        command = self.get_command(msg)
+        verb = self.get_verb(command)
+        subject = self.get_subject(command)
+        self.parse_command(verb, subject, msg)
+
+    def parse_command(self, verb, subject, original):
         if verb == "rotate" or verb == "circulate":
             if subject:
                 self.bot.goal_manager.command_goal(
@@ -83,4 +88,4 @@ class Chat(object):
             else:
                 self.bot.chat_message("show what?")
         else:
-            log.msg("Unknown command: %s" % self.clean_msg)
+            log.msg("Unknown command: %s" % original)
