@@ -1,11 +1,10 @@
 # Bot/Proxy for Minecraft
 - Support for 1.4.2 protocol version 47
-- Running under [PyPy](http://pypy.org/ "PyPy"). You can try [CPython](http://python.org/ "CPython"), if you want
+- Running under [PyPy](http://pypy.org/ "PyPy"). You can try [CPython](http://python.org/ "CPython"), if you want.
 - flake8 clean with long lines
 
 #### Requirements
-- [PyCrypto](https://www.dlitz.net/software/pycrypto/ "PyCrypto")
-- Rest of the dependencies is included in "libs" directory
+[PyCrypto](https://www.dlitz.net/software/pycrypto/ "PyCrypto") only if you want the datastream to be encrypted. You can easily skip it. Rest of the dependencies is included in "libs" directory. That all makes twistedbot self-contained.
 
 ## Bot
 - Client side artificial player for Minecraft that runs on vanilla server in offline mode. No modification on server/client side needed.
@@ -33,6 +32,7 @@ If your username (commander) is set, then you can use chat to send commands to b
 - "rotate 'group'" rotates (after the end, goes back to the beginning) between signs -> details below
 - "circulate 'group'" circulates (at the end, goes backward towards the beginnings) between signs -> details below
 - "go 'name'" go to specific waypoint identified by name, or if name is group and order separated with space
+- "show 'wp'" show in chat waypoint, group or waypoint in group with name 'wp'
 - "cancel" cancel current activity
 
 #### Sign waypoints
