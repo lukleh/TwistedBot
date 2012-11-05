@@ -2,7 +2,7 @@
 import re
 
 
-import goals
+import behaviours
 import logbot
 
 log = logbot.getlogger("BOT_ENTITY")
@@ -53,23 +53,23 @@ class Chat(object):
     def parse_command(self, verb, subject, original):
         if verb == "rotate" or verb == "circulate":
             if subject:
-                self.bot.goal_manager.command_goal(
-                    goals.WalkSignsGoal, group=subject, type=verb)
+                self.bot.behaviour_manager.command(
+                    behaviours.WalkSignsBehaviour, group=subject, type=verb)
             else:
                 self.bot.chat_message("which sign group to %s?" % verb)
         elif verb == "go":
             if subject:
-                self.bot.goal_manager.command_goal(
-                    goals.GoToSignGoal, sign_name=subject)
+                self.bot.behaviour_manager.command(
+                    behaviours.GoToSignBehaviour, sign_name=subject)
             else:
                 self.bot.chat_message("go where?")
         elif verb == "look":
             if subject == "at me":
-                self.bot.goal_manager.command_goal(goals.LookAtPlayerGoal)
+                self.bot.behaviour_manager.command(behaviours.LookAtPlayerBehaviour)
             else:
                 self.bot.chat_message("look at what?")
         elif verb == "cancel":
-            self.bot.goal_manager.cancel_goal()
+            self.bot.behaviour_manager.cancel_running()
         elif verb == "show":
             if subject:
                 sign = self.bot.world.navgrid.sign_waypoints.get_namepoint(subject)

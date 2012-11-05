@@ -39,7 +39,7 @@ SPEED_CLIMB = 0.2
 
 TIME_STEP = 0.05
 
-COST_CLIMB = 1.1
+COST_JUMP = 1.1
 COST_LADDER = 0.21 / \
     0.15  # common speed on ground / max speed on ladder
 COST_FALL = 1.1

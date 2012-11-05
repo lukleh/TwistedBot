@@ -30,8 +30,7 @@ class GridSpace(object):
         else:
             raise Exception("Empty gridspace object")
         self.blocks3 = (self.block,
-                        self.grid.get_block(self.coords[0], self.coords[
-                                            1] + 1, self.coords[2]),
+                        self.grid.get_block(self.coords[0], self.coords[1] + 1, self.coords[2]),
                         self.grid.get_block(self.coords[0], self.coords[1] + 2, self.coords[2]))
         self._can_stand_on_value = None
         self.stand_block = None
@@ -66,7 +65,7 @@ class GridSpace(object):
 
     def compute(self):
         can = self._can_stand_on()
-        self.grid.can_stand_memory[[b.identifier for b in self.blocks3]] = can
+        #self.grid.can_stand_memory[[b.identifier for b in self.blocks3]] = can
         return can
 
     def can_be_in(self, bb):
@@ -84,8 +83,7 @@ class GridSpace(object):
         """
         if isinstance(self.block, blocks.Cactus):
             return False
-        under = self.grid.get_block(
-            self.coords[0], self.coords[1] - 1, self.coords[2])
+        under = self.grid.get_block(self.coords[0], self.coords[1] - 1, self.coords[2])
         if not self.block.collidable and not under.is_fence and not self.block.is_water and not self.block.is_ladder_vine:
             return False
         if self.block.is_ladder_vine or self.block.is_water:
@@ -158,6 +156,8 @@ class GridSpace(object):
                 print 'horizontal distance too far', bb_stand.horizontal_distance(other_bb_stand)
             return False
         if fops.gt(bb_stand.min_y, other_bb_stand.min_y):
+            if (bb_stand.min_y - other_bb_stand.min_y) > 3:
+                return False
             elev = bb_stand.min_y - other_bb_stand.min_y
             elev_bb = other_bb_stand.extend_to(dy=elev)
             bb_from = bb_stand
@@ -223,17 +223,14 @@ class GridSpace(object):
             if debug:
                 print 'hitting avoid block'
             return False
-        if fops.lte(elev, config.MAX_STEP_HEIGHT) and fops.gte(elev, -config.MAX_STEP_HEIGHT):
-            edge_cost += config.COST_DIRECT * \
-                bb_from.horizontal_distance(bb_to)
-        else:
+        edge_cost += config.COST_DIRECT * bb_from.horizontal_distance(bb_to)
+        if not (fops.lte(elev, config.MAX_STEP_HEIGHT) and fops.gte(elev, -config.MAX_STEP_HEIGHT)):
             edge_cost += config.COST_FALL * \
                 bb_from.horizontal_distance(bb_to)
-            vd = bb_from.horizontal_distance(bb_to)
-            if vd < 0:
-                edge_cost += config.COST_FALL * vd
+            if elev < 0:
+                edge_cost += config.COST_FALL * elev
             else:
-                edge_cost += config.COST_CLIMB * vd
+                edge_cost += config.COST_JUMP
         self.edge_cost = edge_cost
         if update_to_bb_stand:
             gs.bb_stand = other_bb_stand

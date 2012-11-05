@@ -14,6 +14,9 @@ class SignWayPoints(object):
         self.crd_to_sign = {}
         self.ordered_sign_groups = {}
 
+    def has_sign_at(self, crd):
+        return crd in self.crd_to_sign
+
     def has_group(self, group):
         return group in self.ordered_sign_groups
 

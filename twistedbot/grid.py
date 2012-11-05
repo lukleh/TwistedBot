@@ -347,12 +347,14 @@ class Grid(object):
                 return False
         return True
 
-    def check_sign(self, crd):
+    def check_sign(self, sign):
+        crd = sign.coords
         sblk = self.get_block(crd[0], crd[1], crd[2])
         if not sblk.is_sign:
             self.navgrid.sign_waypoints.remove(crd)
             return False
-        return True
+        else:
+            return self.navgrid.sign_waypoints.has_sign_at(crd)
 
     def aabb_eyelevel_inside_water(self, bb, eye_height=config.PLAYER_EYELEVEL):
         eye_y = bb.min_y + eye_height

@@ -3,7 +3,6 @@ from collections import deque
 
 
 from twisted.internet.protocol import ReconnectingClientFactory, Protocol
-from twisted.internet.task import cooperate
 from twisted.internet import reactor, defer
 
 import config
@@ -202,7 +201,7 @@ class MineCraftProtocol(Protocol):
         devnull()
 
     def p_animate(self, c):
-        # TODO this is two way, client uses only value 1 (swing arm).
+        #TODO this is two way, client uses only value 1 (swing arm).
         # probably needed. devnull for now
         devnull()
 
@@ -372,8 +371,7 @@ class MineCraftProtocol(Protocol):
             self.send_packet("client statuses", {"status": 0})
 
     def p_error(self, container):
-        # TODO possibly implement error parsing and subsequent action
-        # reactor.stop kills everything
+        #TODO shutdown in the future before exit
         log.msg("Server kicked me out with message: %s" % container.message)
         reactor.stop()
 

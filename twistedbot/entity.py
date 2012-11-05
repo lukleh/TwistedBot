@@ -93,4 +93,3 @@ class EntityDroppedItem(Entity):
     def __init__(self, **kwargs):
         super(EntityDroppedItem, self).__init__(**kwargs)
         self.nbt = kwargs["slotdata"]
-        #ignoring yaw, pitch and roll for now

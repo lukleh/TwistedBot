@@ -291,10 +291,9 @@ class BlockMultiBox(Block):
             col_bb = None
             for box in boxes:
                 col, rel_d = bb.sweep_collision(box, vect, debug=debug)
-                if col and fops.eq(col_rel_d, rel_d):
-                    if max_height:
-                        if fops.lt(col_bb.max_y, bb.max_y):
-                            col_bb = bb
+                if max_height and col and fops.eq(col_rel_d, rel_d):
+                    if fops.lt(col_bb.max_y, bb.max_y):
+                        col_bb = bb
                 if col and fops.lt(rel_d, col_rel_d):
                     col_rel_d = rel_d
                     col_bb = bb
@@ -386,7 +385,7 @@ class BlockStairs(BlockMultiBox):
         maxz = 0.5
         if self.is_upsite_down:
             miny = 0
-            maxy = 0.5    
+            maxy = 0.5
         next_box = True
         dirc = self.meta & 3
         if dirc == 0:
@@ -667,6 +666,33 @@ class BlockSingleSlab(Block):
             return self.bounding_box_lower + self.coords
         else:
             return self.bounding_box_higher + self.coords
+
+
+class BlockBiCollidable(Block):
+    def add_grid_bounding_boxes_to(self, out):
+        if self.collidable:
+            out.append(self.grid_bounding_box)
+
+    def sweep_collision(self, bb, vect, debug=False, max_height=False):
+        if self.collidable:
+            return super(BlockBiCollidable, self).sweep_collision(bb, vect, debug=debug, max_height=max_height)
+        else:
+            return False, None, self.grid_bounding_box
+
+    def collides_with(self, bb):
+        if not self.collidable:
+            return False
+        return super(BlockBiCollidable, self).collides_with(bb)
+
+    def collides_on_axes(self, bb, x=False, y=False, z=False):
+        if not self.collidable:
+            return False
+        return super(BlockBiCollidable, self).collides_on_axes(bb, x, y, z)
+
+    def intersection_on_axes(self, bb, x=False, y=False, z=False, debug=False):
+        if not self.collidable:
+            return None
+        return super(BlockBiCollidable, self).intersection_on_axes(bb, x, y, z, debug)
 
 
 class Air(BlockNonSolid):
@@ -1156,7 +1182,7 @@ class StoneButton(BlockNonSolid):
     material = materials.circuits
 
 
-class Snow(Block):
+class Snow(BlockBiCollidable):
     number = 78
     name = "Snow"
     material = materials.snow
@@ -1378,7 +1404,7 @@ class Vines(BlockNonSolid):
     material = materials.vine
 
 
-class FenceGate(Block):
+class FenceGate(BlockBiCollidable):
     number = 107
     name = "Fence Gate"
     material = materials.wood
@@ -1406,32 +1432,6 @@ class FenceGate(Block):
             return self.bounding_box_north_south + self.coords
         else:
             return self.bounding_box_east_west + self.coords
-
-    def add_grid_bounding_boxes_to(self, out):
-        if not self.is_open:
-            out.append(self.grid_bounding_box)
-
-    def sweep_collision(self, bb, vect, debug=False, max_height=False):
-        if not self.is_open:
-            return super(FenceGate, self).sweep_collision(bb, vect, debug=debug, max_height=max_height)
-        else:
-            return False, None, self.grid_bounding_box
-
-    def collides_with(self, bb):
-        if not self.collidable:
-            return False
-        return super(FenceGate, self).collides_with(bb)
-
-    def collides_on_axes(self, bb, x=False, y=False, z=False):
-        if not self.collidable:
-            return False
-        return super(FenceGate, self).collides_on_axes(bb, x, y, z)
-
-    def intersection_on_axes(self, bb, x=False, y=False, z=False, debug=False):
-        if not self.collidable:
-            return None
-        return bb.intersection_on_axes(self.grid_bounding_box,
-                                       x, y, z, debug=debug)
 
 
 class BrickStairs(BlockStairs):

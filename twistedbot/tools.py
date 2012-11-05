@@ -19,17 +19,20 @@ sign = functools.partial(math.copysign, 1)
 
 
 def do_now(fn, *args, **kwargs):
-    do_later(0, fn, *args, **kwargs)
+    return do_later(0, fn, *args, **kwargs)
 
 
 def do_later(delay, fn, *args, **kwargs):
     d = defer.Deferred()
-
-    def fire(ignore):
-        return fn(*args, **kwargs)
-    d.addCallback(fire)
+    d.addCallback(lambda ignored: fn(*args, **kwargs))
     d.addErrback(logbot.exit_on_error)
     reactor.callLater(delay, d.callback, None)
+    return d
+
+
+def reactor_break():
+    d = defer.Deferred()
+    reactor.callLater(0, d.callback, None)
     return d
 
 
@@ -356,7 +359,7 @@ class Sign(object):
         self.line2 = re.sub(ur"\s+", " ", self.line2.strip().lower())
         try:
             self.name = self.line4
-            self.value = float(self.line2)
+            self.value = float(re.sub(ur",", ".", self.line2))
         except ValueError:
             self.name = self.line2
             self.value = None
@@ -366,7 +369,7 @@ class Sign(object):
         return self.coords == sgn.coords
 
     def __str__(self):
-        return "$coords:%s groups:%s value:%s name:%s$" % \
+        return "$coords:%s group:%s value:%s name:%s$" % \
             (str(self.coords), self.group, self.value, self.name)
 
     def __repr__(self):

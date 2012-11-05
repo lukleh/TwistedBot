@@ -9,7 +9,7 @@ import packets
 import logbot
 import fops
 import blocks
-import goals
+import behaviours
 from statistics import Statistics
 from axisbox import AABB
 from chat import Chat
@@ -63,7 +63,7 @@ class Bot(object):
         self.z = 0
         self.ticks = 0
         self.chunks_ready = False
-        self.goal_manager = goals.Manager(self)
+        self.behaviour_manager = behaviours.BehaviourManager(self)
         self.stance_diff = config.PLAYER_EYELEVEL
         self.pitch = None
         self.yaw = None
@@ -93,8 +93,6 @@ class Bot(object):
         if self.location_received:
             self.location_received = False
             self.chunks_ready = False
-            #TODO remove current chunks
-            # erase all data that came from server
 
     def shutdown(self):
         """ save anything that needs to be saved and shutdown"""
@@ -186,7 +184,7 @@ class Bot(object):
         self.send_location()
         tools.do_later(0, self.on_standing_ready)
         tools.do_later(0, self.every_n_ticks)
-        tools.do_later(0, self.goal_manager.run_goal)
+        tools.do_later(0, self.behaviour_manager.run)
         iter_end = datetime.now()
         d_run = (iter_end - iter_start).total_seconds()  # time this step took
         t = config.TIME_STEP - d_run  # decreased by computation in iterate
@@ -251,43 +249,6 @@ class Bot(object):
         ab = self.aabb.offset(dy=v)
         self.y = ab.posy
 
-    def do_move(self):
-        zero_vels = False
-        if self.is_in_web:
-            self.velocities[0] *= 0.25
-            self.velocities[1] *= 0.05000000074505806
-            self.velocities[2] *= 0.25
-            zero_vels = True
-        aabbs = self.grid.aabbs_in(self.aabb.extend_to(
-            self.velocities[0], self.velocities[1], self.velocities[2]))
-        b_bb = self.aabb
-        dy = self.velocities[1]
-        for bb in aabbs:
-            dy = b_bb.calculate_axis_offset(bb, dy, 1)
-        b_bb = b_bb.offset(dy=dy)
-        dx = self.velocities[0]
-        for bb in aabbs:
-            dx = b_bb.calculate_axis_offset(bb, dx, 0)
-        b_bb = b_bb.offset(dx=dx)
-        dz = self.velocities[2]
-        for bb in aabbs:
-            dz = b_bb.calculate_axis_offset(bb, dz, 2)
-        b_bb = b_bb.offset(dz=dz)
-        onground = self.velocities[1] != dy and self.velocities[1] < 0
-        self.is_collided_horizontally = dx != self.velocities[
-            0] or dz != self.velocities[2]
-        self.horizontally_blocked = dx != self.velocities[0] and dz != self.velocities[2]
-        if self.velocities[0] != dx:
-            self.velocities[0] = 0
-        if self.velocities[1] != dy:
-            self.velocities[1] = 0
-        if self.velocities[2] != dz:
-            self.velocities[2] = 0
-        self.update_position(b_bb.posx, b_bb.min_y, b_bb.posz, onground)
-        if zero_vels:
-            self.velocities = [0, 0, 0]
-        self.do_block_collision()
-
     def clip_abs_velocities(self):
         out = list(self.velocities)
         for i in xrange(3):
@@ -327,14 +288,53 @@ class Bot(object):
                              1] * wconst, water_current[2] * wconst)
         return is_in_water, water_current
 
-    def handle_lava_movement(self):
+    def handle_lava_movement(self, aabb=None):
+        if aabb is None:
+            aabb = self.aabb
         for blk in self.grid.blocks_in_aabb(
-                self.aabb.expand(-0.10000000149011612,
-                                 -0.4000000059604645,
-                                 -0.10000000149011612)):
+                aabb.expand(-0.10000000149011612,
+                            -0.4000000059604645,
+                            -0.10000000149011612)):
             if isinstance(blk, blocks.BlockLava):
                 return True
         return False
+
+    def move_collisions(self):
+        zero_vels = False
+        if self.is_in_web:
+            self.velocities[0] *= 0.25
+            self.velocities[1] *= 0.05000000074505806
+            self.velocities[2] *= 0.25
+            zero_vels = True
+        aabbs = self.grid.aabbs_in(self.aabb.extend_to(
+            self.velocities[0], self.velocities[1], self.velocities[2]))
+        b_bb = self.aabb
+        dy = self.velocities[1]
+        for bb in aabbs:
+            dy = b_bb.calculate_axis_offset(bb, dy, 1)
+        b_bb = b_bb.offset(dy=dy)
+        dx = self.velocities[0]
+        for bb in aabbs:
+            dx = b_bb.calculate_axis_offset(bb, dx, 0)
+        b_bb = b_bb.offset(dx=dx)
+        dz = self.velocities[2]
+        for bb in aabbs:
+            dz = b_bb.calculate_axis_offset(bb, dz, 2)
+        b_bb = b_bb.offset(dz=dz)
+        onground = self.velocities[1] != dy and self.velocities[1] < 0
+        self.is_collided_horizontally = dx != self.velocities[
+            0] or dz != self.velocities[2]
+        self.horizontally_blocked = dx != self.velocities[0] and dz != self.velocities[2]
+        if self.velocities[0] != dx:
+            self.velocities[0] = 0
+        if self.velocities[1] != dy:
+            self.velocities[1] = 0
+        if self.velocities[2] != dz:
+            self.velocities[2] = 0
+        self.update_position(b_bb.posx, b_bb.min_y, b_bb.posz, onground)
+        if zero_vels:
+            self.velocities = [0, 0, 0]
+        self.do_block_collision()
 
     def move(self, direction=(0, 0)):
         self.velocities = self.clip_abs_velocities()
@@ -366,7 +366,7 @@ class Bot(object):
             orig_y = self.y
             self.update_directional_speed(
                 direction, 0.02, balance=True)
-            self.do_move()
+            self.move_collisions()
             self.velocities[0] *= 0.800000011920929
             self.velocities[1] *= 0.800000011920929
             self.velocities[2] *= 0.800000011920929
@@ -380,7 +380,7 @@ class Bot(object):
         elif self.is_in_lava:
             orig_y = self.y
             self.update_directional_speed(direction, 0.02)
-            self.do_move()
+            self.move_collisions()
             self.velocities[0] *= 0.5
             self.velocities[1] *= 0.5
             self.velocities[2] *= 0.5
@@ -395,7 +395,7 @@ class Bot(object):
             slowdown = self.current_slowdown
             self.update_directional_speed(direction, self.current_speed_factor)
             self.velocities = self.clip_ladder_velocities()
-            self.do_move()
+            self.move_collisions()
             if self.is_collided_horizontally and self.is_on_ladder:
                 self.velocities[1] = 0.2
             self.velocities[1] -= config.BLOCK_FALL
@@ -520,17 +520,12 @@ class Bot(object):
 
     def respawn_data(self, dimension, difficulty,
                      mode, world_height, level_type):
-        # TODO
-        # ignore the details now
-        # should clear the world(chunks, entities, etc.)
-        # signs can stay self.grid.navgrid.reset_signs()
         pass
 
     def on_death(self):
         self.location_received = False
         self.spawn_point_received = False
         tools.do_later(1.0, self.do_respawn)
-        #TODO self.world_erase()
 
     @property
     def standing_on_block(self):
