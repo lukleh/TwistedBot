@@ -1750,7 +1750,6 @@ class Anvil(Block):
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.75, 1.0)
 
 
-
 block_map = [None for _ in xrange(256)]
 clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
 for _, cl in clsmembers:

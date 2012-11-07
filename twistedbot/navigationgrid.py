@@ -60,7 +60,7 @@ class NavigationGrid(object):
         self.incomplete_nodes = OrderedDict()
         self.graph = tools.DirectedGraph()
         self.chunk_borders = ChunkBorders()
-        self.sign_waypoints = SignWayPoints(self)       
+        self.sign_waypoints = SignWayPoints(self)
 
     def check_node_resources(self, crd):
         pass
