@@ -48,7 +48,7 @@ def start():
     world = World(host=host, port=port, commander_name=args.commandername, bot_name=args.botname)
     try:
         from twisted.internet import stdio
-        stdio.StandardIO(ConsoleChat(bot))
+        stdio.StandardIO(ConsoleChat(world))
     except ImportError:
         pass
     reactor.addSystemEventTrigger("before", "shutdown", world.shutdown)

@@ -234,9 +234,10 @@ class TravelToBehaviour(BehaviourBase):
         if g.status != Status.success:
             self.ready = False
 
+    @inlineCallbacks
     def _tick(self):
         if not self.ready:
-            self.activate()
+            ignore = yield self.activate()
             if self.status == Status.failure:
                 return
             if not self.ready:
