@@ -60,10 +60,7 @@ class NavigationGrid(object):
         self.incomplete_nodes = OrderedDict()
         self.graph = tools.DirectedGraph()
         self.chunk_borders = ChunkBorders()
-        self.reset_signs()
-
-    def reset_signs(self):
-        self.sign_waypoints = SignWayPoints(self)
+        self.sign_waypoints = SignWayPoints(self)       
 
     def check_node_resources(self, crd):
         pass
@@ -85,7 +82,7 @@ class NavigationGrid(object):
             yield None
 
     def do_incomplete_node(self, crd, recheck):
-        center_space = GridSpace(self.grid, coords=crd)
+        center_space = GridSpace(self.world.grid, coords=crd)
         if not center_space.can_stand_on:
             self.delete_node(crd)
             return
@@ -93,29 +90,29 @@ class NavigationGrid(object):
             self.graph.add_node(crd, miny=center_space.bb_stand.min_y)
         for i, j in tools.adjacency:
             tocrd = (crd[0] + i, crd[1], crd[2] + j)
-            if not self.grid.chunk_complete_at((tocrd[0] >> 4, tocrd[2] >> 4)):
+            if not self.world.grid.chunk_complete_at((tocrd[0] >> 4, tocrd[2] >> 4)):
                 self.chunk_borders.add(center_space.coords, tocrd)
                 continue
             if i != 0 and j != 0:
-                if not self.grid.chunk_complete_at((crd[0] >> 4, (crd[2] + j) >> 4)) or \
-                        not self.grid.chunk_complete_at(((crd[0] + i) >> 4, crd[2] >> 4)):
+                if not self.world.grid.chunk_complete_at((crd[0] >> 4, (crd[2] + j) >> 4)) or \
+                        not self.world.grid.chunk_complete_at(((crd[0] + i) >> 4, crd[2] >> 4)):
                     continue
             if recheck or not self.graph.has_edge(center_space.coords, tocrd):
-                gs = GridSpace(self.grid, coords=tocrd)
+                gs = GridSpace(self.world.grid, coords=tocrd)
                 if gs.can_stand_on:
                     self.make_node(center_space, gs)
                     continue
             tocrd = (crd[0] + i, crd[1] + 1, crd[2] + j)
             if recheck or not self.graph.has_edge(center_space.coords, tocrd):
                 gs = GridSpace(
-                    self.grid, coords=tocrd)
+                    self.world.grid, coords=tocrd)
                 if gs.can_stand_on:
                     self.make_node(center_space, gs)
                     continue
             tocrd = (crd[0] + i, crd[1] + 2, crd[2] + j)
             if recheck or not self.graph.has_edge(center_space.coords, tocrd):
                 gs = GridSpace(
-                    self.grid, coords=tocrd)
+                    self.world.grid, coords=tocrd)
                 if gs.can_stand_on:
                     self.make_node(center_space, gs)
                     continue
@@ -123,14 +120,14 @@ class NavigationGrid(object):
                 tocrd = (crd[0] + i, crd[1] + k, crd[2] + j)
                 if recheck or not self.graph.has_edge(center_space.coords, tocrd):
                     gs = GridSpace(
-                        self.grid, coords=tocrd)
+                        self.world.grid, coords=tocrd)
                     if gs.can_stand_on:
                         self.make_node(center_space, gs)
                         break
         for k in [-1, 1, 2]:  # climb, descend
             tocrd = (crd[0], crd[1] + k, crd[2])
             if recheck or not self.graph.has_edge(center_space.coords, tocrd):
-                gs = GridSpace(self.grid, coords=tocrd)
+                gs = GridSpace(self.world.grid, coords=tocrd)
                 if gs.can_stand_on:
                     self.make_node(center_space, gs)
 
@@ -151,7 +148,7 @@ class NavigationGrid(object):
         last_one = None
         ok = True
         for p in path:
-            gs = GridSpace(self.grid, coords=p)
+            gs = GridSpace(self.world.grid, coords=p)
             if not gs.can_stand_on:
                 self.delete_node(p)
                 last_one = None
@@ -189,14 +186,14 @@ class NavigationGrid(object):
 
     def block_change(self, old_block, new_block):
         coords = new_block.coords
-        gs = GridSpace(self.grid, coords=coords)
+        gs = GridSpace(self.world.grid, coords=coords)
         if gs.can_stand_on:
             self.insert_node(gs.coords, gspace=gs)
         else:
             self.delete_node(gs.coords)
         for i in [-2, -1, 1, 2]:
             crd = (coords[0], coords[1] - i, coords[2])
-            gs = GridSpace(self.grid, crd)
+            gs = GridSpace(self.world.grid, crd)
             if gs.can_stand_on:
                 self.insert_node(gs.coords, gspace=gs)
             else:

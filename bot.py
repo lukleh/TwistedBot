@@ -10,7 +10,6 @@ from twisted.protocols import basic
 
 from twistedbot.factory import MineCraftFactory
 from twistedbot.world import World
-from twistedbot.botentity import Bot
 import twistedbot.config as config
 import twistedbot.logbot as logbot
 
@@ -18,12 +17,12 @@ import twistedbot.logbot as logbot
 class ConsoleChat(basic.LineReceiver):
     from os import linesep as delimiter
 
-    def __init__(self, bot):
-        self.bot = bot
+    def __init__(self, world):
+        self.world = world
         
     def lineReceived(self, line):
         try:
-            self.bot.chat.process_command(line)
+            self.world.chat.process_command(line)
         except Exception as e:
             logbot.exit_on_error(e)
 
@@ -46,15 +45,14 @@ def start():
     config.COMMANDER = args.commandername
     host = args.serverhost
     port = args.serverport
-    world = World(host, port)
-    bot = Bot(world, args.botname, args.commandername)
+    world = World(host=host, port=port, commander_name=args.commandername, bot_name=args.botname)
     try:
         from twisted.internet import stdio
         stdio.StandardIO(ConsoleChat(bot))
     except ImportError:
         pass
     reactor.addSystemEventTrigger("before", "shutdown", world.shutdown)
-    reactor.connectTCP(host, port, MineCraftFactory(bot))
+    reactor.connectTCP(host, port, MineCraftFactory(world))
     reactor.run()
 
 

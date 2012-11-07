@@ -2,12 +2,98 @@
 
 import logbot
 from gridspace import GridSpace
-from entity import EntityMob, EntityPlayer, EntityVehicle, \
-    EntityExperienceOrb, EntityDroppedItem
 from axisbox import AABB
 
 
 log = logbot.getlogger("ENTITIES")
+
+
+class Entity(object):
+    def __init__(self, **kwargs):
+        self.eid = kwargs["eid"]
+        self.x = kwargs["x"]
+        self.y = kwargs["y"]
+        self.z = kwargs["z"]
+        self.velocity = None
+        self.is_bot = False
+
+    @property
+    def position(self):
+        return (self.x / 32.0, self.y / 32.0, self.z / 32.0)
+
+    @property
+    def grid_position(self):
+        x = self.x / 32
+        y = self.y / 32
+        z = self.z / 32
+        return (x, y, z)
+
+
+class EntityBot(Entity):
+    def __init__(self, **kwargs):
+        super(EntityBot, self).__init__(**kwargs)
+        self.is_bot = True
+
+
+class EntityLiving(Entity):
+    def __init__(self, **kwargs):
+        super(EntityLiving, self).__init__(**kwargs)
+        self.yaw = kwargs["yaw"]
+        self.pitch = kwargs["pitch"]
+
+    @property
+    def orientation(self):
+        return (self.yaw, self.pitch)
+
+    @property
+    def location(self):
+        x, y, z = self.position
+        yaw, pitch = self.orientation
+        return (x, y, z, yaw, pitch)
+
+
+class EntityMob(EntityLiving):
+    def __init__(self, **kwargs):
+        super(EntityMob, self).__init__(**kwargs)
+        self.etype = kwargs["etype"]
+        self.head_yaw = kwargs["yaw"]
+        self.status = None
+        #TODO assign mob type according to the etype and metadata
+
+
+class EntityPlayer(EntityLiving):
+    def __init__(self, **kwargs):
+        super(EntityPlayer, self).__init__(**kwargs)
+        self.username = kwargs["username"]
+        self.held_item = kwargs["held_item"]
+
+    @property
+    def aabb(self):
+        return AABB.from_player_coords(self.position)
+
+
+class EntityVehicle(Entity):
+    def __init__(self, **kwargs):
+        super(EntityVehicle, self).__init__(**kwargs)
+        self.etype = kwargs["etype"]
+        self.thrower = kwargs["object_data"]
+        if self.thrower > 0:
+            self.vel_x = kwargs["velocity"]["x"]
+            self.vel_y = kwargs["velocity"]["y"]
+            self.vel_z = kwargs["velocity"]["z"]
+        #TODO assign vehicle type according to the etype and metadata
+
+
+class EntityExperienceOrb(Entity):
+    def __init__(self, **kwargs):
+        super(EntityExperienceOrb, self).__init__(**kwargs)
+        self.quantity = kwargs["count"]
+
+
+class EntityDroppedItem(Entity):
+    def __init__(self, **kwargs):
+        super(EntityDroppedItem, self).__init__(**kwargs)
+        self.nbt = kwargs["slotdata"]
 
 
 class Entities(object):
@@ -15,25 +101,27 @@ class Entities(object):
         self.world = world
         self.entities = {}
 
+    def has_entity(self, eid):
+        return eid in self.entities
+
     def get_entity(self, eid):
-        if eid in self.entities:
-            return self.entities[eid]
-        else:
+        e = self.entities.get(eid, None)
+        if e is None:
             log.msg("Entity %d not in mobs list" % eid)
-            return None
+        return e
 
     def maybe_commander(self, entity):
-        if self.world.bot.commander.eid != entity.eid:
+        if self.world.commander.eid != entity.eid:
             return
         gpos = entity.grid_position
         block = self.world.grid.standing_on_block(
             AABB.from_player_coords(entity.position))
         if block is None:
             return
-        if self.world.bot.commander.last_block is not None and self.world.bot.commander.last_block == block:
+        if self.world.commander.last_block is not None and self.world.commander.last_block == block:
             return
-        self.world.bot.commander.last_block = block
-        lpos = self.world.bot.commander.last_possition
+        self.world.commander.last_block = block
+        lpos = self.world.commander.last_possition
         in_nodes = self.world.navgrid.graph.has_node(block.coords)
         gs = GridSpace(self.world.grid, block=block)
         msg = "P in nm %s nm nodes %d\n" % \
@@ -69,7 +157,7 @@ class Entities(object):
                     gsl.can_stand_between(gs, debug=True), gsl.intersection)
 
         log.msg(msg)
-        self.world.bot.commander.last_possition = gpos
+        self.world.commander.last_possition = gpos
 
     def entityupdate(fn):
         def f(self, *args, **kwargs):
@@ -88,13 +176,16 @@ class Entities(object):
             self.maybe_commander(entity)
         return f
 
+    def new_bot(self, eid):
+        self.entities[eid] = EntityBot(eid=eid, x=0, y=0, z=0)
+
     def new_mob(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityMob(**kwargs)
 
     def new_player(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityPlayer(**kwargs)
-        if self.world.bot.commander.name == kwargs["username"]:
-            self.world.bot.commander.eid = kwargs["eid"]
+        if self.world.commander.name == kwargs["username"]:
+            self.world.commander.eid = kwargs["eid"]
 
     def new_dropped_item(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityDroppedItem(**kwargs)
@@ -110,8 +201,8 @@ class Entities(object):
             entity = self.get_entity(eid)
             if entity:
                 del self.entities[eid]
-                if self.world.bot.commander.eid == eid:
-                    self.world.bot.commander.eid = None
+                if self.world.commander.eid == eid:
+                    self.world.commander.eid = None
 
     @entityupdate
     def move(self, entity, dx, dy, dz):

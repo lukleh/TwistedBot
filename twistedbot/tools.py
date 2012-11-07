@@ -36,10 +36,6 @@ def reactor_break():
     return d
 
 
-def devnull(body=None):
-    pass
-
-
 def meta2str(meta):
     bins = bin(meta)[2:]
     bins = "0" * (8 - len(bins)) + bins

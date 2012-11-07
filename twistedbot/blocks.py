@@ -1724,7 +1724,21 @@ class Skull(Block):
     material = materials.circuits
     render_as_normal_block = False
     is_opaque_cube = False
-    bounding_box = AABB(0.25, 0.0, 0.25, 0.75, 0.5, 0.75)
+
+    @property
+    def grid_bounding_box(self):
+        att = self.meta & 7
+        if att == 1:
+            gbb = AABB(0.25, 0.0, 0.25, 0.75, 0.5, 0.75)
+        elif att == 2:
+            gbb = AABB(0.25, 0.25, 0.5, 0.75, 0.75, 1.0)
+        elif att == 3:
+            gbb = AABB(0.25, 0.25, 0.0, 0.75, 0.75, 0.5)
+        elif att == 4:
+            gbb = AABB(0.5, 0.25, 0.25, 1.0, 0.75, 0.75)
+        elif att == 5:
+            gbb = AABB(0.0, 0.25, 0.25, 0.5, 0.75, 0.75)
+        return gbb + self.coords
 
 
 class Anvil(Block):
@@ -1734,6 +1748,7 @@ class Anvil(Block):
     render_as_normal_block = False
     is_opaque_cube = False
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.75, 1.0)
+
 
 
 block_map = [None for _ in xrange(256)]

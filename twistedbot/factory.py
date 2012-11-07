@@ -3,14 +3,13 @@ from collections import deque
 
 
 from twisted.internet.protocol import ReconnectingClientFactory, Protocol
-from twisted.internet import reactor, defer
+from twisted.internet import reactor
 
 import config
 import logbot
 import proxy_processors.default
 import tools
 from packets import parse_packets, make_packet, packets_by_name, Container
-from tools import devnull
 from proxy_processors.default import process_packets as packet_printout
 
 
@@ -21,10 +20,9 @@ log = logbot.getlogger("PROTOCOL")
 
 
 class MineCraftProtocol(Protocol):
-    def __init__(self, bot):
-        self.bot = bot
-        self.bot.protocol = self
-        self.world = bot.world
+    def __init__(self, world):
+        self.world = world
+        self.world.protocol = self
         self.leftover = ""
         self.encryption_on = False
         self.packets = deque()
@@ -83,6 +81,7 @@ class MineCraftProtocol(Protocol):
         }
 
     def connectionMade(self):
+        self.world.connection_made()
         log.msg("sending HANDSHAKE")
         self.send_packet("handshake", {"protocol": config.PROTOCOL_VERSION,
                                        "username": config.USERNAME,
@@ -91,7 +90,7 @@ class MineCraftProtocol(Protocol):
 
     def connectionLost(self, reason):
         self.packets = deque()
-        self.bot.connection_lost()
+        self.world.connection_lost()
 
     def sendData(self, bytestream):
         if self.encryption_on:
@@ -99,10 +98,10 @@ class MineCraftProtocol(Protocol):
         self.transport.write(bytestream)
 
     def dataReceived(self, bytestream):
-        d = defer.Deferred()
-        d.addCallback(self.parse_stream)
-        d.addErrback(logbot.exit_on_error)
-        d.callback(bytestream)
+        try:
+            self.parse_stream(bytestream)
+        except:
+            logbot.exit_on_error()
 
     def parse_stream(self, bytestream):
         if self.encryption_on:
@@ -126,7 +125,7 @@ class MineCraftProtocol(Protocol):
         while ipackets:
             packet = ipackets.popleft()
             self.process_packet(packet)
-            self.bot.status_diff.packets_in += 1
+            self.world.status_diff.packets_in += 1
 
     def process_packet(self, packet):
         pid = packet[0]
@@ -138,44 +137,39 @@ class MineCraftProtocol(Protocol):
             log.msg("Unknown packet %d" % pid)
             reactor.stop()
 
-    def send_locale(self, **kwargs):
-        self.send_packet("locale view distance", kwargs)
-
     def p_ping(self, c):
         pid = c.pid
         self.send_packet("keep alive", {"pid": pid})
 
     def p_login(self, c):
-        log.msg("LOGIN DATA eid %s level type: %s mode: %s \
+        log.msg("LOGIN DATA eid %s level type: %s game_mode: %s \
                 dimension: %s difficulty: %s max players: %s" %
-                (c.eid, c.level_type, c.mode,
+                (c.eid, c.level_type, c.game_mode,
                  c.dimension, c.difficulty, c.players))
-        self.bot.login_data(c.eid, c.level_type, c.mode,
-                            c.dimension, c.difficulty, c.players)
-        tools.do_now(self.send_locale, locale='en_GB', view_distance=2, chat_flags=0, difficulty=0, show_cape=False)
+        self.world.login_data(bot_eid=c.eid, game_mode=c.game_mode, dimension=c.dimension, difficulty=c.difficulty)
+        tools.do_now(self.send_packet, "locale view distance", {'locale': 'en_GB', 'view_distance': 2, 'chat_flags': 0, 'difficulty': 0, 'show_cape': False})
 
     def p_chat(self, c):
-        self.bot.chat.process(c.message)
+        self.world.chat.process(c.message)
 
     def p_time(self, c):
-        self.world.s_time = c.time
+        self.world.game_state.update_time(timestamp=c.timestamp, daytime=c.daytime)
 
     def p_entity_equipment(self, c):
-        devnull()
+        pass
 
     def p_spawn(self, c):
         spawn = (c.x, c.y, c.z)
         log.msg("SPAWN POSITION %s" % str(spawn))
-        self.world.grid.spawn_position = spawn
-        self.bot.spawn_point_received = True
+        self.world.spawn_position = spawn
+        self.world.bot.spawn_point_received = True
 
     def p_health(self, c):
-        self.bot.health_update(c.hp, c.fp, c.saturation)
+        self.world.bot.health_update(c.hp, c.fp, c.saturation)
 
     def p_respawn(self, c):
         log.msg("RESPAWN received")
-        self.bot.respawn_data(c.dimension, c.difficulty,
-                              c.game_mode, c.world_height, c.level_type)
+        self.world.respawn_data(game_mode=c.game_mode, dimension=c.dimension, difficulty=c.difficulty)
 
     def p_location(self, c):
         log.msg("received LOCATION X:%f Y:%f Z:%f STANCE:%f GROUNDED:%s" %
@@ -185,25 +179,24 @@ class MineCraftProtocol(Protocol):
         c.position.y = c.position.stance
         c.position.stance = s
         self.send_packet("player position&look", c)
-        self.bot.set_location({"x": c.position.x,
-                               "y": c.position.y,
-                               "z": c.position.z,
-                               "stance": c.position.stance,
-                               "grounded": c.grounded.grounded,
-                               "yaw": c.orientation.yaw,
-                               "pitch": c.orientation.pitch})
+        self.world.bot.set_location({"x": c.position.x,
+                                     "y": c.position.y,
+                                     "z": c.position.z,
+                                     "stance": c.position.stance,
+                                     "grounded": c.grounded.grounded,
+                                     "yaw": c.orientation.yaw,
+                                     "pitch": c.orientation.pitch})
 
     def p_use_bed(self, c):
         """
         if ever will use bed, then deal with it.
         possibly also if commander uses bed.
         """
-        devnull()
+        pass
 
     def p_animate(self, c):
-        #TODO this is two way, client uses only value 1 (swing arm).
-        # probably needed. devnull for now
-        devnull()
+        #TODO this is two way, client uses only value 1 (swing arm). Probably needed.
+        pass
 
     def p_player(self, c):
         self.world.entities.new_player(eid=c.eid, username=c.username,
@@ -217,7 +210,7 @@ class MineCraftProtocol(Protocol):
 
     def p_collect(self, c):
         """ can be safely ignored, for animation purposes only """
-        devnull()
+        pass
 
     def p_vehicle(self, c):
         vel = {"x": c.velocity.x,
@@ -272,9 +265,7 @@ class MineCraftProtocol(Protocol):
         self.world.entities.metadata(c.eid, c.metadata)
 
     def p_levelup(self, c):
-        self.bot.s_experience_bar = c.current
-        self.bot.s_level = c.level
-        self.bot.s_total_experience = c.total
+        self.world.bot.update_experience(experience_bar=c.current, level=c.level, total_experience=c.total)
 
     def p_chunk(self, c):
         self.world.grid.load_chunk(c.x, c.z, c.continuous, c.primary_bitmap,
@@ -294,7 +285,7 @@ class MineCraftProtocol(Protocol):
 
     def p_block_break_animation(self, c):
         """ no need for this now """
-        devnull()
+        pass
 
     def p_bulk_chunk(self, c):
         self.world.grid.load_bulk_chunk(c.meta, c.data.decode('zlib'))
@@ -308,13 +299,13 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_named_sound(self, c):
-        devnull(c)
+        pass
 
     def p_state(self, c):
         pass
 
     def p_thunderbolt(self, c):
-        devnull()
+        pass
 
     def p_window_slot(self, c):
         pass
@@ -329,7 +320,7 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_stats(self, c):
-        self.bot.stats.update(c.sid, c.count)
+        self.world.stats.update(c.sid, c.count)
 
     def p_players(self, c):
         if c.online:
@@ -370,15 +361,14 @@ class MineCraftProtocol(Protocol):
             log.msg('USE_ENCRYPTION is False, skipping encryption.')
             self.send_packet("client statuses", {"status": 0})
 
-    def p_error(self, container):
-        #TODO shutdown in the future before exit
-        log.msg("Server kicked me out with message: %s" % container.message)
+    def p_error(self, c):
+        log.msg("Server kicked me out with message: %s" % c.message)
         reactor.stop()
 
 
 class MineCraftFactory(ReconnectingClientFactory):
-    def __init__(self, bot):
-        self.bot = bot
+    def __init__(self, world):
+        self.world = world
         self.maxDelay = config.CONNECTION_MAX_DELAY
         self.initialDelay = config.CONNECTION_INITIAL_DELAY
         self.delay = self.initialDelay
@@ -391,7 +381,7 @@ class MineCraftFactory(ReconnectingClientFactory):
         if self.delay > self.initialDelay:
             log.msg('Resetting reconnection delay')
             self.resetDelay()
-        protocol = MineCraftProtocol(self.bot)
+        protocol = MineCraftProtocol(self.world)
         protocol.factory = self
         return protocol
 
