@@ -67,12 +67,16 @@ def yaw_pitch_between(p1, p2):
 
 
 def yaw_pitch_to_vector(x, y, z):
-    xz = math.hypot(x, z)
-    if xz == 0:
+    d = math.hypot(x, z)
+    if d == 0:
         pitch = 0
     else:
-        pitch = math.sin(y / xz)
+        pitch = math.sin(y / d)
         pitch = math.degrees(pitch)
+        if pitch < -90:
+            pitch = -90
+        elif pitch > 90:
+            pitch = 90
     if z == 0.0:
         if x > 0:
             yaw = 270
@@ -81,8 +85,9 @@ def yaw_pitch_to_vector(x, y, z):
     else:
         yaw = math.atan2(-x, z)
         yaw = math.degrees(yaw)
-        if yaw < 0:
-            yaw = 360 + yaw
+        #yaw -= 90
+        #if yaw < 0:
+        #    yaw = 360 + yaw
     return yaw, -pitch
 
 

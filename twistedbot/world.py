@@ -2,7 +2,6 @@
 
 from collections import defaultdict
 
-import behaviours
 import logbot
 import tools
 import config
@@ -11,7 +10,10 @@ from grid import Grid
 from navigationgrid import NavigationGrid
 from statistics import Statistics
 from chat import Chat
-from botentity import Bot
+from botentity import BotEntity
+
+
+log = logbot.getlogger("WORLD")
 
 
 class World(object):
@@ -21,8 +23,7 @@ class World(object):
         self.server_port = port
         self.commander = Commander(commander_name)
         self.status_diff = StatusDiff(self)
-        self.bot = Bot(self, bot_name)
-        self.behaviour_manager = behaviours.BehaviourManager(self)
+        self.bot = BotEntity(self, bot_name)
         self.chat = Chat(self)
         self.stats = Statistics()
         self.game_state = GameState()
@@ -52,18 +53,23 @@ class World(object):
         if self.game_ticks % n == 0:
             self.status_diff.log()
 
-    def connection_lost(self):
+    def on_connection_lost(self):
         self.connected = False
         self.logged_in = False
         self.protocol = None
-        self.bot.connection_lost()
+        self.bot.on_connection_lost()
 
     def connection_made(self):
         self.connected = True
 
+    def on_shutdown(self):
+        pass
+
     def send_packet(self, name, payload):
         if self.protocol is not None:
             self.protocol.send_packet(name, payload)
+        else:
+            log.msg("Trying to send %s while disconnected" % name)
 
     def dimension_change(self, dimension):
         dim = dimension + 1  # to index from 0
@@ -90,10 +96,6 @@ class World(object):
 
     def respawn_data(self, **kwargs):
         self.login_data(**kwargs)
-
-    def shutdown(self):
-        """ actions to perform before shutdown """
-        pass
 
 
 class GameState(object):

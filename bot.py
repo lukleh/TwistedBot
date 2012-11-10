@@ -51,7 +51,7 @@ def start():
         stdio.StandardIO(ConsoleChat(world))
     except ImportError:
         pass
-    reactor.addSystemEventTrigger("before", "shutdown", world.shutdown)
+    reactor.addSystemEventTrigger("before", "shutdown", world.on_shutdown)
     reactor.connectTCP(host, port, MineCraftFactory(world))
     reactor.run()
 

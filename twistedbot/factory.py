@@ -90,7 +90,7 @@ class MineCraftProtocol(Protocol):
 
     def connectionLost(self, reason):
         self.packets = deque()
-        self.world.connection_lost()
+        self.world.on_connection_lost()
 
     def sendData(self, bytestream):
         if self.encryption_on:
@@ -175,11 +175,9 @@ class MineCraftProtocol(Protocol):
         log.msg("received LOCATION X:%f Y:%f Z:%f STANCE:%f GROUNDED:%s" %
                 (c.position.x, c.position.stance, c.position.z,
                  c.position.y, c.grounded.grounded))
-        s = c.position.y
-        c.position.y = c.position.stance
-        c.position.stance = s
+        c.position.stance, c.position.y = c.position.y, c.position.stance
         self.send_packet("player position&look", c)
-        self.world.bot.set_location({"x": c.position.x,
+        self.world.bot.on_new_location({"x": c.position.x,
                                      "y": c.position.y,
                                      "z": c.position.z,
                                      "stance": c.position.stance,

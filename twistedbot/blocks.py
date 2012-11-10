@@ -121,7 +121,7 @@ class Block(object):
     def is_solid_block(self, blk, v):
         return blk.material.is_solid
 
-    def on_entity_collided(self, entity):
+    def on_entity_collided(self, ignore):
         pass
 
 
@@ -1269,9 +1269,9 @@ class SoulSand(Block):
     material = materials.sand
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 1.0 - 0.125, 1.0)
 
-    def on_entity_collided(self, entity):
-        entity.velocities[0] *= 0.4
-        entity.velocities[2] *= 0.4
+    def on_entity_collided(self, b_obj):
+        b_obj.velocities[0] *= 0.4
+        b_obj.velocities[2] *= 0.4
 
 
 class GlowstoneBlock(Block):

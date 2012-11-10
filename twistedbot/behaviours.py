@@ -23,8 +23,9 @@ class Status(object):
 
 
 class BehaviourManager(object):
-    def __init__(self, world):
+    def __init__(self, world, bot):
         self.world = world
+        self.bot = bot
         self.bqueue = []
         self.default_behaviour = LookAtPlayerBehaviour(self)
         self.running = False
@@ -53,7 +54,7 @@ class BehaviourManager(object):
                     break
                 if g.status == Status.running:
                     ignore = yield g.tick()
-                self.world.bot.floating_flag = g.floating_flag
+                self.bot.bot_object.floating_flag = g.floating_flag
                 if g.status == Status.running:
                     break
                 elif g.status == Status.suspended:
@@ -89,7 +90,7 @@ class BehaviourBase(object):
     def __init__(self, manager=None, parent=None, **kwargs):
         self.manager = manager
         self.world = manager.world
-        self.bot = manager.world.bot
+        self.bot = manager.bot
         self.parent = parent
         self.cancelled = False
         self.status = Status.running
@@ -135,7 +136,7 @@ class LookAtPlayerBehaviour(BehaviourBase):
         if player is None:
             return
         p = player.position
-        self.bot.set_turn_to((p[0], p[1] + config.PLAYER_EYELEVEL, p[2]), elevation=True)
+        self.bot.turn_to_point(self.bot.bot_object, (p[0], p[1] + config.PLAYER_EYELEVEL, p[2]))
 
 
 class WalkSignsBehaviour(BehaviourBase):
@@ -164,7 +165,7 @@ class WalkSignsBehaviour(BehaviourBase):
 
     def _tick(self):
         if not self.world.navgrid.sign_waypoints.has_group(self.group):
-            self.bot.chat_message("cannnot %s group named %s" % (self.walk_type, self.group))
+            self.world.bot.send_chat_message("cannnot %s group named %s" % (self.walk_type, self.group))
             self.status = Status.failure
             return
         self.signpoint = self.next_sign(self.group)
@@ -191,7 +192,7 @@ class GoToSignBehaviour(BehaviourBase):
         if self.signpoint is None:
             self.signpoint = self.world.navgrid.sign_waypoints.get_name_from_group(self.sign_name)
         if self.signpoint is None:
-            self.bot.chat_message("cannot idetify sign with name %s" % self.sign_name)
+            self.world.bot.send_chat_message("cannot idetify sign with name %s" % self.sign_name)
             self.status = Status.failure
             return
         if not self.world.grid.check_sign(self.signpoint):
@@ -209,11 +210,11 @@ class TravelToBehaviour(BehaviourBase):
 
     @property
     def name(self):
-        return 'Travel to %s from %s' % (str(self.travel_coords), self.bot.standing_on_block)
+        return 'Travel to %s from %s' % (str(self.travel_coords), self.bot.standing_on_block(self.bot.bot_object))
 
     @inlineCallbacks
     def activate(self):
-        sb = self.bot.standing_on_block
+        sb = self.bot.standing_on_block(self.bot.bot_object)
         if sb is None:
             self.ready = False
         else:
@@ -261,89 +262,88 @@ class MoveToBehaviour(BehaviourBase):
         self.name = 'Move to %s' % str(self.target_space.block)
         #log.msg(self.name + ' from %s' % self.bot.aabb)
 
-    def check_status(self):
+    def check_status(self, b_obj):
         bb_stand = self.target_space.bb_stand
-        elev = bb_stand.min_y - self.bot.aabb.min_y
-        gs = GridSpace(self.world.grid, bb=self.bot.aabb)
+        elev = bb_stand.min_y - b_obj.aabb.min_y
+        gs = GridSpace(self.world.grid, bb=b_obj.aabb)
         if not self.target_space._can_stand_on():
             self.world.grid.navgrid.delete_node(self.target_space.coords)
             log.msg('CANNOT STAND ON %s' % self.target_space)
             return Status.failure
         if not gs.can_go_between(self.target_space, debug=True):
-            log.msg('CANNOT GO BETWEEN %s AND %s' % (self.bot.aabb, self.target_space))
+            log.msg('CANNOT GO BETWEEN %s AND %s' % (b_obj.aabb, self.target_space))
             return Status.failure
-        if self.bot.is_on_ladder or self.world.grid.aabb_in_water(self.bot.aabb):
-            if self.bot.position_grid == self.target_space.coords:
+        if self.bot.is_on_ladder(b_obj) or self.bot.is_in_water(b_obj):
+            if b_obj.position_grid == self.target_space.coords:
                 return Status.success
-        if self.bot.aabb.horizontal_distance(bb_stand) < self.bot.current_motion:
+        if b_obj.aabb.horizontal_distance(bb_stand) < self.bot.current_motion(b_obj):
             self.was_at_target = True
             if fops.eq(elev, 0):
                 return Status.success
-        if self.bot.horizontally_blocked and self.bot.on_ground:
+        if b_obj.horizontally_blocked and b_obj.on_ground:
             if not gs.can_go(self.target_space):
                 log.msg("I am stuck, let's try again? vels %s" %
-                        str(self.bot.velocities))
+                        str(b_obj.velocities))
                 return Status.failure
         return Status.running
 
     def _tick(self):
-        self.status = self.check_status()
+        b_obj = self.bot.bot_object
+        self.status = self.check_status(b_obj)
         if self.status != Status.running:
             return
-        col_distance, col_bb = self.world.grid.min_collision_between(self.bot.aabb,
+        col_distance, col_bb = self.world.grid.min_collision_between(b_obj.aabb,
                                                                      self.target_space.bb_stand,
                                                                      horizontal=True,
                                                                      max_height=True)
-        if self.bot.is_on_ladder or self.world.grid.aabb_in_water(self.bot.aabb):
-            elev = self.target_space.bb_stand.min_y - self.bot.aabb.min_y
+        if self.bot.is_on_ladder(b_obj) or self.bot.is_in_water(b_obj):
+            elev = self.target_space.bb_stand.min_y - b_obj.aabb.min_y
             if fops.gt(elev, 0):
-                self.jump()
-                self.move()
+                self.jump(b_obj)
+                self.move(b_obj)
             elif fops.lt(elev, 0):
                 if col_distance is None:
-                    self.move()
+                    self.move(b_obj)
             else:
-                self.move()
-        elif self.bot.is_standing:
+                self.move(b_obj)
+        elif self.bot.is_standing(b_obj):
             if col_distance is None:
-                self.move()
+                self.move(b_obj)
             else:
-                elev = self.target_space.bb_stand.min_y - self.bot.aabb.min_y
+                elev = self.target_space.bb_stand.min_y - b_obj.aabb.min_y
                 if fops.lte(elev, 0):
-                    self.move()
+                    self.move(b_obj)
                 elif fops.gt(elev, 0) and fops.lte(elev, config.MAX_STEP_HEIGHT):
-                    if fops.lte(col_distance, self.bot.current_motion):
-                        self.jumpstep()
-                        self.move()
+                    if fops.lte(col_distance, self.bot.current_motion(b_obj)):
+                        self.jumpstep(b_obj)
+                        self.move(b_obj)
                     else:
-                        self.move()
+                        self.move(b_obj)
                 elif fops.gt(elev, config.MAX_STEP_HEIGHT) and fops.lt(elev, config.MAX_JUMP_HEIGHT):
-                    first_elev = col_bb.max_y - self.bot.aabb.min_y
+                    first_elev = col_bb.max_y - b_obj.aabb.min_y
                     if fops.lt(first_elev, elev):
-                        if fops.lte(col_distance, self.bot.current_motion):
-                            self.jumpstep()
-                        self.move()
+                        if fops.lte(col_distance, self.bot.current_motion(b_obj)):
+                            self.jumpstep(b_obj)
+                        self.move(b_obj)
                     else:
-                        ticks_to_col = col_distance / self.bot.current_motion
+                        ticks_to_col = col_distance / self.bot.current_motion(b_obj)
                         ticks_to_jump = math.sqrt(2 * elev / config.G) * 20
                         if ticks_to_col < ticks_to_jump:
-                            self.jump()
-                        self.move()
+                            self.jump(b_obj)
+                        self.move(b_obj)
                 else:
                     raise Exception("move elevation error %s with collision %s" % (elev, col_distance))
         else:
-            self.move()
+            self.move(b_obj)
 
-    def move(self, towards=None):
-        if towards is None:
-            towards = self.target_space.bb_stand
-        direction = self.bot.aabb.horizontal_direction_to(towards)
+    def move(self, b_obj):
+        direction = b_obj.aabb.horizontal_direction_to(self.target_space.bb_stand)
         if not self.was_at_target:
-            self.bot.set_turn_to(self.target_space.bb_stand.bottom_center)
-        self.bot.set_direction(direction)
+            self.bot.turn_to_direction(b_obj, direction[0], direction[1])
+        b_obj.direction = direction
 
-    def jump(self, height=0):
-        self.bot.is_jumping = True
+    def jump(self, b_obj):
+        b_obj.is_jumping = True
 
-    def jumpstep(self, h=config.MAX_STEP_HEIGHT):
-        self.bot.set_jumpstep(h)
+    def jumpstep(self, b_obj, h=config.MAX_STEP_HEIGHT):
+        self.bot.set_jumpstep(b_obj, h)

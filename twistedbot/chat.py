@@ -53,39 +53,39 @@ class Chat(object):
     def parse_command(self, verb, subject, original):
         if verb == "rotate" or verb == "circulate":
             if subject:
-                self.world.behaviour_manager.command(
+                self.world.bot.behaviour_manager.command(
                     behaviours.WalkSignsBehaviour, group=subject, type=verb)
             else:
-                self.world.chat_message("which sign group to %s?" % verb)
+                self.world.bot.send_chat_message("which sign group to %s?" % verb)
         elif verb == "go":
             if subject:
-                self.world.behaviour_manager.command(
+                self.world.bot.behaviour_manager.command(
                     behaviours.GoToSignBehaviour, sign_name=subject)
             else:
-                self.world.chat_message("go where?")
+                self.world.bot.send_chat_message("go where?")
         elif verb == "look":
             if subject == "at me":
-                self.world.behaviour_manager.command(behaviours.LookAtPlayerBehaviour)
+                self.world.bot.behaviour_manager.command(behaviours.LookAtPlayerBehaviour)
             else:
-                self.world.chat_message("look at what?")
+                self.world.bot.send_chat_message("look at what?")
         elif verb == "cancel":
-            self.world.behaviour_manager.cancel_running()
+            self.world.bot.behaviour_manager.cancel_running()
         elif verb == "show":
             if subject:
                 sign = self.world.navgrid.sign_waypoints.get_namepoint(subject)
                 if sign is not None:
-                    self.world.chat_message(str(sign))
+                    self.world.bot.send_chat_message(str(sign))
                     return
                 sign = self.world.navgrid.sign_waypoints.get_name_from_group(subject)
                 if sign is not None:
-                    self.world.chat_message(str(sign))
+                    self.world.bot.send_chat_message(str(sign))
                     return
                 if not self.world.navgrid.sign_waypoints.has_group(subject):
-                    self.world.chat_message("no group named %s" % subject)
+                    self.world.bot.send_chat_message("no group named %s" % subject)
                     return
                 for sign in self.world.navgrid.sign_waypoints.ordered_sign_groups[subject].iter():
-                    self.world.chat_message(str(sign))
+                    self.world.bot.send_chat_message(str(sign))
             else:
-                self.world.chat_message("show what?")
+                self.world.bot.send_chat_message("show what?")
         else:
             log.msg("Unknown command: %s" % original)
