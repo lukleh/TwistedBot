@@ -270,7 +270,7 @@ class MoveToBehaviour(BehaviourBase):
             self.world.grid.navgrid.delete_node(self.target_space.coords)
             log.msg('CANNOT STAND ON %s' % self.target_space)
             return Status.failure
-        if not gs.can_go_between(self.target_space, debug=True):
+        if b_obj.horizontally_blocked and not gs.can_go_between(self.target_space, debug=True):
             log.msg('CANNOT GO BETWEEN %s AND %s' % (b_obj.aabb, self.target_space))
             return Status.failure
         if self.bot.is_on_ladder(b_obj) or self.bot.is_in_water(b_obj):
@@ -314,23 +314,13 @@ class MoveToBehaviour(BehaviourBase):
                 if fops.lte(elev, 0):
                     self.move(b_obj)
                 elif fops.gt(elev, 0) and fops.lte(elev, config.MAX_STEP_HEIGHT):
-                    if fops.lte(col_distance, self.bot.current_motion(b_obj)):
-                        self.jumpstep(b_obj)
-                        self.move(b_obj)
-                    else:
-                        self.move(b_obj)
+                    self.move(b_obj)
                 elif fops.gt(elev, config.MAX_STEP_HEIGHT) and fops.lt(elev, config.MAX_JUMP_HEIGHT):
-                    first_elev = col_bb.max_y - b_obj.aabb.min_y
-                    if fops.lt(first_elev, elev):
-                        if fops.lte(col_distance, self.bot.current_motion(b_obj)):
-                            self.jumpstep(b_obj)
-                        self.move(b_obj)
-                    else:
-                        ticks_to_col = col_distance / self.bot.current_motion(b_obj)
-                        ticks_to_jump = math.sqrt(2 * elev / config.G) * 20
-                        if ticks_to_col < ticks_to_jump:
-                            self.jump(b_obj)
-                        self.move(b_obj)
+                    ticks_to_col = col_distance / self.bot.current_motion(b_obj)
+                    ticks_to_jump = math.sqrt(2 * elev / config.G) * 20
+                    if ticks_to_col < ticks_to_jump:
+                        self.jump(b_obj)
+                    self.move(b_obj)
                 else:
                     raise Exception("move elevation error %s with collision %s" % (elev, col_distance))
         else:
@@ -345,5 +335,3 @@ class MoveToBehaviour(BehaviourBase):
     def jump(self, b_obj):
         b_obj.is_jumping = True
 
-    def jumpstep(self, b_obj, h=config.MAX_STEP_HEIGHT):
-        self.bot.set_jumpstep(b_obj, h)

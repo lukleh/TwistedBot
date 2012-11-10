@@ -164,14 +164,6 @@ class BotEntity(object):
         self.send_packet(
             "entity action", {"eid": self.eid, "action": self.action})
 
-    def set_jumpstep(self, b_obj, v=config.MAX_STEP_HEIGHT):
-        b_obj.velocities[1] = 0
-        aabbs = self.world.grid.aabbs_in(b_obj.aabb.extend_to(0, v, 0))
-        for bb in aabbs:
-            v = b_obj.aabb.calculate_axis_offset(bb, v, 1)
-        ab = b_obj.aabb.offset(dy=v)
-        b_obj.y = ab.posy
-
     def turn_to_point(self, b_obj, point):
         if point[0] == b_obj.x and point[2] == b_obj.z:
             return
@@ -233,45 +225,62 @@ class BotEntity(object):
                 return True
         return False
 
-    def move_collisions(self, b_obj):
+    def move_collisions(self, b_obj, vx, vy, vz):
         zero_vels = False
         if self.is_in_web(b_obj):
-            b_obj.velocities[0] *= 0.25
-            b_obj.velocities[1] *= 0.05000000074505806
-            b_obj.velocities[2] *= 0.25
-            zero_vels = True
-        aabbs = self.world.grid.aabbs_in(b_obj.aabb.extend_to(
-            b_obj.velocities[0], b_obj.velocities[1], b_obj.velocities[2]))
+            vx *= 0.25
+            vy *= 0.05000000074505806
+            vz *= 0.25
+            b_obj.velocities[0] = 0
+            b_obj.velocities[1] = 0
+            b_obj.velocities[2] = 0
+        aabbs = self.world.grid.aabbs_in(b_obj.aabb.extend_to(vx, vy, vz))
         b_bb = b_obj.aabb
-        dy = b_obj.velocities[1]
+        dy = vy
         for bb in aabbs:
             dy = b_bb.calculate_axis_offset(bb, dy, 1)
         b_bb = b_bb.offset(dy=dy)
-        dx = b_obj.velocities[0]
+        dx = vx
         for bb in aabbs:
             dx = b_bb.calculate_axis_offset(bb, dx, 0)
         b_bb = b_bb.offset(dx=dx)
-        dz = b_obj.velocities[2]
+        dz = vz
         for bb in aabbs:
             dz = b_bb.calculate_axis_offset(bb, dz, 2)
         b_bb = b_bb.offset(dz=dz)
-        b_obj.on_ground = b_obj.velocities[1] != dy and b_obj.velocities[1] < 0
-        b_obj.is_collided_horizontally = dx != b_obj.velocities[
-            0] or dz != b_obj.velocities[2]
-        b_obj.horizontally_blocked = dx != b_obj.velocities[0] and dz != b_obj.velocities[2]
-        if b_obj.velocities[0] != dx:
+        if vy != dy and vy < 0 and (dx != vx or dz != vz):
+            st = config.MAX_STEP_HEIGHT
+            aabbs = self.world.grid.aabbs_in(b_obj.aabb.extend_to(vx, st, vz))
+            b_bbs = b_obj.aabb
+            dys = st
+            for bb in aabbs:
+                dys = b_bbs.calculate_axis_offset(bb, dys, 1)
+            b_bbs = b_bbs.offset(dy=dys)
+            dxs = vx
+            for bb in aabbs:
+                dxs = b_bbs.calculate_axis_offset(bb, dxs, 0)
+            b_bbs = b_bbs.offset(dx=dxs)
+            dzs = vz
+            for bb in aabbs:
+                dzs = b_bbs.calculate_axis_offset(bb, dzs, 2)
+            b_bbs = b_bbs.offset(dz=dzs)
+            if fops.gt(dxs * dxs + dzs * dzs, dx * dx + dz * dz):
+                dx = dxs
+                dy = dys
+                dz = dzs
+                b_bb = b_bbs
+        b_obj.on_ground = vy != dy and vy < 0
+        b_obj.is_collided_horizontally = dx != vx or dz != vz
+        b_obj.horizontally_blocked = not fops.eq(dx, vx) and not fops.eq(dz, vz)
+        if not fops.eq(vx, dx):
             b_obj.velocities[0] = 0
-        if b_obj.velocities[1] != dy:
+        if not fops.eq(vy, dy):
             b_obj.velocities[1] = 0
-        if b_obj.velocities[2] != dz:
+        if not fops.eq(vz, dz):
             b_obj.velocities[2] = 0
         b_obj.x = b_bb.posx
         b_obj.y = b_bb.min_y
         b_obj.z = b_bb.posz
-        if zero_vels:
-            b_obj.velocities[0] = 0
-            b_obj.velocities[1] = 0
-            b_obj.velocities[2] = 0
         self.do_block_collision(b_obj)
 
     def move(self, b_obj):
@@ -300,7 +309,7 @@ class BotEntity(object):
                         b_obj.velocities[1] += config.SPEED_LIQUID_JUMP
             orig_y = b_obj.y
             self.update_directional_speed(b_obj, 0.02, balance=True)
-            self.move_collisions(b_obj)
+            self.move_collisions(b_obj, b_obj.velocities[0], b_obj.velocities[1], b_obj.velocities[2])
             b_obj.velocities[0] *= 0.800000011920929
             b_obj.velocities[1] *= 0.800000011920929
             b_obj.velocities[2] *= 0.800000011920929
@@ -314,7 +323,7 @@ class BotEntity(object):
         elif is_in_lava:
             orig_y = self.y
             self.update_directional_speed(b_obj, 0.02)
-            self.move_collisions(b_obj)
+            self.move_collisions(b_obj, b_obj.velocities[0], b_obj.velocities[1], b_obj.velocities[2])
             b_obj.velocities[0] *= 0.5
             b_obj.velocities[1] *= 0.5
             b_obj.velocities[2] *= 0.5
@@ -329,7 +338,7 @@ class BotEntity(object):
             slowdown = self.current_slowdown(b_obj)
             self.update_directional_speed(b_obj, self.current_speed_factor(b_obj))
             self.clip_ladder_velocities(b_obj)
-            self.move_collisions(b_obj)
+            self.move_collisions(b_obj, b_obj.velocities[0], b_obj.velocities[1], b_obj.velocities[2])
             if b_obj.is_collided_horizontally and self.is_on_ladder(b_obj):
                 b_obj.velocities[1] = 0.2
             b_obj.velocities[1] -= config.BLOCK_FALL
