@@ -1,4 +1,4 @@
-﻿
+
 # original version from https://github.com/MostAwesomeDude/bravo
 
 from StringIO import StringIO
@@ -35,9 +35,9 @@ def ucs2(name):
     if name.lower() not in ("ucs2", "ucs-2"):
         return None
 
-    def ucs2_encode(input, errors="replace"):
-        input = u"".join(i if ord(i) < 65536 else u"?" for i in input)
-        return utf_16_be_encode(input, errors)
+    def ucs2_encode(data, errors="replace"):
+        data = u"".join(i if ord(i) < 65536 else u"?" for i in data)
+        return utf_16_be_encode(data, errors)
 
     ucs2_decode = utf_16_be_decode
 
@@ -94,8 +94,8 @@ def Bool(*args, **kwargs):
 grounded = Struct("grounded", UBInt8("grounded"))
 position = Struct("position",
                   BFloat64("x"),
-                  BFloat64("y"),
                   BFloat64("stance"),
+                  BFloat64("y"),
                   BFloat64("z")
                   )
 orientation = Struct("orientation", BFloat32("yaw"), BFloat32("pitch"))
@@ -133,7 +133,7 @@ slotdata = Struct("slotdata",
 
 
 Metadata = namedtuple("Metadata", "type value")
-metadata_types = ["byte", "short", "int", "float", "string16", "short_tup",
+metadata_types = ["byte", "short", "int", "float", "string16", "slotdata",
                   "int_tup"]
 
 # Metadata adaptor.
@@ -144,7 +144,7 @@ class MetadataAdapter(Adapter):
     def _decode(self, obj, context):
         d = {}
         for m in obj.data:
-            d[m.id.second] = Metadata(metadata_types[m.id.first], m.value)
+            d[m.id.identifier] = Metadata(metadata_types[m.id.data_type], m.value)
         return d
 
     def _encode(self, obj, context):
@@ -152,7 +152,7 @@ class MetadataAdapter(Adapter):
         for k, v in obj.iteritems():
             t, value = v
             d = Container(
-                id=Container(first=metadata_types.index(t), second=k),
+                id=Container(data_type=metadata_types.index(t), identifier=k),
                 value=value,
                 peeked=None)
             c.data.append(d)
@@ -166,16 +166,7 @@ metadata_switch = {
     2: SBInt32("value"),
     3: BFloat32("value"),
     4: AlphaString("value"),
-    5: Struct("short_tup",
-              SBInt16("primary"),
-              If(lambda context: context["primary"] != -1,
-                 Embed(Struct("short_tup_rest",
-                              SBInt8("count"),
-                              SBInt16("secondary"),
-                              ),
-                       ),
-                 ),
-              ),
+    5: slotdata,
     6: Struct("int_tup",
               SBInt32("x"),
               SBInt32("y"),
@@ -189,13 +180,12 @@ entity_metadata = MetadataAdapter(
            RepeatUntil(lambda obj, context: obj["peeked"] == 0x7f,
                        Struct("data",
                               BitStruct("id",
-                                        BitField("first", 3),
-                                        BitField("second", 5),
+                                        BitField("data_type", 3),  # first
+                                        BitField("identifier", 5),  # second
                                         ),
-                              Switch(
-                                  "value", lambda context: context[
-                                      "id"]["first"],
-                              metadata_switch),
+                              Switch("value",
+                                     lambda context: context["id"]["data_type"],
+                                     metadata_switch),
                               Peek(SBInt8("peeked")),
                               ),
                        ),
@@ -597,9 +587,9 @@ packets = {
                 AlphaString("line4"),
                 ),
     131: Struct("item data",
-                UBInt16("primary"),
-                UBInt16("secondary"),
-                PascalString("data", length_field=UBInt8("length")),
+                SBInt16("primary"),
+                SBInt16("secondary"),
+                PascalString("data", length_field=UBInt16("length")),
                 ),
     132: Struct("update tile entity",
                 SBInt32("x"),

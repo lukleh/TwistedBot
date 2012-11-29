@@ -11,18 +11,18 @@ import fops
 import blocks
 import behaviours
 from axisbox import AABB
-
+from vector import Vector
 
 log = logbot.getlogger("BOT_ENTITY")
 
 
 class BotObject(object):
     def __init__(self):
-        self.velocities = [0.0, 0.0, 0.0]
+        self.velocities = Vector(0.0, 0.0, 0.0)
         self.direction = [0, 0]
-        self.x = 0
-        self.y = 0
-        self.z = 0
+        self._x = 0
+        self._y = 0
+        self._z = 0
         self.stance_diff = config.PLAYER_EYELEVEL
         self.pitch = None
         self.yaw = None
@@ -34,9 +34,27 @@ class BotObject(object):
         self.floating_flag = True
 
     def set_xyz(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
+        self._x = x
+        self._y = y
+        self._z = z
+        self._aabb = AABB.from_player_coords(self.x, self.y, self.z)
+
+    @property
+    def x(self):
+        return self._x
+
+    @property
+    def y(self):
+        return self._y
+
+    @y.setter
+    def y(self, v):
+        self._y = v
+        self._aabb = AABB.from_player_coords(self.position)
+
+    @property
+    def z(self):
+        return self._z
 
     @property
     def position(self):
@@ -72,13 +90,11 @@ class BotObject(object):
 
     @property
     def aabb(self):
-        return AABB.from_player_coords(self.position)
+        return self._aabb
 
     @aabb.setter
     def aabb(self, v):
         raise Exception('setting bot aabb')
-
-    
 
 
 class BotEntity(object):
@@ -144,10 +160,6 @@ class BotEntity(object):
         self.last_tick_time = tick_start
         return t
 
-    def send_chat_message(self, msg):
-        log.msg(msg)
-        self.world.send_packet("chat message", {"message": msg})
-
     def send_location(self, b_obj):
         self.world.send_packet("player position&look", {
             "position": packets.Container(x=b_obj.x, y=b_obj.y, z=b_obj.z,
@@ -198,35 +210,31 @@ class BotEntity(object):
 
     def handle_water_movement(self, b_obj):
         is_in_water = False
-        water_current = (0, 0, 0)
-        bb = b_obj.aabb.expand(-0.001, -0.4010000059604645, -0.001)
+        water_current = Vector(0, 0, 0)
+        bb = b_obj.aabb.expand(-0.001, -0.401, -0.001)
         top_y = tools.grid_shift(bb.max_y + 1)
         for blk in self.world.grid.blocks_in_aabb(bb):
             if isinstance(blk, blocks.BlockWater):
                 if top_y >= (blk.y + 1 - blk.height_percent):
                     is_in_water = True
                     water_current = blk.add_velocity_to(water_current)
-        if tools.vector_size(water_current) > 0:
-            water_current = tools.normalize(water_current)
+        if water_current.size > 0:
+            water_current.normalize()
             wconst = 0.014
-            water_current = (water_current[0] * wconst, water_current[
-                             1] * wconst, water_current[2] * wconst)
-            b_obj.velocities = [b_obj.velocities[0] + water_current[0],
-                                b_obj.velocities[1] + water_current[1],
-                                b_obj.velocities[2] + water_current[2]]
+            water_current = water_current * wconst
+            b_obj.velocities = b_obj.velocities + water_current
         return is_in_water
 
     def handle_lava_movement(self, b_obj):
         for blk in self.world.grid.blocks_in_aabb(
-                b_obj.aabb.expand(-0.10000000149011612,
-                            -0.4000000059604645,
-                            -0.10000000149011612)):
+                b_obj.aabb.expand(-0.1,
+                                  -0.4,
+                                  -0.1)):
             if isinstance(blk, blocks.BlockLava):
                 return True
         return False
 
     def move_collisions(self, b_obj, vx, vy, vz):
-        zero_vels = False
         if self.is_in_web(b_obj):
             vx *= 0.25
             vy *= 0.05000000074505806
@@ -234,7 +242,7 @@ class BotEntity(object):
             b_obj.velocities[0] = 0
             b_obj.velocities[1] = 0
             b_obj.velocities[2] = 0
-        aabbs = self.world.grid.aabbs_in(b_obj.aabb.extend_to(vx, vy, vz))
+        aabbs = self.world.grid.collision_aabbs_in(b_obj.aabb.extend_to(vx, vy, vz))
         b_bb = b_obj.aabb
         dy = vy
         for bb in aabbs:
@@ -250,7 +258,7 @@ class BotEntity(object):
         b_bb = b_bb.offset(dz=dz)
         if vy != dy and vy < 0 and (dx != vx or dz != vz):
             st = config.MAX_STEP_HEIGHT
-            aabbs = self.world.grid.aabbs_in(b_obj.aabb.extend_to(vx, st, vz))
+            aabbs = self.world.grid.collision_aabbs_in(b_obj.aabb.extend_to(vx, st, vz))
             b_bbs = b_obj.aabb
             dys = st
             for bb in aabbs:
@@ -278,9 +286,7 @@ class BotEntity(object):
             b_obj.velocities[1] = 0
         if not fops.eq(vz, dz):
             b_obj.velocities[2] = 0
-        b_obj.x = b_bb.posx
-        b_obj.y = b_bb.min_y
-        b_obj.z = b_bb.posz
+        b_obj.set_xyz(b_bb.posx, b_bb.min_y, b_bb.posz)
         self.do_block_collision(b_obj)
 
     def move(self, b_obj):
@@ -310,16 +316,16 @@ class BotEntity(object):
             orig_y = b_obj.y
             self.update_directional_speed(b_obj, 0.02, balance=True)
             self.move_collisions(b_obj, b_obj.velocities[0], b_obj.velocities[1], b_obj.velocities[2])
-            b_obj.velocities[0] *= 0.800000011920929
-            b_obj.velocities[1] *= 0.800000011920929
-            b_obj.velocities[2] *= 0.800000011920929
+            b_obj.velocities[0] *= 0.8
+            b_obj.velocities[1] *= 0.8
+            b_obj.velocities[2] *= 0.8
             b_obj.velocities[1] -= 0.02
             if b_obj.is_collided_horizontally and \
                     self.is_offset_in_liquid(b_obj, b_obj.velocities[0],
                                              b_obj.velocities[1] + 0.6 -
                                              b_obj.y + orig_y,
                                              b_obj.velocities[2]):
-                b_obj.velocities[1] = 0.30000001192092896
+                b_obj.velocities[1] = 0.3
         elif is_in_lava:
             orig_y = self.y
             self.update_directional_speed(b_obj, 0.02)
@@ -333,7 +339,7 @@ class BotEntity(object):
                                              self.velocities[1] + 0.6 -
                                              self.y + orig_y,
                                              self.velocities[2]):
-                self.velocities[1] = 0.30000001192092896
+                self.velocities[1] = 0.3
         else:
             slowdown = self.current_slowdown(b_obj)
             self.update_directional_speed(b_obj, self.current_speed_factor(b_obj))
@@ -399,7 +405,6 @@ class BotEntity(object):
 
     def is_in_water(self, b_obj):
         is_in_water = False
-        water_current = (0, 0, 0)
         bb = b_obj.aabb.expand(-0.001, -0.4010000059604645, -0.001)
         top_y = tools.grid_shift(bb.max_y + 1)
         for blk in self.world.grid.blocks_in_aabb(bb):
@@ -442,9 +447,8 @@ class BotEntity(object):
     def do_respawn(self):
         self.world.send_packet("client statuses", {"status": 1})
 
-    def health_update(self, health, food, food_saturation):
-        log.msg("current health %s food %s saturation %s" % (
-            health, food, food_saturation))
+    def on_health_update(self, health, food, food_saturation):
+        log.msg("current health %s food %s saturation %s" % (health, food, food_saturation))
         if health <= 0:
             self.on_death()
 
@@ -457,13 +461,7 @@ class BotEntity(object):
         return self.world.grid.standing_on_block(b_obj.aabb)
 
     def is_standing(self, b_obj):
-        col_d, _ = self.world.grid.min_collision_between(
-            b_obj.aabb, b_obj.aabb - (0, 1, 0))
-        if col_d is None:
-            stand = False
-        else:
-            stand = fops.eq(col_d, 0)
-        return stand
+        return self.standing_on_block(b_obj) is not None
 
     def on_standing_ready(self, b_obj):
         if self.check_location_received:
@@ -471,9 +469,9 @@ class BotEntity(object):
             if block is None:
                 return
             log.msg("Standing on block %s" % block)
-            if not self.world.navgrid.graph.has_node(block.coords):
+            if not self.world.navgrid.node_is_solid(block.coords):
                 self.world.navgrid.block_change(None, block)
             self.check_location_received = False
 
-    def update_experience(self, experience_bar=None, level=None, total_experience=None):
+    def on_update_experience(self, experience_bar=None, level=None, total_experience=None):
         pass

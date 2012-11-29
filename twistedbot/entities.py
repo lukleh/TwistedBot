@@ -1,7 +1,6 @@
 
 
 import logbot
-from gridspace import GridSpace
 from axisbox import AABB
 
 
@@ -67,10 +66,6 @@ class EntityPlayer(EntityLiving):
         self.username = kwargs["username"]
         self.held_item = kwargs["held_item"]
 
-    @property
-    def aabb(self):
-        return AABB.from_player_coords(self.position)
-
 
 class EntityVehicle(Entity):
     def __init__(self, **kwargs):
@@ -114,49 +109,13 @@ class Entities(object):
         if self.world.commander.eid != entity.eid:
             return
         gpos = entity.grid_position
-        block = self.world.grid.standing_on_block(
-            AABB.from_player_coords(entity.position))
+        block = self.world.grid.standing_on_block(AABB.from_player_coords(entity.x, entity.y, entity.z))
         if block is None:
             return
         if self.world.commander.last_block is not None and self.world.commander.last_block == block:
             return
         self.world.commander.last_block = block
-        lpos = self.world.commander.last_possition
-        in_nodes = self.world.navgrid.graph.has_node(block.coords)
-        gs = GridSpace(self.world.grid, block=block)
-        msg = "P in nm %s nm nodes %d\n" % \
-            (in_nodes, self.world.navgrid.graph.node_count)
-        msg += "gs_stand %s\n" % str(gs.bb_stand)
-        msg += str(block) + '\n'
-        msg += str(block.grid_bounding_box)
-        try:
-            msg += "\nsucessors %s" % str(self.world.navgrid.graph.get_succ(block.coords))
-        except:
-            pass
-        if lpos is not None:
-            gsl = GridSpace(self.world.grid, coords=lpos)
-            if gsl.can_stand_on:
-                pass
-            else:
-                gsl = GridSpace(
-                    self.world.grid, coords=(lpos[0], lpos[1] - 1, lpos[2]))
-                if gsl.can_stand_on:
-                    lpos = gsl.coords
-            if not(gsl.bb_stand is None or gs.bb_stand is None):
-                msg += "\ncost from %s to %s %s\n" % \
-                    (lpos, block.coords,
-                     self.world.navgrid.graph.get_edge(lpos, block.coords))
-                msg += "last stand %s now stand %s from %s to %s\n" % \
-                    (gsl.can_stand_on, gs.can_stand_on,
-                     gsl.bb_stand, gs.bb_stand)
-                if gsl.can_go_between(gs, debug=True):
-                    msg += "can go True with cost %s\n" % gsl.edge_cost
-                else:
-                    msg += "can go False\n"
-                msg += "can stand between %s intersection %s" % (
-                    gsl.can_stand_between(gs, debug=True), gsl.intersection)
-
-        log.msg(msg)
+        #TODO put some nice debug code here
         self.world.commander.last_possition = gpos
 
     def entityupdate(fn):
@@ -179,24 +138,24 @@ class Entities(object):
     def new_bot(self, eid):
         self.entities[eid] = EntityBot(eid=eid, x=0, y=0, z=0)
 
-    def new_mob(self, **kwargs):
+    def on_new_mob(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityMob(**kwargs)
 
-    def new_player(self, **kwargs):
+    def on_new_player(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityPlayer(**kwargs)
         if self.world.commander.name == kwargs["username"]:
             self.world.commander.eid = kwargs["eid"]
 
-    def new_dropped_item(self, **kwargs):
+    def on_new_dropped_item(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityDroppedItem(**kwargs)
 
-    def new_vehicle(self, **kwargs):
+    def on_new_vehicle(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityVehicle(**kwargs)
 
-    def new_experience_orb(self, **kwargs):
+    def on_new_experience_orb(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityExperienceOrb(**kwargs)
 
-    def destroy(self, eids):
+    def on_destroy(self, eids):
         for eid in eids:
             entity = self.get_entity(eid)
             if entity:
@@ -205,22 +164,22 @@ class Entities(object):
                     self.world.commander.eid = None
 
     @entityupdate
-    def move(self, entity, dx, dy, dz):
+    def on_move(self, entity, dx, dy, dz):
         entity.x += dx
         entity.y += dy
         entity.z += dz
 
     @entityupdate
-    def look(self, entity, yaw, pitch):
+    def on_look(self, entity, yaw, pitch):
         entity.yaw = yaw
         entity.pitch = pitch
 
     @entityupdate
-    def head_look(self, entity, yaw):
+    def on_head_look(self, entity, yaw):
         entity.yaw = yaw
 
     @entityupdate
-    def move_look(self, entity, dx, dy, dz, yaw, pitch):
+    def on_move_look(self, entity, dx, dy, dz, yaw, pitch):
         entity.x += dx
         entity.y += dy
         entity.z += dz
@@ -228,7 +187,7 @@ class Entities(object):
         entity.pitch = pitch
 
     @entityupdate
-    def teleport(self, entity, x, y, z, yaw, pitch):
+    def on_teleport(self, entity, x, y, z, yaw, pitch):
         entity.x = x
         entity.y = y
         entity.z = z
@@ -236,17 +195,17 @@ class Entities(object):
         entity.pitch = pitch
 
     @entityupdate
-    def velocity(self, entity, dx, dy, dz):
+    def on_velocity(self, entity, dx, dy, dz):
         entity.velocity = (dx, dy, dz)
 
     @entityupdate
-    def status(self, entity, status):
+    def on_status(self, entity, status):
         entity.status = status
 
     @entityupdate
-    def attach(self, entity, vehicle):
+    def on_attach(self, entity, vehicle):
         pass
 
     @entityupdate
-    def metadata(self, entity, metadata):
+    def on_metadata(self, entity, metadata):
         pass

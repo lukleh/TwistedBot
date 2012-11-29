@@ -19,7 +19,7 @@ class Statistics(object):
         self.stats = defaultdict(lambda: 0)
         self.groupnames = sorted(groups.keys(), reverse=True)
 
-    def update(self, sid, count):
+    def on_update(self, sid, count):
         self.stats[sid] += count
 
     def get_groupname(self, stat_id):

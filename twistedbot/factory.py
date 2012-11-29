@@ -1,4 +1,4 @@
-﻿
+
 from collections import deque
 
 
@@ -115,6 +115,7 @@ class MineCraftProtocol(Protocol):
         self.packet_iter(self.packets)
 
     def send_packet(self, name, payload):
+        #print 'sending', name, payload
         p = make_packet(name, payload)
         if config.DEBUG:
             packet_printout(
@@ -142,48 +143,48 @@ class MineCraftProtocol(Protocol):
         self.send_packet("keep alive", {"pid": pid})
 
     def p_login(self, c):
-        log.msg("LOGIN DATA eid %s level type: %s game_mode: %s \
-                dimension: %s difficulty: %s max players: %s" %
-                (c.eid, c.level_type, c.game_mode,
-                 c.dimension, c.difficulty, c.players))
-        self.world.login_data(bot_eid=c.eid, game_mode=c.game_mode, dimension=c.dimension, difficulty=c.difficulty)
-        tools.do_now(self.send_packet, "locale view distance", {'locale': 'en_GB', 'view_distance': 2, 'chat_flags': 0, 'difficulty': 0, 'show_cape': False})
+        log.msg("LOGIN DATA eid %s level type: %s, game_mode: %s, dimension: %s, difficulty: %s, max players: %s" %
+                (c.eid, c.level_type, c.game_mode, c.dimension, c.difficulty, c.players))
+        self.world.on_login(bot_eid=c.eid, game_mode=c.game_mode, dimension=c.dimension, difficulty=c.difficulty)
+        tools.do_now(self.send_packet, "locale view distance", {'locale': 'en_GB',
+                                                                'view_distance': 2,
+                                                                'chat_flags': 0,
+                                                                'difficulty': 0,
+                                                                'show_cape': False})
 
     def p_chat(self, c):
-        self.world.chat.process(c.message)
+        self.world.chat.on_chat_message(c.message)
 
     def p_time(self, c):
-        self.world.game_state.update_time(timestamp=c.timestamp, daytime=c.daytime)
+        self.world.game_state.on_time_update(timestamp=c.timestamp, daytime=c.daytime)
 
     def p_entity_equipment(self, c):
         pass
 
     def p_spawn(self, c):
-        spawn = (c.x, c.y, c.z)
-        log.msg("SPAWN POSITION %s" % str(spawn))
-        self.world.spawn_position = spawn
-        self.world.bot.spawn_point_received = True
+        log.msg("SPAWN POSITION %s %s %s" % (c.x, c.y, c.z))
+        self.world.on_spawn_position(c.x, c.y, c.z)
 
     def p_health(self, c):
-        self.world.bot.health_update(c.hp, c.fp, c.saturation)
+        self.world.bot.on_health_update(c.hp, c.fp, c.saturation)
 
     def p_respawn(self, c):
         log.msg("RESPAWN received")
-        self.world.respawn_data(game_mode=c.game_mode, dimension=c.dimension, difficulty=c.difficulty)
+        self.world.on_respawn(game_mode=c.game_mode, dimension=c.dimension, difficulty=c.difficulty)
 
     def p_location(self, c):
+        #print 'p_location', c
         log.msg("received LOCATION X:%f Y:%f Z:%f STANCE:%f GROUNDED:%s" %
-                (c.position.x, c.position.stance, c.position.z,
-                 c.position.y, c.grounded.grounded))
-        c.position.stance, c.position.y = c.position.y, c.position.stance
+                (c.position.x, c.position.y, c.position.z,
+                 c.position.stance, c.grounded.grounded))
         self.send_packet("player position&look", c)
         self.world.bot.on_new_location({"x": c.position.x,
-                                     "y": c.position.y,
-                                     "z": c.position.z,
-                                     "stance": c.position.stance,
-                                     "grounded": c.grounded.grounded,
-                                     "yaw": c.orientation.yaw,
-                                     "pitch": c.orientation.pitch})
+                                        "y": c.position.y,
+                                        "z": c.position.z,
+                                        "stance": c.position.stance,
+                                        "grounded": c.grounded.grounded,
+                                        "yaw": c.orientation.yaw,
+                                        "pitch": c.orientation.pitch})
 
     def p_use_bed(self, c):
         """
@@ -197,14 +198,14 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_player(self, c):
-        self.world.entities.new_player(eid=c.eid, username=c.username,
-                                       held_item=c.item, yaw=c.yaw,
-                                       pitch=c.pitch, x=c.x, y=c.y, z=c.z)
+        self.world.entities.on_new_player(eid=c.eid, username=c.username,
+                                          held_item=c.item, yaw=c.yaw,
+                                          pitch=c.pitch, x=c.x, y=c.y, z=c.z)
 
     def p_dropped_item(self, c):
-        self.world.entities.new_dropped_item(eid=c.eid, slotdata=c.slotdata, x=c.x,
-                                             y=c.y, z=c.z, yaw=c.yaw,
-                                             pitch=c.pitch, roll=c.roll)
+        self.world.entities.on_new_dropped_item(eid=c.eid, slotdata=c.slotdata, x=c.x,
+                                                y=c.y, z=c.z, yaw=c.yaw,
+                                                pitch=c.pitch, roll=c.roll)
 
     def p_collect(self, c):
         """ can be safely ignored, for animation purposes only """
@@ -214,66 +215,66 @@ class MineCraftProtocol(Protocol):
         vel = {"x": c.velocity.x,
                "y": c.velocity.y,
                "z": c.velocity.z} if c.object_data > 0 else None
-        self.world.entities.new_vehicle(eid=c.eid, etype=c.type,
-                                        x=c.x, y=c.y, z=c.z,
-                                        object_data=c.object_data,
-                                        velocity=vel)
+        self.world.entities.on_new_vehicle(eid=c.eid, etype=c.type,
+                                           x=c.x, y=c.y, z=c.z,
+                                           object_data=c.object_data,
+                                           velocity=vel)
 
     def p_mob(self, c):
-        self.world.entities.new_mob(eid=c.eid, etype=c.type, x=c.x, y=c.y,
-                                    z=c.z, yaw=c.yaw, pitch=c.pitch,
-                                    head_yaw=c.head_yaw,
-                                    velocity_x=c.velocity_x,
-                                    velocity_y=c.velocity_y,
-                                    velocity_z=c.velocity_z,
-                                    metadata=c.metadata)
+        self.world.entities.on_new_mob(eid=c.eid, etype=c.type, x=c.x, y=c.y,
+                                       z=c.z, yaw=c.yaw, pitch=c.pitch,
+                                       head_yaw=c.head_yaw,
+                                       velocity_x=c.velocity_x,
+                                       velocity_y=c.velocity_y,
+                                       velocity_z=c.velocity_z,
+                                       metadata=c.metadata)
 
     def p_experience_orb(self, c):
-        self.world.entities.new_experience_orb(
+        self.world.entities.on_new_experience_orb(
             eid=c.eid, count=c.count, x=c.x, y=c.y, z=c.z)
 
     def p_entity_velocity(self, c):
-        self.world.entities.velocity(c.eid, c.dx, c.dy, c.dz)
+        self.world.entities.on_velocity(c.eid, c.dx, c.dy, c.dz)
 
     def p_entity_destroy(self, c):
-        self.world.entities.destroy(c.eids)
+        self.world.entities.on_destroy(c.eids)
 
     def p_entity_move(self, c):
-        self.world.entities.move(c.eid, c.dx, c.dy, c.dz)
+        self.world.entities.on_move(c.eid, c.dx, c.dy, c.dz)
 
     def p_entity_look(self, c):
-        self.world.entities.look(c.eid, c.yaw, c.pitch)
+        self.world.entities.on_look(c.eid, c.yaw, c.pitch)
 
     def p_entity_move_look(self, c):
-        self.world.entities.move_look(c.eid, c.dx, c.dy, c.dz, c.yaw, c.pitch)
+        self.world.entities.on_move_look(c.eid, c.dx, c.dy, c.dz, c.yaw, c.pitch)
 
     def p_entity_teleport(self, c):
-        self.world.entities.teleport(c.eid, c.x, c.y, c.z, c.yaw, c.pitch)
+        self.world.entities.on_teleport(c.eid, c.x, c.y, c.z, c.yaw, c.pitch)
 
     def p_entity_head_look(self, c):
-        self.world.entities.head_look(c.eid, c.yaw)
+        self.world.entities.on_head_look(c.eid, c.yaw)
 
     def p_entity_status(self, c):
-        self.world.entities.status(c.eid, c.status)
+        self.world.entities.on_status(c.eid, c.status)
 
     def p_entity_attach(self, c):
-        self.world.entities.attach(c.eid, c.vid)
+        self.world.entities.on_attach(c.eid, c.vid)
 
     def p_entity_metadata(self, c):
-        self.world.entities.metadata(c.eid, c.metadata)
+        self.world.entities.on_metadata(c.eid, c.metadata)
 
     def p_levelup(self, c):
-        self.world.bot.update_experience(experience_bar=c.current, level=c.level, total_experience=c.total)
+        self.world.bot.on_update_experience(experience_bar=c.current, level=c.level, total_experience=c.total)
 
     def p_chunk(self, c):
-        self.world.grid.load_chunk(c.x, c.z, c.continuous, c.primary_bitmap,
-                                   c.add_bitmap, c.data.decode('zlib'))
+        self.world.grid.on_load_chunk(c.x, c.z, c.continuous, c.primary_bitmap,
+                                      c.add_bitmap, c.data.decode('zlib'))
 
     def p_multi_block_change(self, c):
-        self.world.grid.multi_block_change(c.x, c.z, c.blocks)
+        self.world.grid.on_multi_block_change(c.x, c.z, c.blocks)
 
     def p_block_change(self, c):
-        self.world.grid.block_change(c.x, c.y, c.z, c.type, c.meta)
+        self.world.grid.on_block_change(c.x, c.y, c.z, c.type, c.meta)
 
     def p_block_action(self, c):
         """
@@ -286,10 +287,10 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_bulk_chunk(self, c):
-        self.world.grid.load_bulk_chunk(c.meta, c.data.decode('zlib'))
+        self.world.grid.on_load_bulk_chunk(c.meta, c.data.decode('zlib'))
 
     def p_explosion(self, c):
-        self.world.grid.explosion(c.x, c.y, c.z, c.records)
+        self.world.grid.on_explosion(c.x, c.y, c.z, c.records)
         log.msg("Explosion at %f %f %f radius %f blocks affected %d" %
                 (c.x, c.y, c.z, c.radius, c.count))
 
@@ -312,19 +313,23 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_sign(self, c):
-        self.world.grid.sign(c.x, c.y, c.z, c.line1, c.line2, c.line3, c.line4)
+        self.world.grid.on_new_sign(c.x, c.y, c.z, c.line1, c.line2, c.line3, c.line4)
 
     def p_update_tile(self, c):
         pass
+        #log.msg('Tile entity %s' % str(c))
 
     def p_stats(self, c):
-        self.world.stats.update(c.sid, c.count)
+        self.world.stats.on_update(c.sid, c.count)
 
     def p_players(self, c):
         if c.online:
             self.world.players[c.name] = c.ping
         else:
-            del self.world.players[c.name]
+            try:
+                del self.world.players[c.name]
+            except KeyError:
+                pass
 
     def p_abilities(self, c):
         pass

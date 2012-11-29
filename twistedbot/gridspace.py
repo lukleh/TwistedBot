@@ -1,41 +1,71 @@
 
+import time
 
-import fops
 import logbot
 import blocks
 import config
+import fops
 from axisbox import AABB
+from tools import NodeState
 
 
 log = logbot.getlogger("GRIDSPACE")
 
+state_catch = {'fast': 0, 'slow': 0}
 
-class GridSpace(object):
+def compute_state(grid, x, y, z):       
+    block_0 = grid.get_block(x, y, z)
+    if block_0.number == blocks.Cactus.number:
+        state_catch['fast'] += 1
+        return NodeState.NO
+    if isinstance(block_0, blocks.BlockLava):
+        state_catch['fast'] += 1
+        return NodeState.NO
+    block_1 = grid.get_block(x, y + 1, z)
+    if isinstance(block_1, blocks.BlockCube):
+        return NodeState.NO
+    if block_0.is_free and block_1.is_free:
+        state_catch['fast'] += 1
+        return NodeState.FREE
+    if isinstance(block_0, blocks.BlockCube):
+        if block_1.is_free:
+            block_2 = grid.get_block(x, y + 2, z)
+            if block_2.is_free:
+                state_catch['fast'] += 1
+                return NodeState.YES
+            elif isinstance(block_2, blocks.BlockCube):
+                state_catch['fast'] += 1
+                return NodeState.NO
+        elif isinstance(block_1, blocks.BlockCube):
+            state_catch['fast'] += 1
+            return NodeState.NO
+    elif not block_0.is_collidable:
+        if block_0.is_water or block_0.is_ladder_or_vine or block_0.is_free:
+            if grid.get_block(x, y - 1, z).is_fence:
+                if block_1.is_free and block_2.is_free:
+                    state_catch['fast'] += 1
+                    return NodeState.YES
+            elif block_1.is_free:
+                state_catch['fast'] += 1
+                return NodeState.YES
+    gs = GridState(grid, block=block_0)
+    t_start = time.time()
+    state = gs.get_state()
+    state_catch['slow'] += 1
+    return state
 
+
+class GridBase(object):
     def __init__(self, grid, coords=None, block=None, bb=None):
         self.grid = grid
-        self.bb_stand = None
         if block is not None:
             self.block = block
             self.coords = self.block.coords
         elif coords is not None:
             self.coords = coords
-            self.block = self.grid.get_block(coords[0], coords[1], coords[2])
-        elif bb is not None:
-            self.bb_stand = bb
-            self.block = self.grid.standing_on_block(bb)
-            if self.block is None:
-                self.block = self.grid.get_block(*bb.grid_bottom_center)
-            self.coords = self.block.coords
+            self.block = self.grid.get_block(self.coords.x, self.coords.y, self.coords.z)
         else:
-            raise Exception("Empty gridspace object")
-        self.blocks3 = (self.block,
-                        self.grid.get_block(self.coords[0], self.coords[1] + 1, self.coords[2]),
-                        self.grid.get_block(self.coords[0], self.coords[1] + 2, self.coords[2]))
-        self._can_stand_on_value = None
-        self.stand_block = None
-        self.platform = None
-        self.intersection = None
+            raise Exception("Empty grid object")
 
     def __unicode__(self):
         return unicode(self.block)
@@ -43,195 +73,247 @@ class GridSpace(object):
     def __str__(self):
         return unicode(self)
 
-    def __eq__(self, other):
-        return self.coords == other.coords
+    def in_interval(self, a, i1, i2):
+        return fops.lt(i1, a) and fops.lt(a, i2)
 
-    @property
-    def b3(self):
-        return "%s %s" % (self.block.coords, ", ".join([b.name for b in self.blocks3]))
+    def is_big_enough_bb(self, bb):
+        return fops.gte(bb.width, config.PLAYER_BODY_DIAMETER) and fops.gte(bb.height, config.PLAYER_HEIGHT)
 
-    def blocks_to_avoid(self, blks):
-        for b in blks:
-            if isinstance(b, blocks.Cobweb) or isinstance(b, blocks.Fire) or isinstance(b, blocks.BlockLava):
-                return True
+
+class Space(object):
+    def __init__(self, orig_aabb, stand=True):
+        self.orig = orig_aabb
+        self.space = None
+        self.block = None
+
+
+
+class GridState(GridBase):
+    def __init__(self, grid, coords=None, block=None, bb=None):
+        super(GridSpace, self).__init__(grid, coords, block, bb)
+        self._state = None
+
+    def get_state(self):
+        if self._state is None:
+            self._state = self.compute_state()
+            assert self._state is not None, '_state is None'
+        return self._state
+
+    def aabb_on_and_expand(self, bb):
+        return AABB(bb.min_x - config.PLAYER_BODY_STAND_REACH,
+                    bb.max_y,
+                    bb.min_z - config.PLAYER_BODY_STAND_REACH,
+                    bb.max_x + config.PLAYER_BODY_STAND_REACH,
+                    bb.max_y + config.PLAYER_HEIGHT,
+                    bb.max_z + config.PLAYER_BODY_STAND_REACH)
+
+    def space_expand(self, h_expand=0):
+        return AABB(self.coords.x - h_expand,
+                    self.coords.y,
+                    self.coords.z - h_expand,
+                    self.coords.x + 1 + h_expand,
+                    self.coords.y + 1 + config.PLAYER_HEIGHT,
+                    self.coords.z + 1 + h_expand)
+
+    def compute_state(self):
+        boxes = []
+        possibly_free = False
+        under = self.grid.get_block(self.coords.x, self.coords.y - 1, self.coords.z)
+        if isinstance(self.block, blocks.BlockCube):
+            boxes = [self.aabb_on_and_expand(AABB.from_block_cube(self.coords.x, self.coords.y, self.coords.z))]
+        else:
+            if self.block.is_collidable or under.is_fence:
+                if under.is_fence:
+                    boxes.extend(map(self.aabb_on_and_expand, under.grid_bounding_boxes))
+                if self.block.is_collidable:
+                    boxes.extend(map(self.aabb_on_and_expand, block.grid_bounding_boxes))
+                if self.block.is_ladder and not under.is_fence:
+                    boxes.append(self.space_expand(h_expand=config.PLAYER_BODY_EXTEND))
+            else:
+                possibly_free = True
+                boxes.append(self.space_expand())
+        if boxes:
+            if len(boxes) == 1:
+                bb = boxes[0].copy()
+            else:
+                bb = reduce(AABB.union, boxes)
+            collisions = self.grid.collision_aabbs_in(bb)
+            for col_bb in collisions:
+                boxes = self.break_boxes(boxes, col_bb)
+                if not boxes:
+                    break
+            if boxes:
+                for col_bb in self.grid.avoid_aabbs_in(bb):  # lava, fire, web
+                    boxes = self.break_boxes(boxes, col_bb, frame_box)
+                boxes = [box for box in boxes if not self.aabb_eyelevel_inside_water(box)]
+        if boxes:
+            if possibly_free:
+                return NodeState.FREE
+            else:
+                return NodeState.YES
+        else:
+            return NodeState.NO
+
+    def aabb_eyelevel_inside_water(self, bb):
+        self.grid.aabb_eyelevel_inside_water(bb, eye_height=bb.height - (config.PLAYER_HEIGHT - config.PLAYER_EYELEVEL))
+
+    def sits_on_any(self, bb, collisions):
+        for col in collisions:
+            if not fops.eq(bb.min_y, col.max_y):
+                continue
+            if fops.lt(bb.max_x, col.min_x) or fops.gt(bb.min_x, col.max_x):
+                continue
+            if fops.lt(bb.max_z, col.min_z) or fops.gt(bb.min_z, col.max_z):
+                continue
+            return True
+        return False
+
+    def break_boxes(self, boxes, col):
+        out = []
+        for box in boxes:
+            if not col.collides(box):
+                out.append(box)
+                continue
+            if self.is_big_enough(col.min_x, box.min_x, config.PLAYER_BODY_DIAMETER) and self.in_interval(col.min_x, box.min_x, box.max_x):
+                out.append(AABB(box.min_x, box.min_y, box.min_z, col.min_x, box.max_y, box.max_z))
+            if self.is_big_enough(box.max_x, col.max_x, config.PLAYER_BODY_DIAMETER) and self.in_interval(col.max_x, box.min_x, box.max_x):
+                out.append(AABB(col.max_x, box.min_y, box.min_z, box.max_x, box.max_y, box.max_z))
+            if self.is_big_enough(col.min_y, box.min_y, config.PLAYER_HEIGHT) and self.in_interval(col.min_y, box.min_y, box.max_y):
+                out.append(AABB(box.min_x, box.min_y, box.min_z, box.max_x, col.min_y, box.max_z))
+            if self.is_big_enough(box.max_y, col.max_y, config.PLAYER_HEIGHT) and self.in_interval(col.max_y, box.min_y, box.max_y):
+                out.append(AABB(box.min_x, col.max_y, box.min_z, box.max_x, box.max_y, box.max_z))
+            if self.is_big_enough(col.min_z, box.min_z, config.PLAYER_BODY_DIAMETER) and self.in_interval(col.min_z, box.min_z, box.min_z):
+                out.append(AABB(box.min_x, box.min_y, box.min_z, box.max_x, box.max_y, col.min_z))
+            if self.is_big_enough(box.max_z, col.max_z, config.PLAYER_BODY_DIAMETER) and self.in_interval(col.max_z, box.min_z, box.min_z):
+                out.append(AABB(box.min_x, box.min_y, col.max_z, box.max_x, box.max_y, box.max_z))
+        return out
+
+
+class GridSpace(GridBase):
+    def __init__(self, grid, coords=None, block=None, bb=None):
+        super(GridSpace, self).__init__(grid, coords, block, bb)
+        self.spaces = None
+
+    def space_expand(self, h_expand=config.PLAYER_BODY_EXTEND):
+        return AABB(self.coords.x - h_expand,
+                    self.coords.y,
+                    self.coords.z - h_expand,
+                    self.coords.x + 1 + h_expand,
+                    self.coords.y + 1 + config.PLAYER_HEIGHT,
+                    self.coords.z + 1 + h_expand)
+
+    def aabb_on_and_expand(self, bb):
+        return AABB(bb.min_x - config.PLAYER_BODY_STAND_REACH,
+                    bb.max_y,
+                    bb.min_z - config.PLAYER_BODY_STAND_REACH,
+                    bb.max_x + config.PLAYER_BODY_STAND_REACH,
+                    bb.max_y + config.JUMP_HEIGHT + config.PLAYER_HEIGHT,
+                    bb.max_z + config.PLAYER_BODY_STAND_REACH)
+
+    def compute_spaces(self):
+        self.spaces = []
+        if isinstance(self.block, blocks.BlockCube):
+            self.spaces = [self.aabb_on_and_expand(AABB.from_block_cube(self.coords.x, self.coords.y, self.coords.z))]
+        else:
+            under = self.grid.get_block(self.coords.x, self.coords.y - 1, self.coords.z)
+            if self.block.is_collidable or under.is_fence:
+                if under.is_fence:
+                    under.add_grid_bounding_boxes_to(self.spaces)
+                self.block.add_grid_bounding_boxes_to(self.spaces)
+                self.spaces = [self.aabb_on_and_expand(box) for box in self.spaces]
+                if self.block.is_ladder:
+                    self.spaces.append(self.space_expand())
+            else:
+                if self.block.is_water:
+                    self.spaces.append(self.space_expand(h_expand=config.PLAYER_BODY_STAND_REACH))
+                elif self.block.is_vine:
+                    self.spaces.append(self.space_expand())
+        if self.spaces:
+            if len(self.spaces) == 1:
+                bb = self.spaces[0].copy()
+            else:
+                bb = reduce(AABB.union, self.spaces)
+            collisions = self.grid.collision_aabbs_in(bb)
+            for col_bb in collisions:
+                self.spaces = self.break_boxes(self.spaces, col_bb)
+                if not self.spaces:
+                    break
+            else:
+                for col_bb in self.grid.avoid_aabbs_in(bb):  # lava, fire, web
+                    self.spaces = self.break_boxes(self.spaces, col_bb)
+
+    def break_boxes(self, boxes, col):
+        out = []
+        for box in boxes:
+            if not col.collides(box):
+                out.append(box)
+                continue
+            if self.in_interval(col.min_x, box.min_x, box.max_x):
+                bb = AABB(box.min_x, box.min_y, box.min_z, col.min_x, box.max_y, box.max_z)
+                if self.is_big_enough_bb(bb):
+                    out.append(bb)
+            if self.in_interval(col.max_x, box.min_x, box.max_x):
+                bb = AABB(col.max_x, box.min_y, box.min_z, box.max_x, box.max_y, box.max_z)
+                if self.is_big_enough_bb(bb):
+                    out.append(bb)
+            if self.in_interval(col.min_y, box.min_y, box.max_y):
+                bb = AABB(box.min_x, box.min_y, box.min_z, box.max_x, col.min_y, box.max_z)
+                if self.is_big_enough_bb(bb):
+                    out.append(bb)
+            if self.in_interval(col.max_y, box.min_y, box.max_y):
+                bb = AABB(box.min_x, col.max_y, box.min_z, box.max_x, box.max_y, box.max_z)
+                if self.is_big_enough_bb(bb):
+                    out.append(bb)
+            if self.in_interval(col.min_z, box.min_z, box.min_z):
+                bb = AABB(box.min_x, box.min_y, box.min_z, box.max_x, box.max_y, col.min_z)
+                if self.is_big_enough_bb(bb):
+                    out.append(bb)
+            if self.in_interval(col.max_z, box.min_z, box.min_z):
+                bb = AABB(box.min_x, box.min_y, col.max_z, box.max_x, box.max_y, box.max_z)
+                if self.is_big_enough_bb(bb):
+                    out.append(bb)
+        return out
+        
+    
+class SpaceGraph(object):
+    def __init__(self):
+        self.start_nodes = []
+        self.snodes = []
+
+    def add_space_node(self, space, start=False):
+        n = SpaceNode(space)
+        if start:
+            self.start_nodes.append(n)
+        for snode in self.snodes:
+            if self.check_connection(snode, n):
+                snode.add_connection(n)
+                n.connected = True
+        self.snodes.append(n)
+        return n
+
+    def check_connection(self, n_from, n_to):
+        if n_from.aabb.collides(n_to.aabb):
+            return True
         else:
             return False
 
-    @property
-    def can_stand_on(self):
-        if self._can_stand_on_value is None:
-            self._can_stand_on_value = self.compute()
-        return self._can_stand_on_value
-
-    def compute(self):
-        can = self._can_stand_on()
-        #self.grid.can_stand_memory[[b.identifier for b in self.blocks3]] = can
-        return can
-
-    def can_be_in(self, bb):
-        if self.grid.aabb_collides(bb):
-            return False
-        if self.blocks_to_avoid(self.grid.blocks_in_aabb(bb)):
-            return False
-        if self.grid.aabb_eyelevel_inside_water(bb):
-            return False
-        return True
-
-    def _can_stand_on(self):
-        """
-        can stand on top of the center of the block
-        """
-        if isinstance(self.block, blocks.Cactus):
-            return False
-        under = self.grid.get_block(self.coords[0], self.coords[1] - 1, self.coords[2])
-        if not self.block.collidable and not under.is_fence and not self.block.is_water and not self.block.is_ladder_vine:
-            return False
-        if self.block.is_ladder_vine or self.block.is_water:
-            bb = AABB.from_block_coords(self.block.coords)
-            if under.is_fence:
-                self.bb_stand = bb.shift(min_y=under.max_y)
+    def check_start(self, gs, bb):
+        check = False
+        for space in gs.spaces:
+            if space.collides(bb):
+                self.add_space_node(space, start=True)
+                check = True
             else:
-                if not under.collidable or (under.collidable and fops.lt(under.max_y, bb.min_y)):
-                    bb1 = bb.offset(dy=0.5)
-                    if self.can_be_in(bb1):
-                        bb = bb1
-                self.bb_stand = bb
-            self.stand_block = self.block
-            self.platform = self.bb_stand.set_to(max_y=self.bb_stand.min_y)
-        else:
-            if under.is_fence:
-                fence_top = under.maxedge_platform(y=1)
-                if self.block.collidable:
-                    self.platform = self.block.maxedge_platform(y=1)
-                    self.stand_block = self.block
-                    if fence_top.min_y > self.platform.min_y:
-                        self.platform = fence_top
-                        self.stand_block = under
-                else:
-                    self.platform = fence_top
-                    self.stand_block = under
-            else:
-                self.platform = self.block.maxedge_platform(y=1)
-                self.stand_block = self.block
-            bb = AABB.from_block_coords(self.block.coords)
-            self.bb_stand = bb.offset(dy=self.platform.min_y - bb.min_y)
-            if not self.bb_stand.collides_on_axes(self.platform, x=True, z=True):
-                return False
-        return self.can_be_in(self.bb_stand)
+                self.add_space_node(space)
+        return check
 
-    def can_go(self, gs, update_to_bb_stand=False):
-        self.can_stand_on
-        if not self.can_stand_between(gs):
+    def can_go_to(self, gs):
+        if not gs.spaces:
             return False
-        if not self.can_go_between(gs, update_to_bb_stand=update_to_bb_stand):
-            return False
-        return True
-
-    def can_stand_between(self, gs, debug=False):
-        if self.block.is_ladder_vine or gs.block.is_ladder_vine:
-            return True
-        if self.block.is_water or gs.block.is_water:
-            return True
-        if fops.gt(abs(self.platform.min_y - gs.platform.min_y), config.MAX_STEP_HEIGHT):
-            return True
-        stand_platform = self.platform.expand(config.PLAYER_BODY_DIAMETER - 0.09, 0, config.PLAYER_BODY_DIAMETER - 0.09)
-        self.intersection = gs.stand_block.intersection_on_axes(
-            stand_platform, x=True, z=True, debug=debug)
-        if self.intersection is None:
-            return False
-        if self.stand_block.x != gs.stand_block.x and self.stand_block.z != gs.stand_block.z:
-            if fops.lt(gs.platform.get_side('min', x=True, z=True), 0.5):
-                return False
-            else:
-                return True
-        else:
-            return True
-
-    def can_go_between(self, gs, update_to_bb_stand=False, debug=False):
-        edge_cost = 0
-        bb_stand = self.bb_stand
-        other_bb_stand = gs.bb_stand
-        if bb_stand.horizontal_distance(other_bb_stand) > config.HORIZONTAL_MOVE_DISTANCE_LIMIT:
-            if debug:
-                print 'horizontal distance too far', bb_stand.horizontal_distance(other_bb_stand)
-            return False
-        if fops.gt(bb_stand.min_y, other_bb_stand.min_y):
-            if (bb_stand.min_y - other_bb_stand.min_y) > 3:
-                return False
-            elev = bb_stand.min_y - other_bb_stand.min_y
-            elev_bb = other_bb_stand.extend_to(dy=elev)
-            bb_from = bb_stand
-            bb_to = other_bb_stand.offset(dy=elev)
-        elif fops.lt(bb_stand.min_y, other_bb_stand.min_y):
-            if fops.lte(bb_stand.grid_y + 2, other_bb_stand.min_y):
-                if debug:
-                    print 'over 2 high difference'
-                return False
-            elev = other_bb_stand.min_y - bb_stand.min_y
-            in_water = self.grid.aabb_in_water(bb_stand)
-            if in_water and \
-                    other_bb_stand.grid_y > bb_stand.grid_y and \
-                    fops.gt(other_bb_stand.min_y, other_bb_stand.grid_y) and \
-                    not self.grid.aabb_in_water(bb_stand.shift(min_y=other_bb_stand.min_y)) and \
-                    fops.gte(other_bb_stand.min_y - (bb_stand.grid_y + 1), config.MAX_WATER_JUMP_HEIGHT - 0.15):
-                if debug:
-                    print 'water cannot go'
-                return False
-            if self.grid.aabb_on_ladder(bb_stand) and \
-                    other_bb_stand.grid_y > bb_stand.grid_y and \
-                    fops.gt(other_bb_stand.min_y, other_bb_stand.grid_y) and \
-                    not self.grid.aabb_on_ladder(bb_stand.shift(min_y=other_bb_stand.min_y)) and \
-                    fops.gte(other_bb_stand.min_y - (bb_stand.grid_y + 1), config.MAX_VINE_JUMP_HEIGHT - 0.2):
-                if debug:
-                    print 'ladder cannot go'
-                return False
-            if fops.gt(elev, config.MAX_JUMP_HEIGHT) and not in_water:
-                if debug:
-                    print 'too high'
-                return False
-            if fops.lte(elev, config.MAX_STEP_HEIGHT):
-                elev = config.MAX_STEP_HEIGHT
-                aabbs = self.grid.aabbs_in(bb_stand.extend_to(0, elev, 0))
-                for bb in aabbs:
-                    elev = bb_stand.calculate_axis_offset(bb, elev, 1)
-                if fops.lt(bb_stand.min_y + elev, other_bb_stand.min_y):
-                    if debug:
-                        print 'cannot make step'
-                    return False
-            elev_bb = bb_stand.extend_to(dy=elev)
-            bb_from = bb_stand.offset(dy=elev)
-            bb_to = other_bb_stand
-        else:
-            elev = 0
-            elev_bb = None
-            bb_from = bb_stand
-            bb_to = other_bb_stand
-        if elev_bb is not None:
-            if self.grid.aabb_collides(elev_bb):
-                if debug:
-                    print 'elevation collision'
-                return False
-            if self.blocks_to_avoid(self.grid.blocks_in_aabb(elev_bb)):
-                if debug:
-                    print 'elevation hitting avoid block'
-                return False
-        if self.grid.collision_between(bb_from, bb_to, debug=debug):
-            if debug:
-                print 'horizontal collision'
-            return False
-        if self.blocks_to_avoid(self.grid.passing_blocks_between(bb_from, bb_to)):
-            if debug:
-                print 'hitting avoid block'
-            return False
-        edge_cost += config.COST_DIRECT * bb_from.horizontal_distance(bb_to)
-        if not (fops.lte(elev, config.MAX_STEP_HEIGHT) and fops.gte(elev, -config.MAX_STEP_HEIGHT)):
-            edge_cost += config.COST_FALL * \
-                bb_from.horizontal_distance(bb_to)
-            if elev < 0:
-                edge_cost += config.COST_FALL * elev
-            else:
-                edge_cost += config.COST_JUMP
-        self.edge_cost = edge_cost
-        if update_to_bb_stand:
-            gs.bb_stand = other_bb_stand
-        return True
+        can_go = False
+        for space in gs.spaces:
+            node = self.space_graph.add_space_node(space)
+            if node.connected:
+                can_go = True
+        return can_go
+    

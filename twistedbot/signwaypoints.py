@@ -1,10 +1,44 @@
 
+import re
 
 import logbot
 import tools
 
 
 log = logbot.getlogger("SIGNS")
+
+
+class Sign(object):
+    def __init__(self, coords, line1, line2, line3, line4):
+        self.coords = coords
+        self.line1 = line1
+        self.line2 = line2
+        self.line3 = line3
+        self.line4 = line4
+        self.is_waypoint = line1.strip().lower() == "waypoint"
+        self.decode()
+        self.is_groupable = self.group and self.value is not None
+        self.nav_coords = self.coords.offset(dy=-1)
+
+    def decode(self):
+        self.line2 = re.sub(ur"\s+", " ", self.line2.strip().lower())
+        try:
+            self.name = self.line4
+            self.value = float(re.sub(ur",", ".", self.line2))
+        except ValueError:
+            self.name = self.line2
+            self.value = None
+        self.group = self.line3
+
+    def __eq__(self, sgn):
+        return self.coords == sgn.coords
+
+    def __str__(self):
+        return "$coords:%s group:%s value:%s name:%s$" % \
+            (str(self.coords), self.group, self.value, self.name)
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class SignWayPoints(object):
@@ -85,7 +119,7 @@ class SignWayPoints(object):
             s = sgroup.next_rotate()
             if s == cs:
                 return None
-            if self.navgrid.graph.has_node(tools.lower_y(s.coords)):
+            if self.navgrid.node_is_solid(tools.lower_y(s.coords)):
                 return s
 
     def get_groupnext_circulate(self, group):
@@ -103,7 +137,7 @@ class SignWayPoints(object):
                 n_pass += 1
                 if n_pass == 2:
                     return None
-            if self.navgrid.graph.has_node(tools.lower_y(s.coords)):
+            if self.navgrid.node_is_solid(tools.lower_y(s.coords)):
                 return s
 
     def reset_group(self, group):

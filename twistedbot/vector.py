@@ -4,22 +4,24 @@ import math
 
 class Vector(object):
     def __init__(self, x, y, z):
-        self.xyz = (x, y, z)
+        self.x = x
+        self.y = y
+        self.z = z
 
     def __hash__(self):
-        return hash(self.xyz)
+        return hash((self.x, self.y, self.z))
 
     def __eq__(self, o):
-        return self.__hash__() == o.__hash__()
+        return self.x == o.x and self.y == o.y and self.z == o.z
 
     def __add__(self, v):
-        return Vector(self.x + v[0], self.y + v[1], self.z + v[2])
+        return Vector(self.x + v.x, self.y + v.y, self.z + v.z)
 
     def __sub__(self, v):
-        return Vector(self.x - v[0], self.y - v[1], self.z - v[2])
+        return Vector(self.x - v.z, self.y - v.z, self.z - v.z)
 
-    def __getitem__(self, k):
-        return self.xyz[k]
+    def __mul__(self, m):
+        return Vector(self.x * m, self.y * m, self.z * m)
 
     def __str__(self):
         return "<%s %s %s>" % (self.x, self.y, self.z)
@@ -28,35 +30,30 @@ class Vector(object):
         return self.__str__()
 
     @property
-    def x(self):
-        return self.xyz[0]
-
-    @property
-    def y(self):
-        return self.xyz[1]
-
-    @property
-    def z(self):
-        return self.xyz[2]
-
-    @property
     def size(self):
-        math.sqrt(pow(self.x, 2) + pow(self.y, 2) + pow(self.z, 2))
+        return math.sqrt(pow(self.x, 2) + pow(self.y, 2) + pow(self.z, 2))
+
+    def normalize(self):
+        d = self.size
+        if d < 0.0001:
+            self.x = 0
+            self.y = 0
+            self.z = 0
+        else:
+            self.x = self.x / d
+            self.y = self.y / d
+            self.z = self.z / d
 
     @property
     def size_pow(self):
         return pow(self.x, 2) + pow(self.y, 2) + pow(self.z, 2)
 
-    def norm_xz_direction(self, vect):
-        x = vect.x - self.x
-        z = vect.z - self.z
-        size = math.hypot(x, z)
-        if size == 0:
-            return (0.0, 0.0)
-        return (x / size, z / size)
+    @property
+    def horizontal_size(self):
+        return math.hypot(self.x, self.z)
 
-    def distance_xz_from(self, v):
-        return math.hypot(self.x - v.x, self.z - v.z)
+    def offset(self, dx=0, dy=0, dz=0):
+        return Vector(self.x + dx, self.y + dy, self.z + dz)
 
     def copy(self):
         return Vector(self.x, self.y, self.z)

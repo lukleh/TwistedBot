@@ -1,4 +1,4 @@
-﻿
+
 import math
 
 from twisted.internet.task import cooperate
@@ -9,7 +9,6 @@ import tools
 
 import logbot
 import fops
-from gridspace import GridSpace
 from pathfinding import AStar
 
 log = logbot.getlogger("BEHAVIOURS")
@@ -53,15 +52,15 @@ class BehaviourManager(object):
                 if g.cancelled:
                     break
                 if g.status == Status.running:
-                    ignore = yield g.tick()
+                    yield g.tick()
                 self.bot.bot_object.floating_flag = g.floating_flag
                 if g.status == Status.running:
                     break
                 elif g.status == Status.suspended:
-                    ignore = yield tools.reactor_break()
+                    yield tools.reactor_break()
                     continue
                 else:
-                    ignore = yield tools.reactor_break()
+                    yield tools.reactor_break()
                     g.return_to_parent()
         except:
             logbot.exit_on_error()
@@ -100,7 +99,7 @@ class BehaviourBase(object):
     def tick(self):
         if self.cancelled:
             returnValue(None)
-        ignore = yield self._tick()
+        yield self._tick()
 
     def cancel(self):
         self.cancelled = True
@@ -165,7 +164,7 @@ class WalkSignsBehaviour(BehaviourBase):
 
     def _tick(self):
         if not self.world.navgrid.sign_waypoints.has_group(self.group):
-            self.world.bot.send_chat_message("cannnot %s group named %s" % (self.walk_type, self.group))
+            self.world.chat.send_chat_message("cannnot %s group named %s" % (self.walk_type, self.group))
             self.status = Status.failure
             return
         self.signpoint = self.next_sign(self.group)
@@ -192,7 +191,7 @@ class GoToSignBehaviour(BehaviourBase):
         if self.signpoint is None:
             self.signpoint = self.world.navgrid.sign_waypoints.get_name_from_group(self.sign_name)
         if self.signpoint is None:
-            self.world.bot.send_chat_message("cannot idetify sign with name %s" % self.sign_name)
+            self.world.chat.send_chat_message("cannot idetify sign with name %s" % self.sign_name)
             self.status = Status.failure
             return
         if not self.world.grid.check_sign(self.signpoint):
@@ -218,15 +217,16 @@ class TravelToBehaviour(BehaviourBase):
         if sb is None:
             self.ready = False
         else:
-            d = cooperate(AStar(self.world.navgrid,
-                                sb.coords,
-                                self.travel_coords)).whenDone()
+            d = cooperate(AStar(dimension=self.world.dimension,
+                                start_coords=sb.coords,
+                                end_coords=self.travel_coords,
+                                current_aabb=self.bot.bot_object.aabb)).whenDone()
             d.addErrback(logbot.exit_on_error)
             astar = yield d
             if astar.path is None:
                 self.status = Status.failure
             else:
-                if self.world.navgrid.check_path(astar.path):
+                if astar.path.check_path(current_aabb=self.bot.bot_object.aabb):
                     self.path = astar.path
                     self.ready = True
 
@@ -238,53 +238,24 @@ class TravelToBehaviour(BehaviourBase):
     @inlineCallbacks
     def _tick(self):
         if not self.ready:
-            ignore = yield self.activate()
+            yield self.activate()
             if self.status == Status.failure:
                 return
             if not self.ready:
                 return
-        if self.path.has_next():
-            gs = GridSpace(self.world.grid, coords=self.path.next_step().coords)
-            if gs.can_stand_on:
-                self.add_subbehaviour(MoveToBehaviour, target_space=gs)
-            else:
-                self.ready = False
-        else:
-            self.status = Status.success
+        self.add_subbehaviour(MoveToBehaviour, path=self.path)
 
 
 class MoveToBehaviour(BehaviourBase):
     def __init__(self, *args, **kwargs):
         super(MoveToBehaviour, self).__init__(*args, **kwargs)
-        self.target_space = kwargs["target_space"]
-        self.was_at_target = False
+        self.path = kwargs["path"]
         self.floating_flag = False
         self.name = 'Move to %s' % str(self.target_space.block)
         #log.msg(self.name + ' from %s' % self.bot.aabb)
 
     def check_status(self, b_obj):
-        bb_stand = self.target_space.bb_stand
-        elev = bb_stand.min_y - b_obj.aabb.min_y
-        gs = GridSpace(self.world.grid, bb=b_obj.aabb)
-        if not self.target_space._can_stand_on():
-            self.world.grid.navgrid.delete_node(self.target_space.coords)
-            log.msg('CANNOT STAND ON %s' % self.target_space)
-            return Status.failure
-        if b_obj.horizontally_blocked and not gs.can_go_between(self.target_space, debug=True):
-            log.msg('CANNOT GO BETWEEN %s AND %s' % (b_obj.aabb, self.target_space))
-            return Status.failure
-        if self.bot.is_on_ladder(b_obj) or self.bot.is_in_water(b_obj):
-            if b_obj.position_grid == self.target_space.coords:
-                return Status.success
-        if b_obj.aabb.horizontal_distance(bb_stand) < self.bot.current_motion(b_obj):
-            self.was_at_target = True
-            if fops.eq(elev, 0):
-                return Status.success
-        if b_obj.horizontally_blocked and b_obj.on_ground:
-            if not gs.can_go(self.target_space):
-                log.msg("I am stuck, let's try again? vels %s" %
-                        str(b_obj.velocities))
-                return Status.failure
+        # TODO can stand on target?
         return Status.running
 
     def _tick(self):
@@ -293,11 +264,11 @@ class MoveToBehaviour(BehaviourBase):
         if self.status != Status.running:
             return
         col_distance, col_bb = self.world.grid.min_collision_between(b_obj.aabb,
-                                                                     self.target_space.bb_stand,
+                                                                     self.closest_platform,
                                                                      horizontal=True,
                                                                      max_height=True)
         if self.bot.is_on_ladder(b_obj) or self.bot.is_in_water(b_obj):
-            elev = self.target_space.bb_stand.min_y - b_obj.aabb.min_y
+            elev = self.closest_platform.min_y - b_obj.aabb.min_y
             if fops.gt(elev, 0):
                 self.jump(b_obj)
                 self.move(b_obj)
@@ -310,7 +281,7 @@ class MoveToBehaviour(BehaviourBase):
             if col_distance is None:
                 self.move(b_obj)
             else:
-                elev = self.target_space.bb_stand.min_y - b_obj.aabb.min_y
+                elev = self.closest_platform.min_y - b_obj.aabb.min_y
                 if fops.lte(elev, 0):
                     self.move(b_obj)
                 elif fops.gt(elev, 0) and fops.lte(elev, config.MAX_STEP_HEIGHT):
@@ -327,11 +298,10 @@ class MoveToBehaviour(BehaviourBase):
             self.move(b_obj)
 
     def move(self, b_obj):
-        direction = b_obj.aabb.horizontal_direction_to(self.target_space.bb_stand)
+        direction = b_obj.aabb.horizontal_direction_to(self.closest_platform)
         if not self.was_at_target:
             self.bot.turn_to_direction(b_obj, direction[0], direction[1])
         b_obj.direction = direction
 
     def jump(self, b_obj):
         b_obj.is_jumping = True
-

@@ -3,6 +3,7 @@ import heapq
 
 import config
 import logbot
+from gridspace import compute_state
 
 
 log = logbot.getlogger("ASTAR")
@@ -54,55 +55,48 @@ class PathNode(object):
 
 
 class Path(object):
-    def __init__(self, goal=None):
+    def __init__(self, dimension=None, nodes=None):
+        self.dimension = dimension
         self.goal = goal
-        self.nodes = []
-        self.reconstruct_path(self.goal)
-        self.step_index = len(self.nodes)
+        self.nodes = nodes
+        self.space_graph = SpaceGraph()
 
     def __str__(self):
         return "Path nodes %s" % [str(n) for n in self.nodes]
 
-    def reconstruct_path(self, current):
-        self.nodes.append(current)
-        while current.parent is not None:
-            self.nodes.append(current.parent)
-            current = current.parent
-
     def __iter__(self):
-        self.iter_index = len(self.nodes)
-        return self
+        return self.space_graph
 
-    def next(self):
-        self.iter_index -= 1
-        if self.iter_index < 0:
-            raise StopIteration()
-        return self.nodes[self.iter_index]
-
-    def has_next(self):
-        return self.step_index > 0
-
-    def next_step(self):
-        self.step_index -= 1
-        if self.step_index < 0:
-            raise Exception("Path consumed")
-        return self.nodes[self.step_index]
+    def check_path(self, current_aabb):
+        previous = GridSpace(self.dimension.grid, coords=self.nodes[0].coords)
+        previous.compute_spaces()
+        if not self.space_graph.check_start(previous, current_aabb):
+            return False
+        for ni in xrange(1, len(self.nodes)):
+            node = self.nodes[ni]
+            current = GridSpace(self.dimension.grid, coords=node.coords)
+            current.compute_spaces()
+            if self.space_graph.can_go_to(current):
+                previous = current
+            else:
+                return False
+        return True
 
 
 class AStar(object):
-    def __init__(self, navgrid, start, goal, max_cost=config.PATHFIND_LIMIT):
-        self.navgrid = navgrid
-        self.succesors = self.navgrid.graph.get_succ
-        self.get_node = self.navgrid.graph.get_node
-        self.start_node = PathNode(start)
-        self.goal_node = PathNode(goal)
+    def __init__(self, dimension=None, start_coords=None, end_coords=None, current_aabb=None, max_cost=config.PATHFIND_LIMIT):
+        self.dimension = dimension
+        self.navgrid = dimension.navgrid
+        self.get_node = self.navgrid.get_node
+        self.start_node = PathNode(start_coords)
+        self.goal_node = PathNode(end_coords)
+        self.current_aabb = current_aabb
         self.max_cost = max_cost
         self.path = None
         self.closed_set = set()
         self.open_heap = [self.start_node]
         self.open_set = set([self.start_node])
-        self.start_node.set_score(
-            0, self.heuristic_cost_estimate(self.start_node, self.goal_node))
+        self.start_node.set_score(0, self.heuristic_cost_estimate(self.start_node, self.goal_node))
 
     def reconstruct_path(self, current):
         nodes = []
@@ -114,12 +108,12 @@ class AStar(object):
         return nodes
 
     def get_edge_cost(self, node_from, node_to):
-        return self.navgrid.graph.get_edge(node_from.coords, node_to.coords)
+        return config.COST_DIRECT
 
-    def neighbours(self, start):
-        for node, cost in self.succesors(start.coords):
+    def neighbours(self, node):
+        for node in self.navgrid.neighbours_of(node.coords):
             if node not in self.closed_set:
-                yield PathNode(node, cost=cost)
+                yield PathNode(node)
 
     def heuristic_cost_estimate(self, start, goal):
         h_diagonal = min(abs(start[0] - goal[0]), abs(start[2] - goal[2]))
@@ -134,7 +128,7 @@ class AStar(object):
             raise StopIteration()
         x = heapq.heappop(self.open_heap)
         if x == self.goal_node:
-            self.path = Path(goal=x)
+            self.path = Path(dimension=self.dimension, nodes=reconstruct_path(x), current_aabb=self.current_aabb)
             raise StopIteration()
         self.open_set.remove(x)
         self.closed_set.add(x)
@@ -143,8 +137,7 @@ class AStar(object):
                 continue
             tentative_g_core = x.g + self.get_edge_cost(x, y)
             if y not in self.open_set or tentative_g_core < y.g:
-                y.set_score(tentative_g_core,
-                            self.heuristic_cost_estimate(y, self.goal_node))
+                y.set_score(tentative_g_core, self.heuristic_cost_estimate(y, self.goal_node))
                 y.parent = x
                 if y not in self.open_set:
                     heapq.heappush(self.open_heap, y)

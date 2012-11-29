@@ -15,11 +15,9 @@ import twistedbot.logbot as logbot
 
 
 class ConsoleChat(basic.LineReceiver):
-    from os import linesep as delimiter
-
     def __init__(self, world):
         self.world = world
-        
+
     def lineReceived(self, line):
         try:
             self.world.chat.process_command(line)

@@ -1,4 +1,4 @@
-﻿
+
 import StringIO
 import array
 
@@ -8,7 +8,9 @@ import blocks
 import config
 import logbot
 import fops
+import signwaypoints
 from axisbox import AABB
+from vector import Vector
 
 
 log = logbot.getlogger("GRID")
@@ -27,13 +29,22 @@ class Chunk(object):
         self.meta = [None for _ in xrange(self.levels)]
         self.block_light = []  # ignore block light
         self.sky_light = []  # ifnore sky light
-        self.biome = [None for _ in xrange(
-            config.CHUNK_SIDE_LEN * config.CHUNK_SIDE_LEN)]
+        self.biome = [None for _ in xrange(config.CHUNK_SIDE_LEN * config.CHUNK_SIDE_LEN)]
         self.complete = False
 
-    def fill_level(self, level):
-        self.blocks[level] = array.array('b', [0 for _ in xrange(4096)])
-        self.meta[level] = array.array('b', [0 for _ in xrange(4096)])
+    def set_meta(self, level, pos, meta):
+        val = self.meta[level][pos / 2]
+        if pos % 2 == 0:
+            val = (val & 240) | meta
+        else:
+            val = (val & 15) | (meta << 4)
+        self.meta[level][pos / 2] = val
+
+    def get_meta(self, level, pos):
+        if pos % 2 == 0:
+            return self.meta[level][pos / 2] & 15
+        else:
+            return self.meta[level][pos / 2] >> 4
 
     def __str__(self):
         return "%s %s %s" % (str(self.coords), self.complete, [i if i is None else 1 for i in self.blocks])
@@ -43,46 +54,36 @@ class Grid(object):
     def __init__(self, world):
         self.world = world
         self.chunks = {}
+        self.nav_cubes = {}
         self.chunks_loaded = 0
         self.spawn_position = None
-        self.can_stand_memory = tools.TreeMemory()
 
     def in_spawn_area(self, coords):
         return abs(coords[0] - self.spawn_position[0]) <= 16 or abs(coords[2] - self.spawn_position[2]) <= 16
 
-    def get_chunk(self, coords, auto_create=False):
-        if coords in self.chunks:
-            return self.chunks[coords]
-        elif auto_create:
-            chunk = Chunk(coords)
-            self.chunks[coords] = chunk
-            return chunk
-        else:
-            return None
+    def get_chunk(self, coords):
+        return self.chunks.get(coords, None)
+
+    def make_block(self, x, y, z, block_type, meta):
+        return blocks.block_map[block_type](self, x, y, z, meta)
 
     def get_block(self, x, y, z):
         if y > 255 or y < 0:
-            #return None
-            return blocks.Air(self, x, y, z)
+            return self.make_block(x, y, z, 0, 0)
         chunk_x = x >> 4
         chunk_z = z >> 4
         chunk = self.get_chunk((chunk_x, chunk_z))
         if chunk is None:
-            return blocks.Air(self, x, y, z)
+            return self.make_block(x, y, z, 0, 0)
         y_level = y >> 4
         block_types = chunk.blocks[y_level]
         if block_types is None:
-            #log.err("level %s not in chunk %s" % (y_level, str(chunk.coords)))
-            return blocks.Air(self, x, y, z)
+            return self.make_block(x, y, z, 0, 0)
         cx = x & 15
         cy = y & 15
         cz = z & 15
         pos = self.chunk_array_position(cx, cy, cz)
-        try:
-            return blocks.block_map[block_types[pos]](self, x, y, z, chunk.meta[y_level][pos])
-        except:
-            log.err("get block pos %s y_level %s block_types array length %d meta array length %d " % (pos, y_level, len(block_types), len(chunk.meta[y_level])))
-            raise
+        return self.make_block(x, y, z, block_types[pos], chunk.get_meta(y_level, pos))
 
     def chunk_updated(self, chunk_x, chunk_z):
         for i, j in tools.adjacency:
@@ -90,24 +91,23 @@ class Grid(object):
             if c in self.chunks:
                 self.world.navgrid.incomplete_on_chunk_border(c, (chunk_x, chunk_z))
 
-    def half_bytes_from_string(self, bstr):
-        for s in bstr:
-            bv = ord(s)
-            yield bv & 15
-            yield bv >> 4
+    def new_chunk(self, x, z):
+        crd = (x, z)
+        chunk = Chunk(crd)
+        self.chunks[crd] = chunk
+        self.world.nav_cubes.new_cube(crd)
+        return chunk
 
-    def load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array, update_after=True):
+    def _load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array):
         if primary_bit == 0:
-            #log.msg("Received chunk erase packet for %s, %s" % (x, z))
+            log.msg("Received chunk erase packet for %s, %s" % (x, z))
             if (x, z) in self.chunks:
                 del self.chunks[(x, z)]
             return
         self.chunks_loaded += 1
-        if (x, z) not in self.chunks:
-            chunk = Chunk((x, z))
-            self.chunks[(x, z)] = chunk
-        else:
-            chunk = self.get_chunk((x, z))
+        chunk = self.get_chunk((x, z))
+        if chunk is None:
+            chunk = self.new_chunk(x, z)
         if continuous:
             chunk.complete = True
         else:
@@ -125,30 +125,30 @@ class Grid(object):
                 if primary_bit & 1 << i:
                     data_str = data.read(2048)
                     data_count += 2048
-                    ndata = array.array(
-                        'B', self.half_bytes_from_string(data_str))
+                    ndata = array.array('B', data_str)
                     if h == 0:
                         chunk.meta[i] = ndata
                     # for now ignore block light and sky light
-                    #elif h == 1:
-                    #    chunk.block_light[i] = ndata
-                    #else:
-                    #    chumk.sky_light[i] = ndata
+                    elif h == 1:
+                        pass
+                    else:
+                        pass
         # higher block id value will be used after Mojang adds them
         for i in xrange(chunk.levels):
             if add_bit >> i & 1:
                 data_str = data.read(2048)
                 data_count += 2048
-                ndata = array.array('B', self.half_bytes_from_string(data_str))
-                log.msg("Add data %s" % ndata)
+                ndata = array.array('B', data_str)
         if continuous:
             data_str = data.read(256)
             data_count += 256
         chunk.biome = array.array('b', data_str)
-        if update_after:
-            self.chunk_updated(x, z)
 
-    def load_bulk_chunk(self, metas, data_array):
+    def on_load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array):
+        self._load_chunk(x, z, continuous, primary_bit, add_bit, data_array)
+        self.chunk_updated(x, z)
+
+    def on_load_bulk_chunk(self, metas, data_array):
         data_start = 0
         data_end = 0
         for meta in metas:
@@ -156,7 +156,7 @@ class Grid(object):
                 if meta.primary_bitmap & 1 << i:
                     data_end += 4096 + 4096 + 2048
             data_end += 256
-            self.load_chunk(meta.x, meta.z, True, meta.primary_bitmap, meta.add_bitmap, data_array[data_start:data_end], update_after=False)
+            self._load_chunk(meta.x, meta.z, True, meta.primary_bitmap, meta.add_bitmap, data_array[data_start:data_end])
             data_start = data_end
         for meta in metas:
             self.chunk_updated(meta.x, meta.z)
@@ -166,37 +166,33 @@ class Grid(object):
         return y * 256 + z * 16 + x
 
     def change_block_to(self, x, y, z, block_type, meta):
-        current_block = self.get_block(x, y, z)
-        if current_block is None:
-            log.err("change_block block %s type %s meta %s is None" %
-                    ((x, y, z), block_type, meta))
-            return None, None
-        if current_block.is_sign and not current_block.number == block_type:
-            self.world.navgrid.sign_waypoints.remove(current_block.coords)
-        cx = x & 15
-        y_level = current_block.y >> 4
-        cy = y & 15
-        cz = z & 15
-        pos = self.chunk_array_position(cx, cy, cz)
         chunk_x = x >> 4
         chunk_z = z >> 4
         if (chunk_x, chunk_z) not in self.chunks:
-            chunk = Chunk((chunk_x, chunk_z))
-            self.chunks[(chunk_x, chunk_z)] = chunk
+            return None, None
         else:
             chunk = self.get_chunk((chunk_x, chunk_z))
+        y_level = y >> 4
         if chunk.blocks[y_level] is None:
-            chunk.fill_level(y_level)
+            return None, None
+        current_block = self.get_block(x, y, z)
+        if current_block is None:
+            log.err("change_block block %s type %s meta %s is None" % ((x, y, z), block_type, meta))
+            return None, None
+        cx = x & 15
+        cy = y & 15
+        cz = z & 15
+        pos = self.chunk_array_position(cx, cy, cz)
         chunk.blocks[y_level][pos] = block_type
-        chunk.meta[y_level][pos] = meta
-        new_block = self.get_block(x, y, z)
+        chunk.set_meta(y_level, pos, meta)
+        new_block = self.make_block(x, y, z, block_type, meta)
         return current_block, new_block
 
-    def block_change(self, x, y, z, btype, bmeta):
+    def on_block_change(self, x, y, z, btype, bmeta):
         ob, nb = self.change_block_to(x, y, z, btype, bmeta)
         self.world.navgrid.block_change(ob, nb)
 
-    def multi_block_change(self, chunk_x, chunk_z, blocks):
+    def on_multi_block_change(self, chunk_x, chunk_z, blocks):
         shift_x = chunk_x << 4
         shift_z = chunk_z << 4
         changed = []
@@ -206,12 +202,13 @@ class Grid(object):
         for ob, nb in changed:
             self.world.navgrid.block_change(ob, nb)
 
-    def sign(self, x, y, z, line1, line2, line3, line4):
-        sign = tools.Sign((x, y, z), line1, line2, line3, line4)
+    def on_new_sign(self, x, y, z, line1, line2, line3, line4):
+        sign = signwaypoints.Sign(Vector(x, y, z), line1, line2, line3, line4)
         if sign.is_waypoint:
             self.world.navgrid.sign_waypoints.new(sign)
 
-    def explosion(self, x, y, z, records):
+    def on_explosion(self, x, y, z, records):
+        changed = []
         for rec in records:
             rx = x + rec.x
             ry = y + rec.y
@@ -219,10 +216,15 @@ class Grid(object):
             gx = int(rx)
             gy = int(ry)
             gz = int(rz)
-            self.block_change(gx, gy, gz, 0, 0)
+            ob, nb = self.change_block_to(gx, gy, gz, 0, 0)
+            changed.append((ob, nb))
+        for ob, nb in changed:
+            self.world.navgrid.block_change(ob, nb)
 
-    def chunk_complete_at(self, crd):
-        chunk = self.get_chunk(crd)
+    def chunk_complete_at(self, x, z):
+        cx = x >> 4
+        cz = z >> 4
+        chunk = self.get_chunk((cx, cz))
         if chunk is None:
             return False
         else:
@@ -243,9 +245,8 @@ class Grid(object):
         return False
 
     def aabb_collides(self, bb):
-        ebb = bb.extend_to(dy=-1)
-        for block in self.blocks_in_aabb(ebb):
-            if block.collides_with(bb):
+        for col_bb in self.collision_aabbs_in(bb):
+            if col_bb.collides(bb):
                 return True
         return False
 
@@ -255,7 +256,7 @@ class Grid(object):
         blcks = self.blocks_in_aabb(ubb)
         dvect = bb1.vector_to(bb2)
         for blk in blcks:
-            bb = AABB.from_block_cube(blk.coords)
+            bb = AABB.from_block_cube(blk.coords.x, blk.coords.y, blk.coords.z)
             col, _ = bb1.sweep_collision(bb, dvect)
             if col:
                 out.append(blk)
@@ -294,11 +295,17 @@ class Grid(object):
                 return True
         return False
 
-    def aabbs_in(self, bb1):
+    def collision_aabbs_in(self, bb):
         out = []
-        blcks = self.blocks_in_aabb(bb1.extend_to(0, -1, 0))
-        for blk in blcks:
+        for blk in self.blocks_in_aabb(bb.extend_to(0, -1, 0)):
             blk.add_grid_bounding_boxes_to(out)
+        return out
+
+    def avoid_aabbs_in(self, bb):
+        out = []
+        for blk in self.blocks_in_aabb(bb):  # lava, fire, web
+            if blk.is_lava or blk.number == blocks.Fire.number or blk.number == blocks.Cobweb.number:
+                out.append(AABB.from_block_cube(blk.x, blk.y, blk.z))
         return out
 
     def aabb_on_ladder(self, bb):
@@ -306,19 +313,22 @@ class Grid(object):
         return blk.number == blocks.Ladders.number or blk.number == blocks.Vines.number
 
     def aabb_in_water(self, bb):
-        for blk in self.blocks_in_aabb(bb):
+        for blk in self.blocks_in_aabb(bb.expand(-0.001, -0.4010000059604645, -0.001)):
             if blk.is_water:
+                return True
+        return False
+
+    def standing_on_solid(self, bb):
+        for col_bb in self.collision_aabbs_in(bb):
+            if fops.eq(col_bb.max_y, bb.min_y):
                 return True
         return False
 
     def standing_on_solidblock(self, bb):
         standing_on = None
-        blocks = self.blocks_in_aabb(bb.extend_to(dy=-1))
-        dvect = (0, -1, 0)
-        for blk in blocks:
-            col, rel_d, _ = blk.sweep_collision(bb, dvect)
-            if col and fops.eq(rel_d, 0):
-                standing_on = blk
+        for col_bb in self.collision_aabbs_in(bb):
+            if fops.eq(col_bb.max_y, bb.min_y):
+                standing_on = self.get_block(col_bb.grid_x, col_bb.grid_y, col_bb.grid_z)
                 if standing_on.x == bb.grid_x and standing_on.z == bb.grid_z:
                     break
         return standing_on
