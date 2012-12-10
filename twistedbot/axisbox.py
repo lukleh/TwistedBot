@@ -85,12 +85,12 @@ class AABB(object):
     @classmethod
     def from_player_coords(cls, x, y, z):
         return cls(
-            x - config.PLAYER_BODY_EXTEND,
+            x - config.PLAYER_BODY_RADIUS,
             y,
-            z - config.PLAYER_BODY_EXTEND,
-            x + config.PLAYER_BODY_EXTEND,
+            z - config.PLAYER_BODY_RADIUS,
+            x + config.PLAYER_BODY_RADIUS,
             y + config.PLAYER_HEIGHT,
-            z + config.PLAYER_BODY_EXTEND)
+            z + config.PLAYER_BODY_RADIUS)
 
     @classmethod
     def from_block_coords(cls, x, y, z):
@@ -173,7 +173,24 @@ class AABB(object):
                     self.min_z if self.min_z < bb.min_z else bb.min_z,
                     self.max_x if self.max_x > bb.max_x else bb.max_x,
                     self.max_y if self.max_y > bb.max_y else bb.max_y,
-                    self.max_z if self.max_z > bb.max_z else bb.max_z,)
+                    self.max_z if self.max_z > bb.max_z else bb.max_z)
+
+    def intersection(self, bb):
+        return AABB(self.min_x if self.min_x > bb.min_x else bb.min_x,
+                    self.min_y if self.min_y > bb.min_y else bb.min_y,
+                    self.min_z if self.min_z > bb.min_z else bb.min_z,
+                    self.max_x if self.max_x < bb.max_x else bb.max_x,
+                    self.max_y if self.max_y < bb.max_y else bb.max_y,
+                    self.max_z if self.max_z < bb.max_z else bb.max_z)
+
+    @property
+    def cube_completent(self):
+        return AABB(self.grid_x if self.min_x > self.grid_x else self.max_x,
+                    self.grid_y if self.min_y > self.grid_y else self.max_y,
+                    self.grid_z if self.min_z > self.grid_z else self.max_z,
+                    self.min_x if self.min_x > self.grid_x else self.grid_x + 1,
+                    self.min_y if self.min_y > self.grid_y else self.grid_y + 1,
+                    self.min_z if self.min_z > self.grid_z else self.grid_z + 1)
 
     @property
     def grid_box(self):
@@ -194,10 +211,6 @@ class AABB(object):
 
     def vector_to(self, bb):
         return Vector(bb.posx - self.posx, bb.posy - self.posy, bb.posz - self.posz)
-
-    def horizontal_distance(self, bb):
-        v = self.vector_to(bb)
-        return v.horizontal_size
 
     def horizontal_direction_to(self, bb):
         v = self.vector_to(bb)

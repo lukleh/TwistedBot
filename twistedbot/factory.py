@@ -177,6 +177,7 @@ class MineCraftProtocol(Protocol):
         log.msg("received LOCATION X:%f Y:%f Z:%f STANCE:%f GROUNDED:%s" %
                 (c.position.x, c.position.y, c.position.z,
                  c.position.stance, c.grounded.grounded))
+        c.position.y, c.position.stance = c.position.stance, c.position.y
         self.send_packet("player position&look", c)
         self.world.bot.on_new_location({"x": c.position.x,
                                         "y": c.position.y,

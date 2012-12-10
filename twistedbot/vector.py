@@ -18,7 +18,7 @@ class Vector(object):
         return Vector(self.x + v.x, self.y + v.y, self.z + v.z)
 
     def __sub__(self, v):
-        return Vector(self.x - v.z, self.y - v.z, self.z - v.z)
+        return Vector(self.x - v.x, self.y - v.y, self.z - v.z)
 
     def __mul__(self, m):
         return Vector(self.x * m, self.y * m, self.z * m)
@@ -57,3 +57,10 @@ class Vector(object):
 
     def copy(self):
         return Vector(self.x, self.y, self.z)
+
+    def turn_direction(sefl, turn):
+        if turn:
+            self.x *= -1
+            self.y *= -1
+            self.z *= -1
+        return self

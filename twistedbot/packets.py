@@ -94,8 +94,8 @@ def Bool(*args, **kwargs):
 grounded = Struct("grounded", UBInt8("grounded"))
 position = Struct("position",
                   BFloat64("x"),
-                  BFloat64("stance"),
                   BFloat64("y"),
+                  BFloat64("stance"),
                   BFloat64("z")
                   )
 orientation = Struct("orientation", BFloat32("yaw"), BFloat32("pitch"))

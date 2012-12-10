@@ -64,6 +64,10 @@ class Block(object):
         return not self.is_collidable and not isinstance(self, BlockFluid) and not self.number == Cobweb.number and not self.number == Fire.number
 
     @property
+    def is_avoid(self):
+        return self.is_lava or self.number == Cobweb.number or self.number == Fire.number
+
+    @property
     def is_fence(self):
         return isinstance(self, BlockFence) or (self.number == FenceGate.number and not FenceGate.is_open)
 
@@ -113,7 +117,9 @@ class BlockNonSolid(Block):
 
 
 class BlockFluid(BlockNonSolid):
-    pass
+    @classmethod
+    def fluid_aabb(cls, x, y, z):
+        return AABB(x, y + 0.4, z, x + 1, y + 0.6, z + 1)
 
 
 class BlockWater(BlockFluid):
