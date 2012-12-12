@@ -100,6 +100,10 @@ class AABB(object):
     def from_block_cube(cls, x, y, z):
         return cls(x, y, z, x + 1, y + 1, z + 1)
 
+    @classmethod
+    def from_two_points(cls, p1, p2):
+        return cls(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z)
+
     @property
     def bottom_center(self):
         return (self.posx, self.posy, self.posz)
