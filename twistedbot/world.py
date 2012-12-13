@@ -3,16 +3,15 @@
 from collections import defaultdict
 
 import logbot
-import tools
+import utils
 import config
 import gridspace
 from entities import Entities
 from grid import Grid
-from navigationgrid import NavigationGrid, NavigationCubes
 from statistics import Statistics
 from chat import Chat
 from botentity import BotEntity
-from tools import NodeState
+from signwaypoints import SignWayPoints
 
 
 log = logbot.getlogger("WORLD")
@@ -22,10 +21,9 @@ class Dimension(object):
 
     def __init__(self, world):
         self.world = world
-        self.entities = Entities(self.world)
-        self.grid = Grid(self.world)
-        self.navgrid = NavigationGrid(self.world)
-        self.nav_cubes = NavigationCubes(self.world)
+        self.entities = Entities(self)
+        self.grid = Grid(self)
+        self.sign_waypoints = SignWayPoints(self)
 
 
 class World(object):
@@ -44,13 +42,12 @@ class World(object):
         self.protocol = None
         self.entities = None
         self.grid = None
-        self.navgrid = None
-        self.nav_cubes = None
+        self.sign_waypoints = None
         self.dimension = None
         self.dimensions = [Dimension(self), Dimension(self), Dimension(self)]
         self.spawn_position = None
         self.players = defaultdict(int)
-        tools.do_later(config.TIME_STEP, self.tick)
+        utils.do_later(config.TIME_STEP, self.tick)
 
     def tick(self):
         t = config.TIME_STEP
@@ -58,7 +55,7 @@ class World(object):
             t = self.bot.tick()
             self.chat.tick()
             self.every_n_ticks()
-        tools.do_later(t, self.tick)
+        utils.do_later(t, self.tick)
 
     def every_n_ticks(self, n=100):
         self.game_ticks += 1
@@ -87,7 +84,7 @@ class World(object):
         dim = dimension + 1  # to index from 0
         d = self.dimensions[dim]
         self.dimension = d
-        self.entities, self.grid, self.navgrid, self.nav_cubes = d.entities, d.grid, d.navgrid, d.nav_cubes
+        self.entities, self.grid, self.sign_waypoints = d.entities, d.grid, d.sign_waypoints
         if not self.entities.has_entity(self.bot.eid):
             self.entities.new_bot(self.bot.eid)
 
@@ -128,17 +125,10 @@ class StatusDiff(object):
     def __init__(self, world):
         self.world = world
         self.packets_in = 0
-        self.n_checks = {NodeState.UNKNOWN: 0,
-                         NodeState.NO: 0,
-                         NodeState.YES: 0,
-                         NodeState.FREE: 0}
-        self.state_catch_count = 0
         self.logger = logbot.getlogger("BOT_ENTITY_STATUS")
 
     def log(self):
-        if self.state_catch_count != sum(gridspace.state_catch.values()):
-            self.logger.msg(gridspace.state_catch)
-            self.state_catch_count = sum(gridspace.state_catch.values())
+        pass
         #self.logger.msg("received %d packets" % self.packets_in)
         #self.logger.msg(self.bot.stats)
 

@@ -8,7 +8,7 @@ from twisted.internet import reactor
 import config
 import logbot
 import proxy_processors.default
-import tools
+import utils
 from packets import parse_packets, make_packet, packets_by_name, Container
 from proxy_processors.default import process_packets as packet_printout
 
@@ -146,7 +146,7 @@ class MineCraftProtocol(Protocol):
         log.msg("LOGIN DATA eid %s level type: %s, game_mode: %s, dimension: %s, difficulty: %s, max players: %s" %
                 (c.eid, c.level_type, c.game_mode, c.dimension, c.difficulty, c.players))
         self.world.on_login(bot_eid=c.eid, game_mode=c.game_mode, dimension=c.dimension, difficulty=c.difficulty)
-        tools.do_now(self.send_packet, "locale view distance", {'locale': 'en_GB',
+        utils.do_now(self.send_packet, "locale view distance", {'locale': 'en_GB',
                                                                 'view_distance': 2,
                                                                 'chat_flags': 0,
                                                                 'difficulty': 0,
@@ -314,7 +314,7 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_sign(self, c):
-        self.world.grid.on_new_sign(c.x, c.y, c.z, c.line1, c.line2, c.line3, c.line4)
+        self.world.sign_waypoints.on_new_sign(c.x, c.y, c.z, c.line1, c.line2, c.line3, c.line4)
 
     def p_update_tile(self, c):
         pass
@@ -376,6 +376,7 @@ class MineCraftFactory(ReconnectingClientFactory):
         self.maxDelay = config.CONNECTION_MAX_DELAY
         self.initialDelay = config.CONNECTION_INITIAL_DELAY
         self.delay = self.initialDelay
+        self.keyboard_kill = False
 
     def startedConnecting(self, connector):
         log.msg('Started connecting...')
@@ -390,11 +391,10 @@ class MineCraftFactory(ReconnectingClientFactory):
         return protocol
 
     def clientConnectionLost(self, connector, unused_reason):
-        log.msg('Connection lost, reason:', unused_reason.getErrorMessage())
-        ReconnectingClientFactory.clientConnectionLost(
-            self, connector, unused_reason)
+        if not self.keyboard_kill:
+            log.msg('Connection lost, reason:', unused_reason.getErrorMessage())
+        ReconnectingClientFactory.clientConnectionLost(self, connector, unused_reason)
 
     def clientConnectionFailed(self, connector, reason):
         log.msg('Connection failed, reason:', reason.getErrorMessage())
-        ReconnectingClientFactory.clientConnectionFailed(
-            self, connector, reason)
+        ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)

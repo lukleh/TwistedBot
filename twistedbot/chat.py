@@ -88,18 +88,18 @@ class Chat(object):
             self.world.bot.behaviour_manager.cancel_running()
         elif verb == "show":
             if subject:
-                sign = self.world.navgrid.sign_waypoints.get_namepoint(subject)
+                sign = self.world.sign_waypoints.get_namepoint(subject)
                 if sign is not None:
                     self.send_chat_message(str(sign))
                     return
-                sign = self.world.navgrid.sign_waypoints.get_name_from_group(subject)
+                sign = self.world.sign_waypoints.get_name_from_group(subject)
                 if sign is not None:
                     self.send_chat_message(str(sign))
                     return
-                if not self.world.navgrid.sign_waypoints.has_group(subject):
+                if not self.world.sign_waypoints.has_group(subject):
                     self.send_chat_message("no group named %s" % subject)
                     return
-                for sign in self.world.navgrid.sign_waypoints.ordered_sign_groups[subject].iter():
+                for sign in self.world.sign_waypoints.ordered_sign_groups[subject].iter():
                     self.send_chat_message(str(sign))
             else:
                 self.send_chat_message("show what?")

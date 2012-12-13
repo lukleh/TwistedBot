@@ -3,7 +3,8 @@ import heapq
 
 import config
 import logbot
-from gridspace import compute_state
+import gridspace
+from utils import Vector
 
 
 log = logbot.getlogger("ASTAR")
@@ -31,7 +32,7 @@ class PathNode(object):
         return self.f < other.f
 
     def __eq__(self, other):
-        return self.hash == other.__hash__()
+        return self.coords == other.coords
 
     def __hash__(self):
         return self.hash
@@ -55,42 +56,33 @@ class PathNode(object):
 
 
 class Path(object):
-    def __init__(self, dimension=None, nodes=None):
+    def __init__(self, dimension=None, nodes=None, start_aabb=start_aabb):
         self.dimension = dimension
-        self.goal = goal
         self.nodes = nodes
-        self.space_graph = SpaceGraph()
+        self.start_aabb = start_aabb
+        self.is_valid = True
 
     def __str__(self):
         return "Path nodes %s" % [str(n) for n in self.nodes]
 
-    def __iter__(self):
-        return self.space_graph
+    def take_step(self):
+        pass
 
-    def check_path(self, current_aabb):
-        previous = GridSpace(self.dimension.grid, coords=self.nodes[0].coords)
-        previous.compute_spaces()
-        if not self.space_graph.check_start(previous, current_aabb):
-            return False
-        for ni in xrange(1, len(self.nodes)):
-            node = self.nodes[ni]
-            current = GridSpace(self.dimension.grid, coords=node.coords)
-            current.compute_spaces()
-            if self.space_graph.can_go_to(current):
-                previous = current
-            else:
-                return False
-        return True
+    def start_from(self, bb):
+        if not self.start_aabb == bb:
+            self.is_valid = False
+            return
+        self.start_aabb = bb
+        
 
 
 class AStar(object):
-    def __init__(self, dimension=None, start_coords=None, end_coords=None, current_aabb=None, max_cost=config.PATHFIND_LIMIT):
+    def __init__(self, dimension=None, start_coords=None, end_coords=None, start_aabb=None, max_cost=config.PATHFIND_LIMIT):
         self.dimension = dimension
-        self.navgrid = dimension.navgrid
-        self.get_node = self.navgrid.get_node
+        self.grid = dimension.grid
         self.start_node = PathNode(start_coords)
         self.goal_node = PathNode(end_coords)
-        self.current_aabb = current_aabb
+        self.start_aabb = start_aabb
         self.max_cost = max_cost
         self.path = None
         self.closed_set = set()
@@ -111,15 +103,17 @@ class AStar(object):
         return config.COST_DIRECT
 
     def neighbours(self, node):
-        for node in self.navgrid.neighbours_of(node.coords):
-            if node not in self.closed_set:
-                yield PathNode(node)
+        for n_coords in gridspace.neighbours_of(self.grid, node.coords):
+            if n_coords not in self.closed_set:
+                if gridspace.can_go(node.coords, n_coords):
+                    yield PathNode(Vector(n_coords[0], n_coords[1], n_coords[2]))
 
     def heuristic_cost_estimate(self, start, goal):
-        h_diagonal = min(abs(start[0] - goal[0]), abs(start[2] - goal[2]))
-        h_straight = (abs(start[0] - goal[0]) + abs(start[2] - goal[2]))
-        h = config.COST_DIAGONAL * h_diagonal + \
-            config.COST_DIRECT * (h_straight - 2 * h_diagonal)
+        adx = abs(start.coords.x - goal.coords.x)
+        adz = abs(start.coords.z - goal.coords.z)
+        h_diagonal = min(adx, adz)
+        h_straight = adx + adz
+        h = config.COST_DIAGONAL * h_diagonal + config.COST_DIRECT * (h_straight - 2 * h_diagonal)
         return h
 
     def next(self):
@@ -128,7 +122,7 @@ class AStar(object):
             raise StopIteration()
         x = heapq.heappop(self.open_heap)
         if x == self.goal_node:
-            self.path = Path(dimension=self.dimension, nodes=reconstruct_path(x), current_aabb=self.current_aabb)
+            self.path = Path(dimension=self.dimension, nodes=self.reconstruct_path(x), start_aabb=self.start_aabb)
             raise StopIteration()
         self.open_set.remove(x)
         self.closed_set.add(x)

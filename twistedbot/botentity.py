@@ -4,21 +4,21 @@ import math
 from datetime import datetime
 
 import config
-import tools
+import utils
 import packets
 import logbot
 import fops
 import blocks
 import behaviours
 from axisbox import AABB
-from vector import Vector
+
 
 log = logbot.getlogger("BOT_ENTITY")
 
 
 class BotObject(object):
     def __init__(self):
-        self.velocities = Vector(0.0, 0.0, 0.0)
+        self.velocities = utils.Vector(0.0, 0.0, 0.0)
         self.direction = [0, 0]
         self._x = 0
         self._y = 0
@@ -78,15 +78,15 @@ class BotObject(object):
 
     @property
     def grid_x(self):
-        return tools.grid_shift(self.x)
+        return utils.grid_shift(self.x)
 
     @property
     def grid_y(self):
-        return tools.grid_shift(self.y)
+        return utils.grid_shift(self.y)
 
     @property
     def grid_z(self):
-        return tools.grid_shift(self.z)
+        return utils.grid_shift(self.z)
 
     @property
     def aabb(self):
@@ -147,8 +147,7 @@ class BotEntity(object):
         self.move(self.bot_object)
         self.bot_object.direction = [0, 0]
         self.send_location(self.bot_object)
-        tools.do_later(0, self.on_standing_ready, self.bot_object)
-        tools.do_later(0, self.behaviour_manager.run)
+        utils.do_later(0, self.behaviour_manager.run)
         tick_end = datetime.now()
         d_run = (tick_end - tick_start).total_seconds()  # time this step took
         t = config.TIME_STEP - d_run  # decreased by computation in tick
@@ -179,7 +178,7 @@ class BotEntity(object):
     def turn_to_point(self, b_obj, point):
         if point[0] == b_obj.x and point[2] == b_obj.z:
             return
-        yaw, pitch = tools.yaw_pitch_between(point, b_obj.position_eyelevel)
+        yaw, pitch = utils.yaw_pitch_between(point, b_obj.position_eyelevel)
         if yaw is None or pitch is None:
             return
         b_obj.yaw = yaw
@@ -188,7 +187,7 @@ class BotEntity(object):
     def turn_to_direction(self, b_obj, x, z):
         if x == 0 and z == 0:
             return
-        yaw, _ = tools.yaw_pitch_to_vector(x, 0, z)
+        yaw, _ = utils.yaw_pitch_to_vector(x, 0, z)
         b_obj.yaw = yaw
         b_obj.pitch = 0
 
@@ -210,9 +209,9 @@ class BotEntity(object):
 
     def handle_water_movement(self, b_obj):
         is_in_water = False
-        water_current = Vector(0, 0, 0)
+        water_current = utils.Vector(0, 0, 0)
         bb = b_obj.aabb.expand(-0.001, -0.401, -0.001)
-        top_y = tools.grid_shift(bb.max_y + 1)
+        top_y = utils.grid_shift(bb.max_y + 1)
         for blk in self.world.grid.blocks_in_aabb(bb):
             if isinstance(blk, blocks.BlockWater):
                 if top_y >= (blk.y + 1 - blk.height_percent):
@@ -360,7 +359,7 @@ class BotEntity(object):
 
     def update_directional_speed(self, b_obj, speedf, balance=False):
         direction = self.directional_speed(b_obj.direction, speedf)
-        if balance and tools.vector_size(direction) > 0:
+        if balance and utils.vector_size(direction) > 0:
             perpedicular_dir = (- direction[1], direction[0])
             dot = (b_obj.velocities[0] * perpedicular_dir[0] + b_obj.velocities[2] * perpedicular_dir[1]) / \
                 (perpedicular_dir[0] * perpedicular_dir[0] + perpedicular_dir[1] * perpedicular_dir[1])
@@ -406,7 +405,7 @@ class BotEntity(object):
     def is_in_water(self, b_obj):
         is_in_water = False
         bb = b_obj.aabb.expand(-0.001, -0.4010000059604645, -0.001)
-        top_y = tools.grid_shift(bb.max_y + 1)
+        top_y = utils.grid_shift(bb.max_y + 1)
         for blk in self.world.grid.blocks_in_aabb(bb):
             if isinstance(blk, blocks.BlockWater):
                 if top_y >= (blk.y + 1 - blk.height_percent):
@@ -455,23 +454,13 @@ class BotEntity(object):
     def on_death(self):
         self.location_received = False
         self.spawn_point_received = False
-        tools.do_later(1.0, self.do_respawn)
+        utils.do_later(1.0, self.do_respawn)
 
     def standing_on_block(self, b_obj):
         return self.world.grid.standing_on_block(b_obj.aabb)
 
     def is_standing(self, b_obj):
         return self.standing_on_block(b_obj) is not None
-
-    def on_standing_ready(self, b_obj):
-        if self.check_location_received:
-            block = self.standing_on_block(b_obj)
-            if block is None:
-                return
-            log.msg("Standing on block %s" % block)
-            if not self.world.navgrid.node_is_solid(block.coords):
-                self.world.navgrid.block_change(None, block)
-            self.check_location_received = False
 
     def on_update_experience(self, experience_bar=None, level=None, total_experience=None):
         pass

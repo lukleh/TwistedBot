@@ -3,10 +3,9 @@ import inspect
 import sys
 
 import logbot
-import tools
+import utils
 import materials
 from axisbox import AABB
-from vector import Vector
 
 
 log = logbot.getlogger("BLOCKS")
@@ -50,10 +49,10 @@ class Block(object):
         self.y = y
         self.z = z
         self.meta = meta
-        self.coords = Vector(self.x, self.y, self.z)
+        self.coords = utils.Vector(self.x, self.y, self.z)
 
     def __str__(self):
-        return "|%s %s %s|" % (self.coords, self.name, tools.meta2str(self.meta))
+        return "|%s %s %s|" % (self.coords, self.name, utils.meta2str(self.meta))
 
     @property
     def is_collidable(self):
@@ -148,9 +147,9 @@ class BlockWater(BlockFluid):
 
     @property
     def flow_vector(self):
-        v = Vector(0, 0, 0)
+        v = utils.Vector(0, 0, 0)
         this_efd = self.effective_flow_decay
-        for i, j in tools.cross:
+        for i, j in utils.cross:
             blk = self.grid.get_block(self.x + i, self.y, self.z + j)
             efd = blk.effective_flow_decay
             if efd < 0:
@@ -159,10 +158,10 @@ class BlockWater(BlockFluid):
                     efd = blk.effective_flow_decay
                     if efd >= 0:
                         va = efd - (this_efd - 8)
-                        v = Vector(i * va, 0, j * va)
+                        v = utils.Vector(i * va, 0, j * va)
             elif efd >= 0:
                 va = efd - this_efd
-                v = Vector(i * va, 0, j * va)
+                v = utils.Vector(i * va, 0, j * va)
         if self.meta >= 8:
             t = False
             if t or self.is_solid_block(self.grid.get_block(self.x, self.y, self.z - 1), 2):

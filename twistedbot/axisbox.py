@@ -4,8 +4,7 @@ import math
 
 import config
 import fops
-import tools
-from vector import Vector
+import utils
 
 
 class AABB(object):
@@ -72,15 +71,15 @@ class AABB(object):
 
     @property
     def grid_x(self):
-        return tools.grid_shift(self.posx)
+        return utils.grid_shift(self.posx)
 
     @property
     def grid_y(self):
-        return tools.grid_shift(self.posy)
+        return utils.grid_shift(self.posy)
 
     @property
     def grid_z(self):
-        return tools.grid_shift(self.posz)
+        return utils.grid_shift(self.posz)
 
     @classmethod
     def from_player_coords(cls, x, y, z):
@@ -214,7 +213,7 @@ class AABB(object):
                     yield x, y, z
 
     def vector_to(self, bb):
-        return Vector(bb.posx - self.posx, bb.posy - self.posy, bb.posz - self.posz)
+        return utils.Vector(bb.posx - self.posx, bb.posy - self.posy, bb.posz - self.posz)
 
     def horizontal_direction_to(self, bb):
         v = self.vector_to(bb)

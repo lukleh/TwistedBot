@@ -2,8 +2,8 @@
 import re
 
 import logbot
-import tools
-
+import utils
+import gridspace
 
 log = logbot.getlogger("SIGNS")
 
@@ -42,11 +42,25 @@ class Sign(object):
 
 
 class SignWayPoints(object):
-    def __init__(self, navgrid):
-        self.navgrid = navgrid
+    def __init__(self, dimension):
+        self.dimension = dimension
         self.sign_points = {}
         self.crd_to_sign = {}
         self.ordered_sign_groups = {}
+
+    def on_new_sign(self, x, y, z, line1, line2, line3, line4):
+        sign = Sign(utils.Vector(x, y, z), line1, line2, line3, line4)
+        if sign.is_waypoint:
+            self.new(sign)
+
+    def check_sign(self, sign):
+        crd = sign.coords
+        sblk = self.dimension.grid.get_block(crd[0], crd[1], crd[2])
+        if not sblk.is_sign:
+            self.remove(crd)
+            return False
+        else:
+            return self.sign_waypoints.has_sign_at(crd)
 
     def has_sign_at(self, crd):
         return crd in self.crd_to_sign
@@ -60,8 +74,7 @@ class SignWayPoints(object):
     def new(self, sign):
         if sign.is_groupable:
             if sign.group not in self.ordered_sign_groups:
-                self.ordered_sign_groups[
-                    sign.group] = tools.OrderedLinkedList(name=sign.group)
+                self.ordered_sign_groups[sign.group] = utils.OrderedLinkedList(name=sign.group)
             self.ordered_sign_groups[sign.group].add(sign.value, sign)
         if sign.name:
             self.sign_points[sign.name] = sign
@@ -119,7 +132,7 @@ class SignWayPoints(object):
             s = sgroup.next_rotate()
             if s == cs:
                 return None
-            if self.navgrid.node_is_solid(tools.lower_y(s.coords)):
+            if gridspace.can_stand(s.coords):
                 return s
 
     def get_groupnext_circulate(self, group):
@@ -137,7 +150,7 @@ class SignWayPoints(object):
                 n_pass += 1
                 if n_pass == 2:
                     return None
-            if self.navgrid.node_is_solid(tools.lower_y(s.coords)):
+            if gridspace.can_stand(s.coords):
                 return s
 
     def reset_group(self, group):

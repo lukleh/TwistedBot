@@ -92,8 +92,9 @@ class EntityDroppedItem(Entity):
 
 
 class Entities(object):
-    def __init__(self, world):
-        self.world = world
+    def __init__(self, dimension):
+        self.dimension = dimension
+        self.world = dimension.world
         self.entities = {}
 
     def has_entity(self, eid):
@@ -109,7 +110,7 @@ class Entities(object):
         if self.world.commander.eid != entity.eid:
             return
         gpos = entity.grid_position
-        block = self.world.grid.standing_on_block(AABB.from_player_coords(entity.x, entity.y, entity.z))
+        block = self.dimension.grid.standing_on_block(AABB.from_player_coords(entity.x, entity.y, entity.z))
         if block is None:
             return
         if self.world.commander.last_block is not None and self.world.commander.last_block == block:

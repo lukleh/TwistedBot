@@ -3,14 +3,12 @@ import StringIO
 import array
 
 
-import tools
+import utils
 import blocks
 import config
 import logbot
 import fops
-import signwaypoints
 from axisbox import AABB
-from vector import Vector
 
 
 log = logbot.getlogger("GRID")
@@ -51,10 +49,9 @@ class Chunk(object):
 
 
 class Grid(object):
-    def __init__(self, world):
-        self.world = world
+    def __init__(self, dimension):
+        self.dimension = dimension
         self.chunks = {}
-        self.nav_cubes = {}
         self.chunks_loaded = 0
         self.spawn_position = None
 
@@ -86,16 +83,12 @@ class Grid(object):
         return self.make_block(x, y, z, block_types[pos], chunk.get_meta(y_level, pos))
 
     def chunk_updated(self, chunk_x, chunk_z):
-        for i, j in tools.adjacency:
-            c = (chunk_x + i, chunk_z + j)
-            if c in self.chunks:
-                self.world.navgrid.incomplete_on_chunk_border(c, (chunk_x, chunk_z))
+        pass
 
     def new_chunk(self, x, z):
         crd = (x, z)
         chunk = Chunk(crd)
         self.chunks[crd] = chunk
-        self.world.nav_cubes.new_cube(crd)
         return chunk
 
     def _load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array):
@@ -189,26 +182,15 @@ class Grid(object):
         return current_block, new_block
 
     def on_block_change(self, x, y, z, btype, bmeta):
-        ob, nb = self.change_block_to(x, y, z, btype, bmeta)
-        self.world.navgrid.block_change(ob, nb)
+        _, _ = self.change_block_to(x, y, z, btype, bmeta)
 
     def on_multi_block_change(self, chunk_x, chunk_z, blocks):
         shift_x = chunk_x << 4
         shift_z = chunk_z << 4
-        changed = []
         for block in blocks:
-            ob, nb = self.change_block_to(block.x + shift_x, block.y, block.z + shift_z, block.block_id, block.meta)
-            changed.append((ob, nb))
-        for ob, nb in changed:
-            self.world.navgrid.block_change(ob, nb)
-
-    def on_new_sign(self, x, y, z, line1, line2, line3, line4):
-        sign = signwaypoints.Sign(Vector(x, y, z), line1, line2, line3, line4)
-        if sign.is_waypoint:
-            self.world.navgrid.sign_waypoints.new(sign)
+            _, _ = self.change_block_to(block.x + shift_x, block.y, block.z + shift_z, block.block_id, block.meta)
 
     def on_explosion(self, x, y, z, records):
-        changed = []
         for rec in records:
             rx = x + rec.x
             ry = y + rec.y
@@ -217,9 +199,6 @@ class Grid(object):
             gy = int(ry)
             gz = int(rz)
             ob, nb = self.change_block_to(gx, gy, gz, 0, 0)
-            changed.append((ob, nb))
-        for ob, nb in changed:
-            self.world.navgrid.block_change(ob, nb)
 
     def chunk_complete_at(self, x, z):
         cx = x >> 4
@@ -267,12 +246,11 @@ class Grid(object):
         blcks = self.blocks_in_aabb(ubb)
         dvect = bb1.vector_to(bb2)
         if horizontal:
-            dvect = (dvect[0], 0, dvect[2])
+            dvect.y = 0
         col_rel_d = 1.1
         col_bb = None
         for blk in blcks:
-            col, rel_d, bb = blk.sweep_collision(
-                bb1, dvect, max_height=max_height)
+            col, rel_d, bb = blk.sweep_collision(bb1, dvect, max_height=max_height)
             if col and fops.eq(col_rel_d, rel_d):
                 if max_height:
                     if fops.lt(col_bb.max_y, bb.max_y):
@@ -281,7 +259,7 @@ class Grid(object):
                 col_rel_d = rel_d
                 col_bb = bb
         if col_bb is not None:
-            return col_rel_d * tools.vector_size(dvect), col_bb
+            return col_rel_d * dvect.size, col_bb
         else:
             return None, None
 
@@ -357,18 +335,9 @@ class Grid(object):
                 return False
         return True
 
-    def check_sign(self, sign):
-        crd = sign.coords
-        sblk = self.get_block(crd[0], crd[1], crd[2])
-        if not sblk.is_sign:
-            self.world.navgrid.sign_waypoints.remove(crd)
-            return False
-        else:
-            return self.world.navgrid.sign_waypoints.has_sign_at(crd)
-
     def aabb_eyelevel_inside_water(self, bb, eye_height=config.PLAYER_EYELEVEL):
         eye_y = bb.min_y + eye_height
-        ey = tools.grid_shift(eye_y)
+        ey = utils.grid_shift(eye_y)
         blk = self.get_block(bb.grid_x, ey, bb.grid_z)
         if blk.is_water:
             wh = blk.height_percent - 0.11111111
