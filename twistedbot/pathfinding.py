@@ -22,8 +22,8 @@ class PathNode(object):
         self.hash = hash(self.coords)
 
     def __str__(self):
-        return "%s:%s:g%s:h%s:f%s" % \
-            (str(self.coords), self.cost, self.g, self.h, self.f)
+        return "%s:st%s:cost:%s:g%s:h%s:f%s" % \
+            (str(self.coords), self.step, self.cost, self.g, self.h, self.f)
 
     def __repr__(self):
         return self.__str__()
@@ -36,9 +36,6 @@ class PathNode(object):
 
     def __hash__(self):
         return self.hash
-
-    def __getitem__(self, i):
-        return self.coords[i]
 
     @property
     def parent(self):
@@ -56,27 +53,24 @@ class PathNode(object):
 
 
 class Path(object):
-    def __init__(self, dimension=None, nodes=None, start_aabb=start_aabb):
+    def __init__(self, dimension=None, nodes=None, start_aabb=None):
         self.dimension = dimension
         self.nodes = nodes
         self.start_aabb = start_aabb
         self.is_valid = True
 
     def __str__(self):
-        return "Path nodes %s" % [str(n) for n in self.nodes]
+        return "Path nodes %d\n\t%s" % (len(self.nodes), '\n\t'.join([str(n) for n in self.nodes]))
 
     def take_step(self):
         pass
 
     def start_from(self, bb):
-        if not self.start_aabb == bb:
-            self.is_valid = False
-            return
         self.start_aabb = bb
-        
 
 
 class AStar(object):
+
     def __init__(self, dimension=None, start_coords=None, end_coords=None, start_aabb=None, max_cost=config.PATHFIND_LIMIT):
         self.dimension = dimension
         self.grid = dimension.grid
@@ -89,6 +83,7 @@ class AStar(object):
         self.open_heap = [self.start_node]
         self.open_set = set([self.start_node])
         self.start_node.set_score(0, self.heuristic_cost_estimate(self.start_node, self.goal_node))
+        self.iter_count = 0
 
     def reconstruct_path(self, current):
         nodes = []
@@ -103,10 +98,10 @@ class AStar(object):
         return config.COST_DIRECT
 
     def neighbours(self, node):
-        for n_coords in gridspace.neighbours_of(self.grid, node.coords):
-            if n_coords not in self.closed_set:
-                if gridspace.can_go(node.coords, n_coords):
-                    yield PathNode(Vector(n_coords[0], n_coords[1], n_coords[2]))
+        for t_coords in gridspace.neighbours_of(self.grid, node.coords):
+            if t_coords not in self.closed_set:
+                if gridspace.can_go(self.grid, node.coords.tuple, t_coords):
+                    yield PathNode(Vector.from_tuple(t_coords))
 
     def heuristic_cost_estimate(self, start, goal):
         adx = abs(start.coords.x - goal.coords.x)
@@ -117,6 +112,7 @@ class AStar(object):
         return h
 
     def next(self):
+        self.iter_count += 1
         if not self.open_set:
             log.err("Did not find path between %s and %s" % (self.start_node.coords, self.goal_node.coords))
             raise StopIteration()
@@ -125,9 +121,9 @@ class AStar(object):
             self.path = Path(dimension=self.dimension, nodes=self.reconstruct_path(x), start_aabb=self.start_aabb)
             raise StopIteration()
         self.open_set.remove(x)
-        self.closed_set.add(x)
+        self.closed_set.add(x.coords.tuple)
         for y in self.neighbours(x):
-            if y in self.closed_set:
+            if y.coords.tuple in self.closed_set:
                 continue
             tentative_g_core = x.g + self.get_edge_cost(x, y)
             if y not in self.open_set or tentative_g_core < y.g:

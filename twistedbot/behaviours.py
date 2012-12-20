@@ -1,13 +1,17 @@
 
 
+import time
+
 from twisted.internet.task import cooperate
 from twisted.internet.defer import inlineCallbacks, returnValue
 
 import config
 import utils
-
+import gridspace
 import logbot
 from pathfinding import AStar
+from axisbox import AABB
+
 
 log = logbot.getlogger("BEHAVIOURS")
 
@@ -24,7 +28,7 @@ class BehaviourManager(object):
         self.world = world
         self.bot = bot
         self.bqueue = []
-        self.default_behaviour = LookAtPlayerBehaviour(self)
+        self.default_behaviour = FollowPlayerBehaviour(self)  # LookAtPlayerBehaviour(self)
         self.running = False
         self.new_command = None
 
@@ -103,10 +107,10 @@ class BehaviourBase(object):
         self.cancelled = True
 
     def _tick(self):
-        pass
+        raise NotImplemented('_tick')
 
-    def from_child(self):
-        pass
+    def from_child(self, g):
+        self.status = Status.running
 
     def add_subbehaviour(self, behaviour, *args, **kwargs):
         g = behaviour(manager=self.manager, parent=self, **kwargs)
@@ -114,7 +118,9 @@ class BehaviourBase(object):
         self.status = Status.suspended
 
     def return_to_parent(self):
-        self.manager.bqueue.pop()
+        for i, b in enumerate(self.manager.bqueue):
+            if b == self:
+                self.manager.bqueue.pop(i)
         if self.parent is not None:
             self.parent.from_child(self)
 
@@ -157,9 +163,6 @@ class WalkSignsBehaviour(BehaviourBase):
             raise Exception("unknown walk type")
         self.world.sign_waypoints.reset_group(self.group)
 
-    def from_child(self, g):
-        self.status = Status.running
-
     def _tick(self):
         if not self.world.sign_waypoints.has_group(self.group):
             self.world.chat.send_chat_message("cannnot %s group named %s" % (self.walk_type, self.group))
@@ -198,6 +201,23 @@ class GoToSignBehaviour(BehaviourBase):
         self.add_subbehaviour(TravelToBehaviour, coords=self.signpoint.nav_coords)
 
 
+class FollowPlayerBehaviour(BehaviourBase):
+    def __init__(self, *args, **kwargs):
+        super(FollowPlayerBehaviour, self).__init__(*args, **kwargs)
+        self.last_block = None
+
+    def _tick(self):
+        entity = self.world.entities.get_entity(self.world.commander.eid)
+        if entity is None:
+            return
+        block = self.world.grid.standing_on_block(AABB.from_player_coords(*entity.position))
+        if block is None:
+            return
+        if self.last_block != block:
+            self.last_block = block
+            self.add_subbehaviour(TravelToBehaviour, coords=block.coords)
+
+
 class TravelToBehaviour(BehaviourBase):
     def __init__(self, *args, **kwargs):
         super(TravelToBehaviour, self).__init__(*args, **kwargs)
@@ -215,22 +235,20 @@ class TravelToBehaviour(BehaviourBase):
         if sb is None:
             self.ready = False
         else:
+            t_start = time.time()
             d = cooperate(AStar(dimension=self.world.dimension,
                                 start_coords=sb.coords,
                                 end_coords=self.travel_coords,
-                                current_aabb=self.bot.bot_object.aabb)).whenDone()
+                                start_aabb=self.bot.bot_object.aabb)).whenDone()
             d.addErrback(logbot.exit_on_error)
             astar = yield d
+            log.msg('ASTAR finished in %s sec, length %d, made %d iterations' % (time.time() - t_start, len(astar.path.nodes), astar.iter_count))
             if astar.path is None:
                 self.status = Status.failure
             else:
-                self.path = astar.path
-                self.ready = True
-
-    def from_child(self, g):
-        self.status = Status.running
-        if g.status != Status.success:
-            self.ready = False
+                if sb == self.bot.standing_on_block(self.bot.bot_object):
+                    self.path = astar.path
+                    self.ready = True
 
     @inlineCallbacks
     def _tick(self):
@@ -241,10 +259,9 @@ class TravelToBehaviour(BehaviourBase):
             if not self.ready:
                 return
             self.path.start_from(self.bot.bot_object.aabb)
-            if not self.path.is_valid:
-                if self.status == Status.failure:
-                    return
-        self.follow(self.path, self.bot.bot_object)
+        #print self.path
+        self.status = Status.success
+        #self.follow(self.path, self.bot.bot_object)
 
     def follow(self, path, b_obj):
         step = path.take_step()
@@ -257,9 +274,8 @@ class TravelToBehaviour(BehaviourBase):
                 self.status = Status.success
 
     def move(self, step, b_obj):
-        direction = b_obj.aabb.horizontal_direction_to(self.closest_platform)
-        if not self.was_at_target:
-            self.bot.turn_to_direction(b_obj, direction[0], direction[1])
+        direction = b_obj.aabb.horizontal_direction_to(step)
+        self.bot.turn_to_direction(b_obj, direction[0], direction[1])
         b_obj.direction = direction
 
     def jump(self, b_obj):

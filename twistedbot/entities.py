@@ -101,6 +101,8 @@ class Entities(object):
         return eid in self.entities
 
     def get_entity(self, eid):
+        if eid is None:
+            return None
         e = self.entities.get(eid, None)
         if e is None:
             log.msg("Entity %d not in mobs list" % eid)
@@ -110,7 +112,7 @@ class Entities(object):
         if self.world.commander.eid != entity.eid:
             return
         gpos = entity.grid_position
-        block = self.dimension.grid.standing_on_block(AABB.from_player_coords(entity.x, entity.y, entity.z))
+        block = self.dimension.grid.standing_on_block(AABB.from_player_coords(*entity.position))
         if block is None:
             return
         if self.world.commander.last_block is not None and self.world.commander.last_block == block:

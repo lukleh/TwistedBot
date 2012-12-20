@@ -5,7 +5,6 @@ from collections import defaultdict
 import logbot
 import utils
 import config
-import gridspace
 from entities import Entities
 from grid import Grid
 from statistics import Statistics
@@ -72,7 +71,8 @@ class World(object):
         self.connected = True
 
     def on_shutdown(self):
-        pass
+        log.msg("Reactor shutdown")
+        self.protocol.factory.log_connection_lost = False
 
     def send_packet(self, name, payload):
         if self.protocol is not None:

@@ -75,8 +75,7 @@ class Chat(object):
                 self.send_chat_message("which sign group to %s?" % verb)
         elif verb == "go":
             if subject:
-                self.world.bot.behaviour_manager.command(
-                    behaviours.GoToSignBehaviour, sign_name=subject)
+                self.world.bot.behaviour_manager.command(behaviours.GoToSignBehaviour, sign_name=subject)
             else:
                 self.send_chat_message("go where?")
         elif verb == "look":
@@ -84,6 +83,8 @@ class Chat(object):
                 self.world.bot.behaviour_manager.command(behaviours.LookAtPlayerBehaviour)
             else:
                 self.send_chat_message("look at what?")
+        elif verb == "follow":
+            self.world.bot.behaviour_manager.command(behaviours.FollowPlayerBehaviour)
         elif verb == "cancel":
             self.world.bot.behaviour_manager.cancel_running()
         elif verb == "show":

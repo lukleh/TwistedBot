@@ -55,7 +55,7 @@ def start():
     mc_factory = MineCraftFactory(world)
     def customKeyboardInterruptHandler(signum, stackframe):
         log.msg("CTRL-C from user, exiting....")
-        mc_factory.keyboard_kill = True
+        mc_factory.log_connection_lost = False
         reactor.callFromThread(reactor.stop)
     signal.signal(signal.SIGINT, customKeyboardInterruptHandler)
     reactor.addSystemEventTrigger("before", "shutdown", world.on_shutdown)

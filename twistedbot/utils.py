@@ -171,6 +171,10 @@ class Vector(object):
         self.y = y
         self.z = z
 
+    @classmethod
+    def from_tuple(cls, tpl):
+        return Vector(tpl[0], tpl[1], tpl[2])
+
     def __hash__(self):
         return hash((self.x, self.y, self.z))
 
@@ -191,6 +195,10 @@ class Vector(object):
 
     def __repr__(self):
         return self.__str__()
+
+    @property
+    def tuple(self):
+        return (self.x, self.y, self.z)
 
     @property
     def size(self):

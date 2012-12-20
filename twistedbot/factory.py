@@ -115,7 +115,6 @@ class MineCraftProtocol(Protocol):
         self.packet_iter(self.packets)
 
     def send_packet(self, name, payload):
-        #print 'sending', name, payload
         p = make_packet(name, payload)
         if config.DEBUG:
             packet_printout(
@@ -173,7 +172,6 @@ class MineCraftProtocol(Protocol):
         self.world.on_respawn(game_mode=c.game_mode, dimension=c.dimension, difficulty=c.difficulty)
 
     def p_location(self, c):
-        #print 'p_location', c
         log.msg("received LOCATION X:%f Y:%f Z:%f STANCE:%f GROUNDED:%s" %
                 (c.position.x, c.position.y, c.position.z,
                  c.position.stance, c.grounded.grounded))
@@ -376,7 +374,7 @@ class MineCraftFactory(ReconnectingClientFactory):
         self.maxDelay = config.CONNECTION_MAX_DELAY
         self.initialDelay = config.CONNECTION_INITIAL_DELAY
         self.delay = self.initialDelay
-        self.keyboard_kill = False
+        self.log_connection_lost = True
 
     def startedConnecting(self, connector):
         log.msg('Started connecting...')
@@ -391,10 +389,11 @@ class MineCraftFactory(ReconnectingClientFactory):
         return protocol
 
     def clientConnectionLost(self, connector, unused_reason):
-        if not self.keyboard_kill:
+        if self.log_connection_lost:
             log.msg('Connection lost, reason:', unused_reason.getErrorMessage())
         ReconnectingClientFactory.clientConnectionLost(self, connector, unused_reason)
 
     def clientConnectionFailed(self, connector, reason):
         log.msg('Connection failed, reason:', reason.getErrorMessage())
+        print self.delay
         ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)

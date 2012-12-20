@@ -30,9 +30,6 @@ class BlockMetaClass(type):
         cls.is_vine = name_or_class(cls, 'Vines')
         cls.is_simple_cube = name_or_class(cls, 'BlockCube')
         cls.is_ladder_or_vine = cls.is_ladder or cls.is_vine
-        #atts = [(k, v) for k, v in cls.__dict__.items() if k.startswith("is_") and (v == False or v == True)]
-        #if any([v == True for k, v in atts]):
-        #    print ', '.join(["%s, %s" % (k, v) for k, v in atts]), cls.__name__
         return cls
 
 
@@ -53,6 +50,12 @@ class Block(object):
 
     def __str__(self):
         return "|%s %s %s|" % (self.coords, self.name, utils.meta2str(self.meta))
+
+    def __eq__(self, other):
+        return other is not None and self.coords == other.coords and self.meta == other.meta
+
+    def __ne__(self, other):
+        return not (self == other)
 
     @property
     def is_collidable(self):

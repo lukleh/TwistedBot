@@ -93,7 +93,7 @@ class Grid(object):
 
     def _load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array):
         if primary_bit == 0:
-            log.msg("Received chunk erase packet for %s, %s" % (x, z))
+            #log.msg("Received chunk erase packet for %s, %s" % (x, z))
             if (x, z) in self.chunks:
                 del self.chunks[(x, z)]
             return
@@ -210,12 +210,10 @@ class Grid(object):
             return chunk.complete
 
     def blocks_in_aabb(self, bb):
-        out = []
         for x, y, z in bb.grid_area:
             blk = self.get_block(x, y, z)
             if blk is not None:
-                out.append(blk)
-        return out
+                yield blk
 
     def is_any_liquid(self, bb):
         for blk in self.blocks_in_aabb(bb):
@@ -226,50 +224,6 @@ class Grid(object):
     def aabb_collides(self, bb):
         for col_bb in self.collision_aabbs_in(bb):
             if col_bb.collides(bb):
-                return True
-        return False
-
-    def passing_blocks_between(self, bb1, bb2):
-        out = []
-        ubb = bb1.union(bb2)
-        blcks = self.blocks_in_aabb(ubb)
-        dvect = bb1.vector_to(bb2)
-        for blk in blcks:
-            bb = AABB.from_block_cube(blk.coords.x, blk.coords.y, blk.coords.z)
-            col, _ = bb1.sweep_collision(bb, dvect)
-            if col:
-                out.append(blk)
-        return out
-
-    def min_collision_between(self, bb1, bb2, horizontal=False, max_height=False):
-        ubb = bb1.extend_to(dy=-1).union(bb2.extend_to(dy=-1))
-        blcks = self.blocks_in_aabb(ubb)
-        dvect = bb1.vector_to(bb2)
-        if horizontal:
-            dvect.y = 0
-        col_rel_d = 1.1
-        col_bb = None
-        for blk in blcks:
-            col, rel_d, bb = blk.sweep_collision(bb1, dvect, max_height=max_height)
-            if col and fops.eq(col_rel_d, rel_d):
-                if max_height:
-                    if fops.lt(col_bb.max_y, bb.max_y):
-                        col_bb = bb
-            if col and fops.lt(rel_d, col_rel_d):
-                col_rel_d = rel_d
-                col_bb = bb
-        if col_bb is not None:
-            return col_rel_d * dvect.size, col_bb
-        else:
-            return None, None
-
-    def collision_between(self, bb1, bb2, debug=False):
-        ubb = bb1.extend_to(dy=-1).union(bb2.extend_to(dy=-1))
-        blcks = self.blocks_in_aabb(ubb)
-        dvect = bb1.vector_to(bb2)
-        for blk in blcks:
-            col, _, _ = blk.sweep_collision(bb1, dvect, debug=debug)
-            if col:
                 return True
         return False
 
@@ -287,18 +241,13 @@ class Grid(object):
         return out
 
     def aabb_on_ladder(self, bb):
-        blk = self.get_block(bb.grid_x, bb.grid_y, bb.grid_z)
+        blk = self.get_block(bb.gridpos_x, bb.gridpos_y, bb.gridpos_z)
         return blk.number == blocks.Ladders.number or blk.number == blocks.Vines.number
 
     def aabb_in_water(self, bb):
+        #TODO return the bast water block instead of boolean
         for blk in self.blocks_in_aabb(bb.expand(-0.001, -0.4010000059604645, -0.001)):
             if blk.is_water:
-                return True
-        return False
-
-    def standing_on_solid(self, bb):
-        for col_bb in self.collision_aabbs_in(bb):
-            if fops.eq(col_bb.max_y, bb.min_y):
                 return True
         return False
 
@@ -307,15 +256,18 @@ class Grid(object):
         for col_bb in self.collision_aabbs_in(bb):
             if fops.eq(col_bb.max_y, bb.min_y):
                 standing_on = self.get_block(col_bb.grid_x, col_bb.grid_y, col_bb.grid_z)
-                if standing_on.x == bb.grid_x and standing_on.z == bb.grid_z:
+                if standing_on.x == bb.gridpos_x and standing_on.z == bb.gridpos_z:
                     break
+        if standing_on is not None:
+            if not fops.eq(bb.grid_y, standing_on.y):
+                standing_on = self.get_block(standing_on.x, standing_on.y + 1, standing_on.z)
         return standing_on
 
     def standing_on_block(self, bb):
         standing_on = self.standing_on_solidblock(bb)
         if standing_on is None:
             if self.aabb_on_ladder(bb):
-                standing_on = self.get_block(bb.grid_x, bb.grid_y, bb.grid_z)
+                standing_on = self.get_block(bb.gridpos_x, bb.gridpos_y, bb.gridpos_z)
         if standing_on is None:
             if self.aabb_in_water(bb):
                 standing_on = self.get_block(bb.grid_x, bb.grid_y, bb.grid_z)
@@ -338,7 +290,7 @@ class Grid(object):
     def aabb_eyelevel_inside_water(self, bb, eye_height=config.PLAYER_EYELEVEL):
         eye_y = bb.min_y + eye_height
         ey = utils.grid_shift(eye_y)
-        blk = self.get_block(bb.grid_x, ey, bb.grid_z)
+        blk = self.get_block(bb.gridpos_x, ey, bb.gridpos_z)
         if blk.is_water:
             wh = blk.height_percent - 0.11111111
             return eye_y < (ey + 1 - wh)

@@ -54,6 +54,10 @@ class AABB(object):
         return self.max_x - self.min_x
 
     @property
+    def depth(self):
+        return self.max_z - self.min_z
+
+    @property
     def height(self):
         return self.max_y - self.min_y
 
@@ -71,25 +75,37 @@ class AABB(object):
 
     @property
     def grid_x(self):
-        return utils.grid_shift(self.posx)
+        return utils.grid_shift(self.min_x)
 
     @property
     def grid_y(self):
-        return utils.grid_shift(self.posy)
+        return utils.grid_shift(self.min_y)
 
     @property
     def grid_z(self):
+        return utils.grid_shift(self.min_z)
+
+    @property
+    def gridpos_x(self):
+        return utils.grid_shift(self.posx)
+
+    @property
+    def gridpos_y(self):
+        return utils.grid_shift(self.posy)
+
+    @property
+    def gridpos_z(self):
         return utils.grid_shift(self.posz)
 
     @classmethod
     def from_player_coords(cls, x, y, z):
         return cls(
-            x - config.PLAYER_BODY_RADIUS,
+            x - config.PLAYER_RADIUS,
             y,
-            z - config.PLAYER_BODY_RADIUS,
-            x + config.PLAYER_BODY_RADIUS,
+            z - config.PLAYER_RADIUS,
+            x + config.PLAYER_RADIUS,
             y + config.PLAYER_HEIGHT,
-            z + config.PLAYER_BODY_RADIUS)
+            z + config.PLAYER_RADIUS)
 
     @classmethod
     def from_block_coords(cls, x, y, z):
@@ -109,7 +125,7 @@ class AABB(object):
 
     @property
     def grid_bottom_center(self):
-        return (self.grid_x, self.grid_y, self.grid_z)
+        return (self.gridpos_x, self.gridpos_y, self.gridpos_z)
 
     def collides(self, bb):
         for i in xrange(3):
