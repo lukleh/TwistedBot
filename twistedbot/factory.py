@@ -286,7 +286,7 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_bulk_chunk(self, c):
-        self.world.grid.on_load_bulk_chunk(c.meta, c.data.decode('zlib'))
+        self.world.grid.on_load_bulk_chunk(c.meta, c.data.decode('zlib'), c.light_data)
 
     def p_explosion(self, c):
         self.world.grid.on_explosion(c.x, c.y, c.z, c.records)

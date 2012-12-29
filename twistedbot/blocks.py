@@ -1637,7 +1637,15 @@ class Anvil(Block):
     material = materials.iron
     render_as_normal_block = False
     is_opaque_cube = False
-    bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.75, 1.0)
+
+    @property
+    def grid_bounding_box(self):
+        orient = self.meta & 3
+        if orient != 3 or orient != 1:
+            gbb = AABB(0.125, 0.0, 0.0, 0.875, 1.0, 1.0)
+        else:
+            gbb = AABB(0.0, 0.0, 0.125, 1.0, 1.0, 0.875)
+        return gbb.offset(self.x, self.y, self.z)
 
 
 block_map = [None for _ in xrange(256)]

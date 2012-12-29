@@ -91,12 +91,13 @@ class Grid(object):
         self.chunks[crd] = chunk
         return chunk
 
-    def _load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array):
+    def _load_chunk(self, x, z, continuous, primary_bit, add_bit, data, light_data=True):
         if primary_bit == 0:
-            #log.msg("Received chunk erase packet for %s, %s" % (x, z))
-            if (x, z) in self.chunks:
+            try:
                 del self.chunks[(x, z)]
-            return
+                return
+            except KeyError:
+                pass
         self.chunks_loaded += 1
         chunk = self.get_chunk((x, z))
         if chunk is None:
@@ -105,52 +106,42 @@ class Grid(object):
             chunk.complete = True
         else:
             log.msg("WARNING: received noncontinuous chunk, current complete state is %s" % chunk.complete)
-        data = StringIO.StringIO(data_array)
-        data_count = 0
         for i in xrange(chunk.levels):
-            if primary_bit & 1 << i:
+            if primary_bit & (1 << i):
                 data_str = data.read(4096)
-                data_count += 4096
                 ndata = array.array('B', data_str)  # y, z, x
                 chunk.blocks[i] = ndata
-        for h in xrange(3):
+        for i in xrange(chunk.levels):
+            if primary_bit & (1 << i):
+                data_str = data.read(2048)
+                ndata = array.array('B', data_str)
+                chunk.meta[i] = ndata
+        if light_data:
             for i in xrange(chunk.levels):
-                if primary_bit & 1 << i:
+                if primary_bit & (1 << i):
                     data_str = data.read(2048)
-                    data_count += 2048
-                    ndata = array.array('B', data_str)
-                    if h == 0:
-                        chunk.meta[i] = ndata
-                    # for now ignore block light and sky light
-                    elif h == 1:
-                        pass
-                    else:
-                        pass
+                    #ndata = array.array('B', data_str)
+            for i in xrange(chunk.levels):
+                if primary_bit & (1 << i):
+                    data_str = data.read(2048)
+                    #ndata = array.array('B', data_str)
         # higher block id value will be used after Mojang adds them
         for i in xrange(chunk.levels):
             if add_bit >> i & 1:
                 data_str = data.read(2048)
-                data_count += 2048
                 ndata = array.array('B', data_str)
         if continuous:
             data_str = data.read(256)
-            data_count += 256
-        chunk.biome = array.array('b', data_str)
+            chunk.biome = array.array('b', data_str)
 
     def on_load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array):
-        self._load_chunk(x, z, continuous, primary_bit, add_bit, data_array)
+        self._load_chunk(x, z, continuous, primary_bit, add_bit, StringIO.StringIO(data_array))
         self.chunk_updated(x, z)
 
-    def on_load_bulk_chunk(self, metas, data_array):
-        data_start = 0
-        data_end = 0
+    def on_load_bulk_chunk(self, metas, data_array, light_data):
+        data = StringIO.StringIO(data_array)
         for meta in metas:
-            for i in xrange(Chunk.levels):
-                if meta.primary_bitmap & 1 << i:
-                    data_end += 4096 + 4096 + 2048
-            data_end += 256
-            self._load_chunk(meta.x, meta.z, True, meta.primary_bitmap, meta.add_bitmap, data_array[data_start:data_end])
-            data_start = data_end
+            self._load_chunk(meta.x, meta.z, True, meta.primary_bitmap, meta.add_bitmap, data, light_data=light_data)
         for meta in metas:
             self.chunk_updated(meta.x, meta.z)
 
