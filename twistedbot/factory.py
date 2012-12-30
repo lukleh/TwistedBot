@@ -37,7 +37,7 @@ class MineCraftProtocol(Protocol):
             8: self.p_health,
             9: self.p_respawn,
             13: self.p_location,
-            16: self.p_held_item_change
+            16: self.p_held_item_change,
             17: self.p_use_bed,
             18: self.p_animate,
             20: self.p_player,

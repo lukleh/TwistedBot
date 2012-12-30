@@ -62,7 +62,7 @@ def compute_state(grid, x, y, z):
         return NO
     if block_1.can_stand_in:
         if block_1.is_stairs:
-            pass
+            raise NotImplemented('stairs state')
         elif block_0.is_fence and block_1.fence_overlap:
             if block_3.is_fall_through or block_3.is_slab:
                 return YES
@@ -87,46 +87,9 @@ def compute_state(grid, x, y, z):
 
 
 def can_go(grid, from_coords, to_coords):
+    #TODO turn this dummy function into something usefull
     return True
 
 
 def can_stand(grid, x, y, z):
     return compute_state(grid, x, y, z) == NodeState.YES
-
-
-class GridState(object):
-
-    def __init__(self, grid, block_0, block_1, block_2):
-        self.grid = grid
-        self.under = block_0
-        self.block = block_1
-        self.over = block_2
-        self.state = self.compute_state()
-
-    def compute_state(self):
-        if not over.is_fall_through:
-            return NO
-        if block.can_stand_in:
-            if block.is_stairs:
-                pass
-            elif under.is_fence and block.fence_overlap:
-                if over2.is_fall_through or over2.min_y > block.y + 0.5 + PLAYER_HEIGHT:
-                    return YES
-                else:
-                    return NO
-            elif block.stand_in_over2:
-                if over2.is_fall_through or over2.min_y > block.max_y + PLAYER_HEIGHT:
-                    return YES
-                else:
-                    return NO
-            else:
-                return YES
-        elif under.can_stand_on:
-            if under.is_fall_through and block.is_fall_through:
-                return FREE
-            else:
-                return YES
-        elif block.is_fall_through:
-            return FREE
-        else:
-            return NO
