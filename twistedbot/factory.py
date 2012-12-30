@@ -37,6 +37,7 @@ class MineCraftProtocol(Protocol):
             8: self.p_health,
             9: self.p_respawn,
             13: self.p_location,
+            16: self.p_held_item_change
             17: self.p_use_bed,
             18: self.p_animate,
             20: self.p_player,
@@ -184,6 +185,10 @@ class MineCraftProtocol(Protocol):
                                         "grounded": c.grounded.grounded,
                                         "yaw": c.orientation.yaw,
                                         "pitch": c.orientation.pitch})
+
+    def p_held_item_change(self, c):
+        #TODO ignore for now
+        pass
 
     def p_use_bed(self, c):
         """

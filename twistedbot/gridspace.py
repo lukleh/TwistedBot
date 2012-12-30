@@ -58,7 +58,32 @@ def compute_state(grid, x, y, z):
             return NodeState.YES
     if block_0.is_free and block_1.is_free and block_2.is_free:
         return NodeState.FREE
-    return GridState(grid, block_0, block_1, block_2).state
+    if not block_2.is_fall_through:
+        return NO
+    if block_1.can_stand_in:
+        if block_1.is_stairs:
+            pass
+        elif block_0.is_fence and block_1.fence_overlap:
+            if block_3.is_fall_through or block_3.is_slab:
+                return YES
+            else:
+                return NO
+        elif block_1.stand_in_over2:
+            if block_3.is_fall_through or block_3.min_y > block_1.max_y + PLAYER_HEIGHT:
+                return YES
+            else:
+                return NO
+        else:
+            return YES
+    elif block_0.can_stand_on:
+        if block_0.is_fall_through and block_1.is_fall_through:
+            return FREE
+        else:
+            return YES
+    elif block_1.is_fall_through:
+        return FREE
+    else:
+        return NO
 
 
 def can_go(grid, from_coords, to_coords):

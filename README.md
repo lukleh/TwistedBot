@@ -1,5 +1,5 @@
 # Bot/Proxy for Minecraft
-- Support for 1.4.4 protocol version 49
+- Support for 1.4.7 protocol version 51
 - Running under [PyPy](http://pypy.org/ "PyPy")
 - flake8 clean with long lines
 - Optional [PyCrypto](https://www.dlitz.net/software/pycrypto/ "PyCrypto") dependency if you want the datastream to be encrypted. Also configurable in config.
