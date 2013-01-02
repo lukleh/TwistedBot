@@ -51,10 +51,8 @@ def compute_state(grid, x, y, z, debug=False):
         return NodeState.NO
     block_0 = grid.get_block(x, y - 1, z)
     if block_0.is_cube:
-        if block_1.is_free and block_2.is_free:
+        if block_1.is_fall_through and block_2.is_fall_through:
             return NodeState.YES
-    if not block_1.can_stand_in and block_0.is_free and block_1.is_free and block_2.is_free:
-        return NodeState.FREE
     if block_1.can_stand_in:
         if block_1.is_stairs:
             for bb in block_1.check_aabbs():
