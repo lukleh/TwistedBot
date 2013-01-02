@@ -51,7 +51,7 @@ def compute_state(grid, x, y, z, debug=False):
         return NodeState.NO
     block_0 = grid.get_block(x, y - 1, z)
     if block_0.is_cube:
-        if block_1.is_fall_through and block_2.is_fall_through:
+        if block_1.is_fall_through:
             return NodeState.YES
     if block_1.can_stand_in:
         if block_1.is_stairs:
@@ -76,10 +76,8 @@ def compute_state(grid, x, y, z, debug=False):
             return NodeState.FREE
         else:
             return NodeState.YES
-    elif block_1.is_fall_through:
-        return NodeState.FREE
     else:
-        return NodeState.NO
+        return NodeState.FREE
 
 
 def can_go(grid, from_coords, to_coords):
