@@ -7,7 +7,6 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 
 import config
 import utils
-import gridspace
 import logbot
 from pathfinding import AStar
 from axisbox import AABB
@@ -227,7 +226,7 @@ class TravelToBehaviour(BehaviourBase):
 
     @property
     def name(self):
-        return 'Travel to %s from %s' % (str(self.travel_coords), self.bot.standing_on_block(self.bot.bot_object))
+        return 'Travel to %s from %s' % (self.world.grid.get_block_coords(self.travel_coords), self.bot.standing_on_block(self.bot.bot_object))
 
     @inlineCallbacks
     def activate(self):
@@ -242,10 +241,12 @@ class TravelToBehaviour(BehaviourBase):
                                 start_aabb=self.bot.bot_object.aabb)).whenDone()
             d.addErrback(logbot.exit_on_error)
             astar = yield d
-            log.msg('ASTAR finished in %s sec, length %d, made %d iterations' % (time.time() - t_start, len(astar.path.nodes), astar.iter_count))
             if astar.path is None:
+                log.msg('ASTAR time consumed %s sec, made %d iterations' % (time.time() - t_start, astar.iter_count))
                 self.status = Status.failure
             else:
+                log.msg('ASTAR finished in %s sec, length %d, made %d iterations' % (time.time() - t_start, len(astar.path.nodes), astar.iter_count))
+                print astar.path.nodes
                 if sb == self.bot.standing_on_block(self.bot.bot_object):
                     self.path = astar.path
                     self.ready = True

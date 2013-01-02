@@ -22,8 +22,8 @@ class PathNode(object):
         self.hash = hash(self.coords)
 
     def __str__(self):
-        return "%s:st%s:cost:%s:g%s:h%s:f%s" % \
-            (str(self.coords), self.step, self.cost, self.g, self.h, self.f)
+        #return "%s:st%s:cost:%s:g%s:h%s:f%s" % (str(self.coords), self.step, self.cost, self.g, self.h, self.f)
+        return str(self.coords)
 
     def __repr__(self):
         return self.__str__()

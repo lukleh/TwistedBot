@@ -1,11 +1,8 @@
 
 
 import logbot
-import blocks
-import config
-import fops
 import utils
-from axisbox import AABB
+import blocks
 
 
 log = logbot.getlogger("GRIDSPACE")
@@ -45,45 +42,46 @@ def neighbours_of(grid, coords):
         yield x, y - 1, z
 
 
-def compute_state(grid, x, y, z):
+def compute_state(grid, x, y, z, debug=False):
     block_1 = grid.get_block(x, y, z)
     if block_1.is_cube:
         return NodeState.NO
     block_2 = grid.get_block(x, y + 1, z)
-    if block_2.is_cube:
+    if not block_2.is_fall_through:
         return NodeState.NO
     block_0 = grid.get_block(x, y - 1, z)
     if block_0.is_cube:
         if block_1.is_free and block_2.is_free:
             return NodeState.YES
-    if block_0.is_free and block_1.is_free and block_2.is_free:
+    if not block_1.can_stand_in and block_0.is_free and block_1.is_free and block_2.is_free:
         return NodeState.FREE
-    if not block_2.is_fall_through:
-        return NO
     if block_1.can_stand_in:
         if block_1.is_stairs:
-            raise NotImplemented('stairs state')
-        elif block_0.is_fence and block_1.fence_overlap:
-            if block_3.is_fall_through or block_3.is_slab:
-                return YES
+            for bb in block_1.check_aabbs():
+                if grid.aabb_collides(bb):
+                    continue
+                else:
+                    return NodeState.YES
+            return NodeState.NO
+        elif block_0.is_fence or block_1.stand_in_over2:
+            block_3 = grid.get_block(x, y + 2, z)
+            if block_3.is_fall_through:
+                return NodeState.YES
             else:
-                return NO
-        elif block_1.stand_in_over2:
-            if block_3.is_fall_through or block_3.min_y > block_1.max_y + PLAYER_HEIGHT:
-                return YES
-            else:
-                return NO
+                return NodeState.NO
         else:
-            return YES
+            return NodeState.YES
+    elif not block_1.is_fall_through:
+        return NodeState.NO
     elif block_0.can_stand_on:
-        if block_0.is_fall_through and block_1.is_fall_through:
-            return FREE
+        if block_0.is_fall_through and (not block_1.is_free or not block_2.is_free):
+            return NodeState.FREE
         else:
-            return YES
+            return NodeState.YES
     elif block_1.is_fall_through:
-        return FREE
+        return NodeState.FREE
     else:
-        return NO
+        return NodeState.NO
 
 
 def can_go(grid, from_coords, to_coords):

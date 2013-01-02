@@ -56,6 +56,7 @@ class MineCraftProtocol(Protocol):
             38: self.p_entity_status,
             39: self.p_entity_attach,
             40: self.p_entity_metadata,
+            41: self.p_entity_effect,
             43: self.p_levelup,
             51: self.p_chunk,
             52: self.p_multi_block_change,
@@ -118,8 +119,7 @@ class MineCraftProtocol(Protocol):
     def send_packet(self, name, payload):
         p = make_packet(name, payload)
         if config.DEBUG:
-            packet_printout(
-                "CLIENT", [(packets_by_name[name], Container(**payload))])
+            packet_printout("CLIENT", [(packets_by_name[name], Container(**payload))])
         self.sendData(p)
 
     def packet_iter(self, ipackets):
@@ -267,6 +267,10 @@ class MineCraftProtocol(Protocol):
     def p_entity_metadata(self, c):
         self.world.entities.on_metadata(c.eid, c.metadata)
 
+    def p_entity_effect(self, c):
+        #TODO pass for now
+        pass
+
     def p_levelup(self, c):
         self.world.bot.on_update_experience(experience_bar=c.current, level=c.level, total_experience=c.total)
 
@@ -400,5 +404,4 @@ class MineCraftFactory(ReconnectingClientFactory):
 
     def clientConnectionFailed(self, connector, reason):
         log.msg('Connection failed, reason:', reason.getErrorMessage())
-        print self.delay
         ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)

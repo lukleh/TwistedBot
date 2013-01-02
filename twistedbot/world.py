@@ -101,6 +101,9 @@ class World(object):
     def on_respawn(self, game_mode=None, dimension=None, difficulty=None):
         self.dimension_change(dimension)
         self.game_state.update_settings(game_mode=game_mode, dimension=dimension, difficulty=difficulty)
+        self.bot.location_received = False
+        self.bot.spawn_point_received = False
+        self.i_am_dead = False
 
 
 class GameState(object):

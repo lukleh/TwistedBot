@@ -105,6 +105,7 @@ class BotEntity(object):
         self.eid = None
         self.chunks_ready = False
         self.ready = False
+        self.i_am_dead = False
         self.location_received = False
         self.check_location_received = False
         self.spawn_point_received = False
@@ -147,7 +148,9 @@ class BotEntity(object):
         self.move(self.bot_object)
         self.bot_object.direction = [0, 0]
         self.send_location(self.bot_object)
-        utils.do_later(0, self.behaviour_manager.run)
+        if not self.i_am_dead:
+            #print self.behaviour_manager.bqueue, self.behaviour_manager.default_behaviour
+            utils.do_later(0, self.behaviour_manager.run)
         tick_end = datetime.now()
         d_run = (tick_end - tick_start).total_seconds()  # time this step took
         t = config.TIME_STEP - d_run  # decreased by computation in tick
@@ -452,9 +455,9 @@ class BotEntity(object):
             self.on_death()
 
     def on_death(self):
-        self.location_received = False
-        self.spawn_point_received = False
-        utils.do_later(1.0, self.do_respawn)
+        log.msg("I am dead")
+        self.i_am_dead = True
+        utils.do_later(2.0, self.do_respawn)
 
     def standing_on_block(self, b_obj):
         return self.world.grid.standing_on_block(b_obj.aabb)

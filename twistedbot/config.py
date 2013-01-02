@@ -10,7 +10,7 @@ USERNAME = "twistedbot"
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 25565
 
-PROTOCOL_VERSION = 51  # minecraft version 1.4.6
+PROTOCOL_VERSION = 51  # minecraft version 1.4.7
 CONNECTION_MAX_DELAY = 5
 CONNECTION_INITIAL_DELAY = 0.1
 
@@ -26,9 +26,8 @@ MAX_JUMP_HEIGHT = 1.25
 MAX_STEP_HEIGHT = 0.5
 MAX_WATER_JUMP_HEIGHT = 0.67
 MAX_VINE_JUMP_HEIGHT = 0.35
-G = 27.0
-# or 0.08 block/tick - drag 0.02 blk/tick (used as final multiply by 0.98)
 
+# 0.08 block/tick - drag 0.02 blk/tick (used as final multiply by 0.98)
 BLOCK_FALL = 0.08
 DRAG = 0.98
 SPEED_ON_GROUND = 0.1
@@ -45,5 +44,5 @@ COST_LADDER = 0.21 / \
 COST_FALL = 1.1
 COST_DIRECT = 1
 COST_DIAGONAL = math.sqrt(2) * COST_DIRECT
-PATHFIND_LIMIT = 256  # roughly in blocks
+PATHFIND_LIMIT = 25  # roughly in blocks
 HORIZONTAL_MOVE_DISTANCE_LIMIT = 2.83

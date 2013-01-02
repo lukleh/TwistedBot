@@ -308,8 +308,8 @@ packets = {
                SBInt32("x"),
                SBInt32("y"),
                SBInt32("z"),
-               SBInt16("yawn"),
-               SBInt16("pitch"),
+               SBInt8("yawn"),
+               SBInt8("pitch"),
                SBInt32("object_data"),
                If(lambda context: context["object_data"] != 0,
                   Struct("velocity",
@@ -651,7 +651,8 @@ packets = {
 
 
 def packet_stream_print_header(context):
-    #log.msg("packet_stream_print_header %s" % context["header"])
+    #if context["header"] not in [28, 31, 32, 33, 34, 35]:
+    #  log.msg("packet_stream_print_header %s" % context["header"])
     return context["header"]
 
 

@@ -64,6 +64,9 @@ class Grid(object):
     def make_block(self, x, y, z, block_type, meta):
         return blocks.block_map[block_type](self, x, y, z, meta)
 
+    def get_block_coords(self, crds):
+        return self.get_block(crds.x, crds.y, crds.z)
+
     def get_block(self, x, y, z):
         if y > 255 or y < 0:
             return self.make_block(x, y, z, 0, 0)
