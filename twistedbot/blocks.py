@@ -31,7 +31,7 @@ class BlockMetaClass(type):
         cls.is_stairs = name_or_class(cls, 'BlockStairs')
         cls.is_ladder = name_or_class(cls, 'Ladders')
         cls.is_vine = name_or_class(cls, 'Vines')
-        cls.is_ladder_or_vine = cls.is_ladder or cls.is_vine
+        cls.is_single_slab = name_or_class(cls, 'BlockSingleSlab')
         return cls
 
 
@@ -60,16 +60,8 @@ class Block(object):
         return not (self == other)
 
     @property
-    def is_collidable(self):
-        return True
-
-    @property
     def is_free(self):
         return not self.is_collidable and not isinstance(self, BlockFluid) and not self.number == Cobweb.number and not self.number == Fire.number
-
-    @property
-    def is_avoid(self):
-        return self.is_lava or self.number == Cobweb.number or self.number == Fire.number
 
     @property
     def is_fence(self):
@@ -101,6 +93,11 @@ class Block(object):
 
 
 class BlockSolid(Block):
+
+    @property
+    def is_collidable(self):
+        return True
+
     @property
     def is_fall_through(self):
         return not (self.can_stand_in or self.can_stand_on)
@@ -151,7 +148,7 @@ class BlockNonSolid(Block):
 
     @property
     def stand_in_over2(self):
-        return False
+        raise Exception("don't check stand_in_over2 for non solid block")
 
 
 class BlockFluid(BlockNonSolid):
@@ -162,6 +159,10 @@ class BlockFluid(BlockNonSolid):
 
 class BlockWater(BlockFluid):
     material = materials.water
+
+    @property
+    def is_climbable(self):
+        return True
 
     @property
     def can_stand_in(self):
@@ -1120,6 +1121,10 @@ class Ladders(BlockSolid):
     def can_stand_in(self):
         return True
 
+    @property
+    def is_climbable(self):
+        return True
+
 
 class Rail(BlockNonSolid):
     number = 66
@@ -1378,7 +1383,10 @@ class Trapdoor(BlockSolid):
 
     @property
     def stand_in_over2(self):
-        return False
+        if self.is_closed:
+            return False
+        else:
+            raise Exception("don't check stand_in_over2 for open Trapdoor")
 
 
 class HiddenSilverfish(BlockCube):
@@ -1441,6 +1449,13 @@ class Vines(BlockNonSolid):
     @property
     def can_stand_in(self):
         return True
+
+    @property
+    def is_climbable(self):
+        return self.grid.get_block(self.x - 1, self.y, self.z).is_cube or \
+            self.grid.get_block(self.x, self.y, self.z - 1).is_cube or \
+            self.grid.get_block(self.x + 1, self.y, self.z).is_cube or \
+            self.grid.get_block(self.x, self.y, self.z + 1).is_cube
 
 
 class FenceGate(BlockBiCollidable):

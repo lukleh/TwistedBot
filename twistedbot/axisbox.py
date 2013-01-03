@@ -129,8 +129,7 @@ class AABB(object):
 
     def collides(self, bb):
         for i in xrange(3):
-            if fops.lte(self.maxs[i], bb.mins[i]) or \
-                    fops.gte(self.mins[i], bb.maxs[i]):
+            if fops.lte(self.maxs[i], bb.mins[i]) or fops.gte(self.mins[i], bb.maxs[i]):
                 return False
         return True
 
@@ -240,23 +239,19 @@ class AABB(object):
 
     def sweep_collision(self, collidee, v, debug=False):
         """
-        self moving by v, collidee stationery
+        self (collider) moving by v, collidee stationery
         based on http://bit.ly/3grWzs
         """
         u_0 = [2, 2, 2]
         u_1 = [1, 1, 1]
-        dists = [None, None, None]
         for i in xrange(3):
             if fops.lte(self.maxs[i], collidee.mins[i]) and fops.gt(v[i], 0):
                 d = collidee.mins[i] - self.maxs[i]
-                dists[i] = d
                 u_0[i] = d / v[i]
             elif fops.lte(collidee.maxs[i], self.mins[i]) and fops.lt(v[i], 0):
                 d = collidee.maxs[i] - self.mins[i]
-                dists[i] = d
                 u_0[i] = d / v[i]
-            elif not(fops.lte(self.maxs[i], collidee.mins[i]) or
-                     fops.gte(self.mins[i], collidee.maxs[i])):
+            elif not(fops.lte(self.maxs[i], collidee.mins[i]) or fops.gte(self.mins[i], collidee.maxs[i])):
                 u_0[i] = 0
             if fops.gte(collidee.maxs[i], self.mins[i]) and fops.gt(v[i], 0):
                 d = collidee.maxs[i] - self.mins[i]

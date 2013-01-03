@@ -98,10 +98,10 @@ class AStar(object):
         return config.COST_DIRECT
 
     def neighbours(self, node):
-        for t_coords in gridspace.neighbours_of(self.grid, node.coords):
-            if t_coords not in self.closed_set:
-                if gridspace.can_go(self.grid, node.coords.tuple, t_coords):
-                    yield PathNode(Vector.from_tuple(t_coords))
+        for coords in gridspace.neighbours_of(self.grid, node.coords):
+            if coords not in self.closed_set:
+                if gridspace.can_go(self.grid, node.coords, coords):
+                    yield PathNode(coords)
 
     def heuristic_cost_estimate(self, start, goal):
         adx = abs(start.coords.x - goal.coords.x)
@@ -121,9 +121,9 @@ class AStar(object):
             self.path = Path(dimension=self.dimension, nodes=self.reconstruct_path(x), start_aabb=self.start_aabb)
             raise StopIteration()
         self.open_set.remove(x)
-        self.closed_set.add(x.coords.tuple)
+        self.closed_set.add(x.coords)
         for y in self.neighbours(x):
-            if y.coords.tuple in self.closed_set:
+            if y.coords in self.closed_set:
                 continue
             tentative_g_core = x.g + self.get_edge_cost(x, y)
             if y not in self.open_set or tentative_g_core < y.g:
