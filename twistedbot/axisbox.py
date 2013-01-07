@@ -227,16 +227,6 @@ class AABB(object):
                 for z in xrange(gbb[2], gbb[5] + 1):
                     yield x, y, z
 
-    def vector_to(self, bb):
-        return utils.Vector(bb.posx - self.posx, bb.posy - self.posy, bb.posz - self.posz)
-
-    def horizontal_direction_to(self, bb):
-        v = self.vector_to(bb)
-        size = v.horizontal_size
-        if fops.eq(size, 0):
-            return (0, 0)
-        return (v.x / size, v.z / size)
-
     def sweep_collision(self, collidee, v, debug=False):
         """
         self (collider) moving by v, collidee stationery

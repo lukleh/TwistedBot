@@ -11,8 +11,12 @@ log = logbot.getlogger("ASTAR")
 
 
 class PathNode(object):
-    def __init__(self, coords, cost=1):
-        self.coords = coords
+    def __init__(self, coords=None, state=None, cost=1):
+        if coords:
+            self.coords = coords
+        else:
+            self.coords = state.coords
+        self.state = state
         self.cost = cost
         self.g = 0
         self.h = 0
@@ -57,16 +61,22 @@ class Path(object):
         self.dimension = dimension
         self.nodes = nodes
         self.start_aabb = start_aabb
-        self.is_valid = True
+        self.node_step = 0
+        self.is_finished = False
 
     def __str__(self):
         return "Path nodes %d\n\t%s" % (len(self.nodes), '\n\t'.join([str(n) for n in self.nodes]))
 
     def take_step(self):
-        pass
+        try:
+            step = self.nodes[self.node_step]
+            self.node_step += 1
+            if self.node_step == len(self.nodes):
+                self.is_finished = True
+            return step
+        except IndexError:
+            return None
 
-    def start_from(self, bb):
-        self.start_aabb = bb
 
 
 class AStar(object):
@@ -74,14 +84,20 @@ class AStar(object):
     def __init__(self, dimension=None, start_coords=None, end_coords=None, start_aabb=None, max_cost=config.PATHFIND_LIMIT):
         self.dimension = dimension
         self.grid = dimension.grid
-        self.start_node = PathNode(start_coords)
-        self.goal_node = PathNode(end_coords)
+        start_state = gridspace.NodeState(self.grid, start_coords.x, start_coords.y, start_coords.z)
+        goal_state = gridspace.NodeState(self.grid, end_coords.x, end_coords.y, end_coords.z)
+        self.start_node = PathNode(state=start_state)
+        self.goal_node = PathNode(state=goal_state)
         self.start_aabb = start_aabb
         self.max_cost = max_cost
         self.path = None
         self.closed_set = set()
-        self.open_heap = [self.start_node]
-        self.open_set = set([self.start_node])
+        if goal_state.can_stand or goal_state.can_hold:
+            self.open_heap = [self.start_node]
+            self.open_set = set([self.start_node])
+        else:
+            self.open_heap = []
+            self.open_set = set([])
         self.start_node.set_score(0, self.heuristic_cost_estimate(self.start_node, self.goal_node))
         self.iter_count = 0
 
@@ -98,10 +114,9 @@ class AStar(object):
         return config.COST_DIRECT
 
     def neighbours(self, node):
-        for coords in gridspace.neighbours_of(self.grid, node.coords):
-            if coords not in self.closed_set:
-                if gridspace.can_go(self.grid, node.coords, coords):
-                    yield PathNode(coords)
+        for state in gridspace.neighbours_of(self.grid, node.state):
+            if state.coords not in self.closed_set:
+                yield PathNode(state=state)
 
     def heuristic_cost_estimate(self, start, goal):
         adx = abs(start.coords.x - goal.coords.x)

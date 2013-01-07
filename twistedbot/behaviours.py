@@ -247,8 +247,10 @@ class TravelToBehaviour(BehaviourBase):
             else:
                 log.msg('ASTAR finished in %s sec, length %d, made %d iterations' % (time.time() - t_start, len(astar.path.nodes), astar.iter_count))
                 print astar.path.nodes
-                if sb == self.bot.standing_on_block(self.bot.bot_object):
+                current_start = self.bot.standing_on_block(self.bot.bot_object)
+                if sb == current_start:
                     self.path = astar.path
+                    self.current_bot_coords = current_start.coords
                     self.ready = True
 
     @inlineCallbacks
@@ -259,24 +261,73 @@ class TravelToBehaviour(BehaviourBase):
                 return
             if not self.ready:
                 return
-            self.path.start_from(self.bot.bot_object.aabb)
-        #print self.path
-        self.status = Status.success
-        #self.follow(self.path, self.bot.bot_object)
+        self.follow(self.path, self.bot.bot_object)
 
     def follow(self, path, b_obj):
+        if path.is_finished:
+            self.status = Status.success
+            return
         step = path.take_step()
         if step is None:
             self.status = Status.failure
             return
         else:
-            self.move(step, b_obj)
-            if path.is_finished:
-                self.status = Status.success
+            self.add_subbehaviour(MoveToBehaviour, start=self.current_bot_coords, target=step.coords)
 
-    def move(self, step, b_obj):
-        direction = b_obj.aabb.horizontal_direction_to(step)
-        self.bot.turn_to_direction(b_obj, direction[0], direction[1])
+
+class MoveToBehaviour(BehaviourBase):
+    def __init__(self, *args, **kwargs):
+        super(MoveToBehaviour, self).__init__(*args, **kwargs)
+        self.target_coords = kwargs["target"]
+        self.start_coords = kwargs["start"]
+        self.was_at_target = False
+        self.floating_flag = False
+        self.name = 'Move to %s' % str(self.target_coords)
+
+    def check_status(self, b_obj):
+        self.start_state = gridspace.NodeState(self.grid, vector=self.start_coords)
+        self.target_state = gridspace.NodeState(self.grid, vector=self.target_coords)
+        go = gridspace.can_go(self.start_state, self.target_state)
+        if not go:
+            log.msg('Cannot go between %s %s' % (self.start_state, self.target_state))
+            return Status.failure
+        if not self.was_at_target:
+            self.was_at_target = self.target_state.center_in(b_obj.position)
+        if self.target_state.base_in(b_obj.aabb) and self.target_state.touch_platform(b_obj.position):
+            return Status.success
+        return Status.running
+
+    def _tick(self):
+        b_obj = self.bot.bot_object
+        self.status = self.check_status(b_obj)
+        if self.status != Status.running:
+            return
+        if self.bot.is_on_ladder(b_obj) or self.bot.is_in_water(b_obj):
+            elev = self.target_state.platform_y - b_obj.y
+            if fops.gt(elev, 0):
+                self.jump(b_obj)
+                self.move(b_obj)
+            elif fops.lt(elev, 0):
+                self.move(b_obj)
+            else:
+                self.sneak(b_obj)
+                self.move(b_obj)
+        elif self.bot.is_standing(b_obj):
+            elev = self.target_state.platform_y - b_obj.y
+            if fops.lte(elev, 0):
+                self.move(b_obj)
+            elif fops.gt(elev, 0):
+                if self.target_state.base_in(b_obj.aabb):
+                    self.jump(b_obj)
+                self.move(b_obj)
+        else:
+            self.move(b_obj)
+
+    def move(self, b_obj):
+        direction = Vector2D(b_obj.x - self.target_state.center_x, b_obj.z - self.target_state.center_z)
+        direction.normalize()
+        if not self.was_at_target:
+            self.bot.turn_to_direction(b_obj, direction.x, direction.z)
         b_obj.direction = direction
 
     def jump(self, b_obj):

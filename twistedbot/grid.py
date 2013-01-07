@@ -129,10 +129,11 @@ class Grid(object):
                     data_str = data.read(2048)
                     #ndata = array.array('B', data_str)
         # higher block id value will be used after Mojang adds them
-        for i in xrange(chunk.levels):
-            if add_bit >> i & 1:
-                data_str = data.read(2048)
-                ndata = array.array('B', data_str)
+        if add_bit > 0:
+            for i in xrange(chunk.levels):
+                if add_bit >> i & 1:
+                    data_str = data.read(2048)
+                    ndata = array.array('B', data_str)
         if continuous:
             data_str = data.read(256)
             chunk.biome = array.array('b', data_str)

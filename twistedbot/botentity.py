@@ -19,7 +19,7 @@ log = logbot.getlogger("BOT_ENTITY")
 class BotObject(object):
     def __init__(self):
         self.velocities = utils.Vector(0.0, 0.0, 0.0)
-        self.direction = [0, 0]
+        self.direction = utils.Vector2D(0, 0)
         self._x = 0
         self._y = 0
         self._z = 0
@@ -50,7 +50,7 @@ class BotObject(object):
     @y.setter
     def y(self, v):
         self._y = v
-        self._aabb = AABB.from_player_coords(self.position)
+        self._aabb = AABB.from_player_coords(self.x, self.y, self.z)
 
     @property
     def z(self):
@@ -58,7 +58,7 @@ class BotObject(object):
 
     @property
     def position(self):
-        return (self.x, self.y, self.z)
+        return utils.Vector(self.x, self.y, self.z)
 
     @property
     def position_grid(self):
@@ -124,7 +124,7 @@ class BotEntity(object):
         self.bot_object.on_ground = kw["grounded"]
         self.bot_object.yaw = kw["yaw"]
         self.bot_object.pitch = kw["pitch"]
-        self.bot_object.velocities = [0.0, 0.0, 0.0]
+        self.bot_object.velocities = utils.Vector(0.0, 0.0, 0.0)
         self.check_location_received = True
         if self.location_received is False:
             self.location_received = True
@@ -146,10 +146,9 @@ class BotEntity(object):
                 self.last_tick_time = tick_start
                 return config.TIME_STEP
         self.move(self.bot_object)
-        self.bot_object.direction = [0, 0]
+        self.bot_object.direction = utils.vector2D(0, 0)
         self.send_location(self.bot_object)
         if not self.i_am_dead:
-            #print self.behaviour_manager.bqueue, self.behaviour_manager.default_behaviour
             utils.do_later(0, self.behaviour_manager.run)
         tick_end = datetime.now()
         d_run = (tick_end - tick_start).total_seconds()  # time this step took
@@ -195,20 +194,23 @@ class BotEntity(object):
         b_obj.pitch = 0
 
     def clip_abs_velocities(self, b_obj):
-        for i in xrange(3):
-            if abs(b_obj.velocities[i]) < 0.005:  # minecraft value
-                b_obj.velocities[i] = 0
+        if abs(b_obj.velocities.x) < 0.005:  # minecraft value
+            b_obj.velocities.x = 0
+        if abs(b_obj.velocities.y) < 0.005:  # minecraft value
+            b_obj.velocities.y = 0
+        if abs(b_obj.velocities.z) < 0.005:  # minecraft value
+            b_obj.velocities.z = 0
 
     def clip_ladder_velocities(self, b_obj):
         if self.is_on_ladder(b_obj):
-            for i in xrange(3):
-                if i == 1:
-                    if b_obj.velocities[i] < -0.15:
-                        b_obj.velocities[i] = -0.15
-                elif abs(b_obj.velocities[i]) > 0.15:
-                    b_obj.velocities[i] = math.copysign(0.15, b_obj.velocities[i])
-        if self.is_sneaking(b_obj) and b_obj.velocities[1] < 0:
-            b_obj[1] = 0
+            if b_obj.velocities.y < -0.15:
+                b_obj.velocities.y = -0.15
+            if abs(b_obj.velocities.x) > 0.15:
+                b_obj.velocities.x = math.copysign(0.15, b_obj.velocities.x)
+            if abs(b_obj.velocities.z) > 0.15:
+                b_obj.velocities.z = math.copysign(0.15, b_obj.velocities.z)
+        if self.is_sneaking(b_obj) and b_obj.velocities.y < 0:
+            b_obj.velocities.y = 0
 
     def handle_water_movement(self, b_obj):
         is_in_water = False
@@ -241,9 +243,9 @@ class BotEntity(object):
             vx *= 0.25
             vy *= 0.05000000074505806
             vz *= 0.25
-            b_obj.velocities[0] = 0
-            b_obj.velocities[1] = 0
-            b_obj.velocities[2] = 0
+            b_obj.velocities.x = 0
+            b_obj.velocities.y = 0
+            b_obj.velocities.z = 0
         aabbs = self.world.grid.collision_aabbs_in(b_obj.aabb.extend_to(vx, vy, vz))
         b_bb = b_obj.aabb
         dy = vy
@@ -283,11 +285,11 @@ class BotEntity(object):
         b_obj.is_collided_horizontally = dx != vx or dz != vz
         b_obj.horizontally_blocked = not fops.eq(dx, vx) and not fops.eq(dz, vz)
         if not fops.eq(vx, dx):
-            b_obj.velocities[0] = 0
+            b_obj.velocities.x = 0
         if not fops.eq(vy, dy):
-            b_obj.velocities[1] = 0
+            b_obj.velocities.y = 0
         if not fops.eq(vz, dz):
-            b_obj.velocities[2] = 0
+            b_obj.velocities.z = 0
         b_obj.set_xyz(b_bb.posx, b_bb.min_y, b_bb.posz)
         self.do_block_collision(b_obj)
 
@@ -297,89 +299,81 @@ class BotEntity(object):
         is_in_lava = self.handle_lava_movement(b_obj)
         if b_obj.is_jumping:
             if is_in_water or is_in_lava:
-                b_obj.velocities[1] += config.SPEED_LIQUID_JUMP
+                b_obj.velocities.y += config.SPEED_LIQUID_JUMP
             elif b_obj.on_ground:
-                b_obj.velocities[1] = config.SPEED_JUMP
+                b_obj.velocities.y = config.SPEED_JUMP
             elif self.is_on_ladder(b_obj):
-                b_obj.velocities[1] = config.SPEED_CLIMB
+                b_obj.velocities.y = config.SPEED_CLIMB
             b_obj.is_jumping = False
         if is_in_water:
             if b_obj.floating_flag:
-                if self.head_inside_water(b_obj):
-                    b_obj.velocities[1] += config.SPEED_LIQUID_JUMP
-                else:
-                    x, y, z = b_obj.aabb.grid_bottom_center
-                    b_up = self.world.grid.get_block(x, y + 1, z)
-                    b_down = self.world.grid.get_block(x, y - 1, z)
-                    b_cent = self.world.grid.get_block(x, y, z)
-                    no_up = not b_up.is_water and b_down.collidable and fops.eq(b_down.max_y, y)
-                    if (not no_up and b_cent.is_water and fops.gt(b_cent.y + 0.5, b_obj.aabb.min_y)) or isinstance(b_up, blocks.StillWater):
-                        b_obj.velocities[1] += config.SPEED_LIQUID_JUMP
+                b_obj.velocities.y = 0
             orig_y = b_obj.y
             self.update_directional_speed(b_obj, 0.02, balance=True)
-            self.move_collisions(b_obj, b_obj.velocities[0], b_obj.velocities[1], b_obj.velocities[2])
-            b_obj.velocities[0] *= 0.8
-            b_obj.velocities[1] *= 0.8
-            b_obj.velocities[2] *= 0.8
-            b_obj.velocities[1] -= 0.02
+            self.move_collisions(b_obj, b_obj.velocities.x, b_obj.velocities.y, b_obj.velocities.z)
+            b_obj.velocities.x *= 0.8
+            b_obj.velocities.y *= 0.8
+            b_obj.velocities.z *= 0.8
+            b_obj.velocities.y -= 0.02
             if b_obj.is_collided_horizontally and \
-                    self.is_offset_in_liquid(b_obj, b_obj.velocities[0],
-                                             b_obj.velocities[1] + 0.6 -
+                    self.is_offset_in_liquid(b_obj, b_obj.velocities.x,
+                                             b_obj.velocities.y + 0.6 -
                                              b_obj.y + orig_y,
-                                             b_obj.velocities[2]):
-                b_obj.velocities[1] = 0.3
+                                             b_obj.velocities.z):
+                b_obj.velocities.y = 0.3
         elif is_in_lava:
+            if b_obj.floating_flag:
+                b_obj.velocities.y = 0
             orig_y = self.y
             self.update_directional_speed(b_obj, 0.02)
-            self.move_collisions(b_obj, b_obj.velocities[0], b_obj.velocities[1], b_obj.velocities[2])
-            b_obj.velocities[0] *= 0.5
-            b_obj.velocities[1] *= 0.5
-            b_obj.velocities[2] *= 0.5
-            b_obj.velocities[1] -= 0.02
+            self.move_collisions(b_obj, b_obj.velocities.x, b_obj.velocities.y, b_obj.velocities.z)
+            b_obj.velocities.x *= 0.5
+            b_obj.velocities.y *= 0.5
+            b_obj.velocities.z *= 0.5
+            b_obj.velocities.y -= 0.02
             if b_obj.is_collided_horizontally and \
-                    self.is_offset_in_liquid(b_obj, self.velocities[0],
-                                             self.velocities[1] + 0.6 -
+                    self.is_offset_in_liquid(b_obj, self.velocities.x,
+                                             self.velocities.y + 0.6 -
                                              self.y + orig_y,
-                                             self.velocities[2]):
-                self.velocities[1] = 0.3
+                                             self.velocities.z):
+                self.velocities.y = 0.3
         else:
             slowdown = self.current_slowdown(b_obj)
             self.update_directional_speed(b_obj, self.current_speed_factor(b_obj))
             self.clip_ladder_velocities(b_obj)
-            self.move_collisions(b_obj, b_obj.velocities[0], b_obj.velocities[1], b_obj.velocities[2])
+            self.move_collisions(b_obj, b_obj.velocities.x, b_obj.velocities.y, b_obj.velocities.z)
             if b_obj.is_collided_horizontally and self.is_on_ladder(b_obj):
-                b_obj.velocities[1] = 0.2
-            b_obj.velocities[1] -= config.BLOCK_FALL
-            b_obj.velocities[1] *= config.DRAG
-            b_obj.velocities[0] *= slowdown
-            b_obj.velocities[2] *= slowdown
+                b_obj.velocities.y = 0.2
+            b_obj.velocities.y -= config.BLOCK_FALL
+            b_obj.velocities.y *= config.DRAG
+            b_obj.velocities.x *= slowdown
+            b_obj.velocities.z *= slowdown
 
     def directional_speed(self, direction, speedf):
         x, z = direction
         dx = x * speedf
         dz = z * speedf
-        return (dx, dz)
+        return utils.Vector2D(dx, dz)
 
     def update_directional_speed(self, b_obj, speedf, balance=False):
         direction = self.directional_speed(b_obj.direction, speedf)
-        if balance and utils.vector_size(direction) > 0:
-            perpedicular_dir = (- direction[1], direction[0])
-            dot = (b_obj.velocities[0] * perpedicular_dir[0] + b_obj.velocities[2] * perpedicular_dir[1]) / \
-                (perpedicular_dir[0] * perpedicular_dir[0] + perpedicular_dir[1] * perpedicular_dir[1])
+        if balance and direction.size > 0:
+            perpedicular_dir = utils.Vector2D(- direction.z, direction.x)
+            dot = (b_obj.velocities.x * perpedicular_dir.x + b_obj.velocities.z * perpedicular_dir.z) / \
+                (perpedicular_dir.x * perpedicular_dir.x + perpedicular_dir.z * perpedicular_dir.z)
             if dot < 0:
                 dot *= -1
-                perpedicular_dir = (direction[1], - direction[0])
-            direction = (direction[0] - perpedicular_dir[0] * dot, direction[1] - perpedicular_dir[1] * dot)
-            self.turn_to_direction(b_obj, direction[0], direction[1])
-        b_obj.velocities[0] += direction[0]
-        b_obj.velocities[2] += direction[1]
+                perpedicular_dir = (direction.z, - direction.x)
+            direction = (direction.x - perpedicular_dir.x * dot, direction.z - perpedicular_dir.z * dot)
+            self.turn_to_direction(b_obj, direction.x, direction.z)
+        b_obj.velocities.x += direction.x
+        b_obj.velocities.z += direction.z
 
     def current_slowdown(self, b_obj):
         slowdown = 0.91
         if b_obj.on_ground:
             slowdown = 0.546
-            block = self.world.grid.get_block(
-                b_obj.grid_x, b_obj.grid_y - 1, b_obj.grid_z)
+            block = self.world.grid.get_block(b_obj.grid_x, b_obj.grid_y - 1, b_obj.grid_z)
             if block is not None:
                 slowdown = block.slipperiness * 0.91
         return slowdown
@@ -394,12 +388,9 @@ class BotEntity(object):
         return factor * 0.98
 
     def current_motion(self, b_obj):
-        #TODO
-        # check if in water or lava -> factor = 0.2
-        # else check ladder and clip if necessary
         self.clip_abs_velocities(b_obj)
-        vx = b_obj.velocities[0]
-        vz = b_obj.velocities[2]
+        vx = b_obj.velocities.x
+        vz = b_obj.velocities.z
         return math.hypot(vx, vz) + self.current_speed_factor(b_obj)
 
     def is_on_ladder(self, b_obj):

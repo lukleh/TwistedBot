@@ -28,10 +28,12 @@ class BlockMetaClass(type):
         cls.is_sign = name_or_class(cls, 'BlockSign')
         cls.is_water = name_or_class(cls, 'BlockWater')
         cls.is_lava = name_or_class(cls, 'BlockLava')
+        cls.is_fluid = cls.is_water or cls.is_lava
         cls.is_stairs = name_or_class(cls, 'BlockStairs')
         cls.is_ladder = name_or_class(cls, 'Ladders')
         cls.is_vine = name_or_class(cls, 'Vines')
         cls.is_single_slab = name_or_class(cls, 'BlockSingleSlab')
+        cls.is_burning = cls.is_lava or name_or_class(cls, 'Fire')
         return cls
 
 
@@ -91,6 +93,10 @@ class Block(object):
     def on_entity_collided(self, ignore):
         pass
 
+    @property
+    def is_climbable(self):
+        return False
+
 
 class BlockSolid(Block):
 
@@ -99,8 +105,8 @@ class BlockSolid(Block):
         return True
 
     @property
-    def is_fall_through(self):
-        return not (self.can_stand_in or self.can_stand_on)
+    def can_fall_through(self):
+        return False
 
     @property
     def can_stand_in(self):
@@ -108,15 +114,15 @@ class BlockSolid(Block):
 
     @property
     def can_stand_on(self):
-        return not self.can_stand_in
-
-    @property
-    def stand_in_over2(self):
-        return True
+        return False
 
 
 class BlockCube(BlockSolid):
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
+
+    @property
+    def can_stand_on(self):
+        return True
 
 
 class BlockNonSolid(Block):
@@ -135,20 +141,8 @@ class BlockNonSolid(Block):
         pass
 
     @property
-    def is_fall_through(self):
+    def can_fall_through(self):
         return True
-
-    @property
-    def can_stand_in(self):
-        return False
-
-    @property
-    def can_stand_on(self):
-        return False
-
-    @property
-    def stand_in_over2(self):
-        raise Exception("don't check stand_in_over2 for non solid block")
 
 
 class BlockFluid(BlockNonSolid):
@@ -156,13 +150,17 @@ class BlockFluid(BlockNonSolid):
     def fluid_aabb(cls, x, y, z):
         return AABB(x, y + 0.4, z, x + 1, y + 0.6, z + 1)
 
-
-class BlockWater(BlockFluid):
-    material = materials.water
-
     @property
     def is_climbable(self):
         return True
+
+    @property
+    def can_fall_through(self):
+        return True
+
+
+class BlockWater(BlockFluid):
+    material = materials.water
 
     @property
     def can_stand_in(self):
@@ -272,10 +270,6 @@ class BlockRedstoneRepeater(BlockSolid):
     def can_stand_in(self):
         return True
 
-    @property
-    def stand_in_over2(self):
-        return False
-
 
 class BlockMultiBox(BlockSolid):
 
@@ -289,10 +283,6 @@ class BlockStairs(BlockMultiBox):
     is_opaque_cube = False
     bounding_box_half = AABB(0.0, 0.0, 0.0, 1.0, 0.5, 1.0)
     bounding_box_up_half = AABB(0.0, 0.5, 0.0, 1.0, 1.0, 1.0)
-
-    @property
-    def can_stand_in(self):
-        return not self.is_upsite_down
 
     @property
     def can_stand_on(self):
@@ -484,7 +474,7 @@ class BlockDoor(BlockSolid):
     bottom_part = None
 
     @property
-    def is_fall_through(self):
+    def can_fall_through(self):
         return True
 
     def assign_parts(self):
@@ -622,6 +612,10 @@ class BlockSingleSlab(BlockSolid):
     @property
     def can_stand_in(self):
         return self.lower_part
+
+    @property
+    def can_stand_on(self):
+        return not self.can_stand_in
 
     @property
     def lower_part(self):
@@ -830,6 +824,10 @@ class Cobweb(BlockNonSolid):
     number = 30
     name = "Cobweb"
     material = materials.web
+
+    @property
+    def can_fall_through(self):
+        return False
 
 
 class TallGrass(BlockFlower):
@@ -1110,11 +1108,7 @@ class Ladders(BlockSolid):
         return self.bounding_box[i].offset(self.x, self.y, self.z)
 
     @property
-    def is_fall_through(self):
-        return True
-
-    @property
-    def can_stand_on(self):
+    def can_fall_through(self):
         return True
 
     @property
@@ -1219,10 +1213,6 @@ class Snow(BlockBiCollidable):
     def can_stand_in(self):
         return self.is_collidable
 
-    @property
-    def can_stand_on(self):
-        return False
-
 
 class Ice(BlockCube):
     number = 79
@@ -1290,8 +1280,8 @@ class SoulSand(BlockSolid):
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 1.0 - 0.125, 1.0)
 
     def on_entity_collided(self, b_obj):
-        b_obj.velocities[0] *= 0.4
-        b_obj.velocities[2] *= 0.4
+        b_obj.velocities.x *= 0.4
+        b_obj.velocities.z *= 0.4
 
     @property
     def can_stand_in(self):
@@ -1328,10 +1318,6 @@ class Cake(BlockSolid):
         f = 0.0625
         f1 = (1 + self.meta * 2) / 16.0
         return AABB(f1, 0.0, f, 1.0 - f, 0.5 - f, 1.0 - f).offset(self.x, self.y, self.z)
-
-    @property
-    def can_stand_in(self):
-        return True
 
 
 class RedstoneRepeaterOff(BlockRedstoneRepeater):
@@ -1378,15 +1364,8 @@ class Trapdoor(BlockSolid):
         return self.is_closed
 
     @property
-    def is_fall_through(self):
-        return not self.is_closed
-
-    @property
-    def stand_in_over2(self):
-        if self.is_closed:
-            return False
-        else:
-            raise Exception("don't check stand_in_over2 for open Trapdoor")
+    def can_fall_through(self):
+        return not self.can_stand_in
 
 
 class HiddenSilverfish(BlockCube):
@@ -1475,6 +1454,10 @@ class FenceGate(BlockBiCollidable):
             return True
 
     @property
+    def can_fall_through(self):
+        return not self.is_collidable
+
+    @property
     def is_open(self):
         return (self.meta & 4) != 0
 
@@ -1486,10 +1469,6 @@ class FenceGate(BlockBiCollidable):
             return self.bounding_box_north_south.offset(self.x, self.y, self.z)
         else:
             return self.bounding_box_east_west.offset(self.x, self.y, self.z)
-
-    @property
-    def can_stand_on(self):
-        return self.is_collidable
 
 
 class BrickStairs(BlockStairs):
@@ -1521,10 +1500,6 @@ class LilyPad(BlockSolid):
     @property
     def can_stand_in(self):
         return True
-
-    @property
-    def stand_in_over2(self):
-        return False
 
 
 class NetherBrick(BlockCube):
@@ -1576,10 +1551,6 @@ class BrewingStand(BlockMultiBox):
         out.append(self.bounding_box_stand.offset(self.x, self.y, self.z))
         out.append(self.bounding_box_base.offset(self.x, self.y, self.z))
 
-    @property
-    def can_stand_in(self):
-        return True
-
 
 class Cauldron(BlockMultiBox):
     number = 118
@@ -1597,14 +1568,6 @@ class Cauldron(BlockMultiBox):
     def add_grid_bounding_boxes_to(self, out):
         for box in self.bounding_boxes:
             out.append(box.offset(self.x, self.y, self.z))
-
-    @property
-    def can_stand_on(self):
-        return False
-
-    @property
-    def is_fall_through(self):
-        return False
 
 
 class EndPortal(BlockNonSolid):
@@ -1629,10 +1592,6 @@ class EndPortalFrame(BlockMultiBox):
         out.append(self.bounding_box.offset(self.x, self.y, self.z))
         if self.eye_inserted:
             out.append(self.bounding_box_eye_inserted.offset(self.x, self.y, self.z))
-
-    @property
-    def can_stand_in(self):
-        return not self.eye_inserted
 
 
 class EndStone(BlockCube):
@@ -1699,10 +1658,6 @@ class CocoaPlant(BlockSolid):
         else:
             raise Exception("undefined cocoa bounding box for %s" % direction)
         return gbb.offset(self.x, self.y, self.z)
-
-    @property
-    def can_stand_in(self):
-        return True
 
 
 class SandstoneStairs(BlockStairs):
@@ -1797,10 +1752,6 @@ class FlowerPot(BlockSolid):
     b2 = b1 / 2.0
     bounding_box = AABB(0.5 - b2, 0.0, 0.5 - b2, 0.5 + b2, b1, 0.5 + b2)
 
-    @property
-    def can_stand_in(self):
-        return True
-
 
 class Carrots(BlockFlower):
     number = 141
@@ -1839,10 +1790,6 @@ class Skull(BlockSolid):
         elif att == 5:
             gbb = AABB(0.0, 0.25, 0.25, 0.5, 0.75, 0.75)
         return gbb.offset(self.x, self.y, self.z)
-
-    @property
-    def can_stand_in(self):
-        return True
 
 
 class Anvil(BlockSolid):
