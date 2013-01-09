@@ -57,6 +57,7 @@ class MineCraftProtocol(Protocol):
             39: self.p_entity_attach,
             40: self.p_entity_metadata,
             41: self.p_entity_effect,
+            42: self.p_entity_remove_effect,
             43: self.p_levelup,
             51: self.p_chunk,
             52: self.p_multi_block_change,
@@ -126,7 +127,6 @@ class MineCraftProtocol(Protocol):
         while ipackets:
             packet = ipackets.popleft()
             self.process_packet(packet)
-            self.world.status_diff.packets_in += 1
 
     def process_packet(self, packet):
         pid = packet[0]
@@ -156,7 +156,7 @@ class MineCraftProtocol(Protocol):
         self.world.chat.on_chat_message(c.message)
 
     def p_time(self, c):
-        self.world.game_state.on_time_update(timestamp=c.timestamp, daytime=c.daytime)
+        self.world.on_time_update(timestamp=c.timestamp, daytime=c.daytime)
 
     def p_entity_equipment(self, c):
         pass
@@ -268,6 +268,10 @@ class MineCraftProtocol(Protocol):
         self.world.entities.on_metadata(c.eid, c.metadata)
 
     def p_entity_effect(self, c):
+        #TODO pass for now
+        pass
+
+    def p_entity_remove_effect(self, c):
         #TODO pass for now
         pass
 

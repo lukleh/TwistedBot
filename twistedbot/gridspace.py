@@ -2,7 +2,7 @@
 
 import logbot
 import utils
-import blocks
+import fops
 
 
 log = logbot.getlogger("GRIDSPACE")
@@ -19,10 +19,10 @@ class NodeState(object):
             self.x = x
             self.y = y
             self.z = z
-        self.coords = utils.Vector(x, y, z)
-        self.block_0 = grid.get_block(x, y - 1, z)
-        self.block_1 = grid.get_block(x, y, z)
-        self.block_2 = grid.get_block(x, y + 1, z)
+        self.coords = utils.Vector(self.x, self.y, self.z)
+        self.block_0 = grid.get_block(self.x, self.y - 1, self.z)
+        self.block_1 = grid.get_block(self.x, self.y, self.z)
+        self.block_2 = grid.get_block(self.x, self.y + 1, self.z)
         self.can_be = self.block_1.can_fall_through and self.block_2.can_fall_through
         self.can_stand = self.block_0.can_stand_on and self.can_be
         self.can_jump = self.can_stand and self.block_1.is_free and self.block_2.is_free
@@ -31,6 +31,27 @@ class NodeState(object):
         self.in_fire = self.block_1.is_burning or self.block_2.is_burning
         self.in_water = self.block_1.is_water or self.block_2.is_water
         self.can_hold = self.in_water or self.block_1.is_ladder or (self.block_1.is_vine and self.block_1.is_climbable)
+        self.platform_y = self.y
+        self.center_x = self.x + 0.5
+        self.center_z = self.z + 0.5
+
+    def __str__(self):
+        if self.can_stand:
+            return "ON %s" % self.block_0
+        else:
+            return "IN %s" % self.block_1
+
+    def vertical_center_in(self, center):
+        return self.x < center.x and center.x < (self.x + 1) and self.z < center.z and center.z < (self.z + 1)
+
+    def base_in(self, bb):
+        return self.vertical_center_in(utils.Vector2D(bb.min_x, bb.min_z)) and self.vertical_center_in(utils.Vector2D(bb.max_x, bb.max_z))
+
+    def touch_platform(self, center):
+        if self.can_stand:
+            return fops.eq(center.y, self.y)
+        elif self.can_hold:
+            return self.y < center.y and center.y < (self.y + 1)
 
 
 def neighbours_of(grid, base_state, go_fire=False):
@@ -42,7 +63,7 @@ def neighbours_of(grid, base_state, go_fire=False):
             for i, j in utils.adjacency:
                 to_state = NodeState(grid, x + i, y + k, z + j)
                 if to_state.in_water:
-                    go = can_swim(grid, base_state, to_state)
+                    go = can_swim(base_state, to_state)
                     if go:
                         yield to_state
                 elif to_state.can_stand:
@@ -51,7 +72,7 @@ def neighbours_of(grid, base_state, go_fire=False):
                     if k == 0:
                         yield to_state
                     else:
-                        go = can_go(grid, base_state, to_state)
+                        go = can_go(base_state, to_state)
                         if go:
                             yield to_state
                 elif to_state.can_hold:
@@ -69,7 +90,7 @@ def neighbours_of(grid, base_state, go_fire=False):
             for i, j in utils.cross:
                 to_state = NodeState(grid, x + i, y + k, z + j)
                 if to_state.can_stand:
-                    go = can_go(grid, base_state, to_state)
+                    go = can_go(base_state, to_state)
                     if go:
                         yield to_state
                 elif to_state.can_hold:
@@ -85,14 +106,14 @@ def neighbours_of(grid, base_state, go_fire=False):
         for i, j in utils.adjacency:
             to_state = NodeState(grid, x + i, y, z + j)
             if to_state.can_stand or to_state.can_hold:
-                go = can_go(grid, base_state, to_state)
+                go = can_go(base_state, to_state)
                 if go:
                     yield to_state
             elif to_state.can_fall:
                 for k in [-1, -2, -3]:
                     to_state = NodeState(grid, x + i, y + k, z + j)
                     if to_state.can_stand or to_state.can_hold:
-                        go = can_go(grid, base_state, to_state)
+                        go = can_go(base_state, to_state)
                         if go:
                             yield to_state
                         break
@@ -103,7 +124,7 @@ def neighbours_of(grid, base_state, go_fire=False):
             else:
                 to_state = NodeState(grid, x + i, y + 1, z + j)
                 if to_state.can_stand or to_state.can_hold:
-                    go = can_go(grid, base_state, to_state)
+                    go = can_go(base_state, to_state)
                     if go:
                         yield to_state
 
@@ -137,14 +158,14 @@ def can_go(from_state, to_state):
             return True
     elif not cross:
         if from_state.y == to_state.y:
-            return diagonal_free(grid, from_state, to_state, from_state.y)
+            return diagonal_free(from_state, to_state, from_state.y)
         elif from_state.y < to_state.y:
             down = NodeState(grid, to_state.x, from_state.y, to_state.z)
             if not down.can_be:
                 return False
-            return diagonal_free(grid, from_state, to_state, to_state.y)
+            return diagonal_free(from_state, to_state, to_state.y)
         else:
-            go = diagonal_free(grid, from_state, to_state, from_state.y)
+            go = diagonal_free(from_state, to_state, from_state.y)
             if not go:
                 return False
             for i in xrange(from_state.y - to_state.y):
@@ -181,3 +202,7 @@ def diagonal_free(from_state, to_state, y_level):
 
 def can_stand(grid, x, y, z):
     return NodeState(grid, x, y, z).can_stand
+
+
+def can_stand_coords(grid, coords):
+    return can_stand(grid, coords.x, coords.y, coords.z)

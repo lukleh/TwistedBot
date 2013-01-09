@@ -4,7 +4,6 @@ import heapq
 import config
 import logbot
 import gridspace
-from utils import Vector
 
 
 log = logbot.getlogger("ASTAR")
@@ -77,6 +76,12 @@ class Path(object):
         except IndexError:
             return None
 
+    def remove_last(self, n):
+        if n < 1:
+            return
+        self.nodes = self.nodes[:-n]
+        if not self.nodes:
+            self.is_finished = True
 
 
 class AStar(object):

@@ -30,11 +30,9 @@ class World(object):
         self.server_host = host
         self.server_port = port
         self.commander = Commander(commander_name)
-        self.status_diff = StatusDiff(self)
         self.bot = BotEntity(self, bot_name)
         self.chat = Chat(self)
         self.stats = Statistics()
-        self.game_state = GameState()
         self.game_ticks = 0
         self.connected = False
         self.logged_in = False
@@ -45,6 +43,8 @@ class World(object):
         self.dimension = None
         self.dimensions = [Dimension(self), Dimension(self), Dimension(self)]
         self.spawn_position = None
+        self.game_mode = None
+        self.difficulty = None
         self.players = defaultdict(int)
         utils.do_later(config.TIME_STEP, self.tick)
 
@@ -58,8 +58,6 @@ class World(object):
 
     def every_n_ticks(self, n=100):
         self.game_ticks += 1
-        if self.game_ticks % n == 0:
-            self.status_diff.log()
 
     def on_connection_lost(self):
         self.connected = False
@@ -92,7 +90,8 @@ class World(object):
         self.bot.eid = bot_eid
         self.logged_in = True
         self.dimension_change(dimension)
-        self.game_state.update_settings(game_mode=game_mode, dimension=dimension, difficulty=difficulty)
+        self.game_mode = game_mode
+        self.difficulty = difficulty
 
     def on_spawn_position(self, x, y, z):
         self.spawn_position = (x, y, z)
@@ -100,40 +99,15 @@ class World(object):
 
     def on_respawn(self, game_mode=None, dimension=None, difficulty=None):
         self.dimension_change(dimension)
-        self.game_state.update_settings(game_mode=game_mode, dimension=dimension, difficulty=difficulty)
+        self.game_mode = game_mode
+        self.difficulty = difficulty
         self.bot.location_received = False
         self.bot.spawn_point_received = False
         self.bot.i_am_dead = False
 
-
-class GameState(object):
-    def __init__(self):
-        self.game_mode = None
-        self.dimension = None
-        self.difficulty = None
-        self.daytime = None
-        self.timestamp = None
-
-    def update_settings(self, game_mode=None, dimension=None, difficulty=None):
-        self.game_mode = game_mode
-        self.difficulty = difficulty
-        self.dimension = dimension
-
     def on_time_update(self, timestamp=None, daytime=None):
         self.timestamp = timestamp
         self.daytime = daytime
-
-
-class StatusDiff(object):
-    def __init__(self, world):
-        self.world = world
-        self.packets_in = 0
-        self.logger = logbot.getlogger("BOT_ENTITY_STATUS")
-
-    def log(self):
-        pass
-        #self.logger.msg("received %d packets" % self.packets_in)
-        #self.logger.msg(self.bot.stats)
 
 
 class Commander(object):

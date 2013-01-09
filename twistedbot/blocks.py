@@ -86,7 +86,6 @@ class Block(object):
     def effective_flow_decay(self):
         return -1
 
-    @property
     def is_solid_block(self, block, ignore):
         return block.material.is_solid
 
@@ -139,6 +138,10 @@ class BlockNonSolid(Block):
 
     def add_grid_bounding_boxes_to(self, out):
         pass
+
+    @property
+    def can_stand_on(self):
+        return False
 
     @property
     def can_fall_through(self):
@@ -634,6 +637,18 @@ class BlockBiCollidable(Block):
     def add_grid_bounding_boxes_to(self, out):
         if self.is_collidable:
             out.append(self.grid_bounding_box)
+
+    @property
+    def can_stand_in(self):
+        raise NotImplemented('can_stand_in')
+
+    @property
+    def can_fall_through(self):
+        raise NotImplemented('can_fall_through')
+
+    @property
+    def can_stand_on(self):
+        raise NotImplemented('can_stand_on')
 
 
 class BlockSign(BlockNonSolid):
@@ -1213,6 +1228,14 @@ class Snow(BlockBiCollidable):
     def can_stand_in(self):
         return self.is_collidable
 
+    @property
+    def can_fall_through(self):
+        return not self.is_collidable
+
+    @property
+    def can_stand_on(self):
+        return False
+
 
 class Ice(BlockCube):
     number = 79
@@ -1456,6 +1479,14 @@ class FenceGate(BlockBiCollidable):
     @property
     def can_fall_through(self):
         return not self.is_collidable
+
+    @property
+    def can_stand_in(self):
+        return False
+
+    @property
+    def can_stand_on(self):
+        return False
 
     @property
     def is_open(self):

@@ -18,7 +18,6 @@ class Sign(object):
         self.is_waypoint = line1.strip().lower() == "waypoint"
         self.decode()
         self.is_groupable = self.group and self.value is not None
-        self.nav_coords = self.coords.offset(dy=-1)
 
     def decode(self):
         self.line2 = re.sub(ur"\s+", " ", self.line2.strip().lower())
@@ -54,13 +53,12 @@ class SignWayPoints(object):
             self.new(sign)
 
     def check_sign(self, sign):
-        crd = sign.coords
-        sblk = self.dimension.grid.get_block(crd[0], crd[1], crd[2])
+        sblk = self.dimension.grid.get_block_coords(sign.coords)
         if not sblk.is_sign:
-            self.remove(crd)
+            self.remove(sign.coords)
             return False
         else:
-            return self.sign_waypoints.has_sign_at(crd)
+            return self.has_sign_at(sign.coords)
 
     def has_sign_at(self, crd):
         return crd in self.crd_to_sign
@@ -132,7 +130,7 @@ class SignWayPoints(object):
             s = sgroup.next_rotate()
             if s == cs:
                 return None
-            if gridspace.can_stand(s.coords):
+            if gridspace.can_stand_coords(self.dimension.grid, s.coords):
                 return s
 
     def get_groupnext_circulate(self, group):
@@ -150,7 +148,7 @@ class SignWayPoints(object):
                 n_pass += 1
                 if n_pass == 2:
                     return None
-            if gridspace.can_stand(s.coords):
+            if gridspace.can_stand_coords(self.dimension.grid, s.coords):
                 return s
 
     def reset_group(self, group):

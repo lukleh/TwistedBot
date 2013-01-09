@@ -30,6 +30,7 @@ class BotObject(object):
         self.is_collided_horizontally = False
         self.horizontally_blocked = False
         self.action = 2  # normal
+        self._action = self.action
         self.is_jumping = False
         self.floating_flag = True
 
@@ -135,21 +136,7 @@ class BotEntity(object):
     def in_complete_chunks(self, b_obj):
         return self.world.grid.aabb_in_complete_chunks(b_obj.aabb)
 
-    def tick(self):
-        tick_start = datetime.now()
-        if self.location_received is False:
-            self.last_tick_time = tick_start
-            return config.TIME_STEP
-        if not self.ready:
-            self.ready = self.in_complete_chunks(self.bot_object) and self.spawn_point_received
-            if not self.ready:
-                self.last_tick_time = tick_start
-                return config.TIME_STEP
-        self.move(self.bot_object)
-        self.bot_object.direction = utils.vector2D(0, 0)
-        self.send_location(self.bot_object)
-        if not self.i_am_dead:
-            utils.do_later(0, self.behaviour_manager.run)
+    def predict_next_ticktime(self, tick_start):
         tick_end = datetime.now()
         d_run = (tick_end - tick_start).total_seconds()  # time this step took
         t = config.TIME_STEP - d_run  # decreased by computation in tick
@@ -161,6 +148,25 @@ class BotEntity(object):
         self.last_tick_time = tick_start
         return t
 
+    def tick(self):
+        tick_start = datetime.now()
+        if self.location_received is False:
+            self.last_tick_time = tick_start
+            return config.TIME_STEP
+        if not self.ready:
+            self.ready = self.in_complete_chunks(self.bot_object) and self.spawn_point_received
+            if not self.ready:
+                self.last_tick_time = tick_start
+                return config.TIME_STEP
+        self.move(self.bot_object)
+        self.bot_object.direction = utils.Vector2D(0, 0)
+        self.send_location(self.bot_object)
+        self.send_action(self.bot_object)
+        self.stop_sneaking(self.bot_object)
+        if not self.i_am_dead:
+            utils.do_later(0, self.behaviour_manager.run)
+        return self.predict_next_ticktime(tick_start)
+
     def send_location(self, b_obj):
         self.world.send_packet("player position&look", {
             "position": packets.Container(x=b_obj.x, y=b_obj.y, z=b_obj.z,
@@ -168,14 +174,13 @@ class BotEntity(object):
             "orientation": packets.Container(yaw=b_obj.yaw, pitch=b_obj.pitch),
             "grounded": packets.Container(grounded=b_obj.on_ground)})
 
-    def set_action(self, action_id):
+    def send_action(self, b_obj):
         """
         sneaking, not sneaking, leave bed, start sprinting, stop sprinting
         """
-        if self.action != action_id:
-            self.action = action_id
-        self.send_packet(
-            "entity action", {"eid": self.eid, "action": self.action})
+        if b_obj.action != b_obj._action:
+            b_obj.action = b_obj._action
+            self.send_packet("entity action", {"eid": self.eid, "action": b_obj._action})
 
     def turn_to_point(self, b_obj, point):
         if point[0] == b_obj.x and point[2] == b_obj.z:
@@ -249,17 +254,20 @@ class BotEntity(object):
         aabbs = self.world.grid.collision_aabbs_in(b_obj.aabb.extend_to(vx, vy, vz))
         b_bb = b_obj.aabb
         dy = vy
-        for bb in aabbs:
-            dy = b_bb.calculate_axis_offset(bb, dy, 1)
-        b_bb = b_bb.offset(dy=dy)
+        if not fops.eq(vy, 0):
+            for bb in aabbs:
+                dy = b_bb.calculate_axis_offset(bb, dy, 1)
+            b_bb = b_bb.offset(dy=dy)
         dx = vx
-        for bb in aabbs:
-            dx = b_bb.calculate_axis_offset(bb, dx, 0)
-        b_bb = b_bb.offset(dx=dx)
+        if not fops.eq(vx, 0):
+            for bb in aabbs:
+                dx = b_bb.calculate_axis_offset(bb, dx, 0)
+            b_bb = b_bb.offset(dx=dx)
         dz = vz
-        for bb in aabbs:
-            dz = b_bb.calculate_axis_offset(bb, dz, 2)
-        b_bb = b_bb.offset(dz=dz)
+        if not fops.eq(vz, 0):
+            for bb in aabbs:
+                dz = b_bb.calculate_axis_offset(bb, dz, 2)
+            b_bb = b_bb.offset(dz=dz)
         if vy != dy and vy < 0 and (dx != vx or dz != vz):
             st = config.MAX_STEP_HEIGHT
             aabbs = self.world.grid.collision_aabbs_in(b_obj.aabb.extend_to(vx, st, vz))
@@ -338,6 +346,8 @@ class BotEntity(object):
                                              self.velocities.z):
                 self.velocities.y = 0.3
         else:
+            if self.is_on_ladder(b_obj) and b_obj.floating_flag:
+                self.start_sneaking(b_obj)
             slowdown = self.current_slowdown(b_obj)
             self.update_directional_speed(b_obj, self.current_speed_factor(b_obj))
             self.clip_ladder_velocities(b_obj)
@@ -350,9 +360,8 @@ class BotEntity(object):
             b_obj.velocities.z *= slowdown
 
     def directional_speed(self, direction, speedf):
-        x, z = direction
-        dx = x * speedf
-        dz = z * speedf
+        dx = direction.x * speedf
+        dz = direction.z * speedf
         return utils.Vector2D(dx, dz)
 
     def update_directional_speed(self, b_obj, speedf, balance=False):
@@ -363,8 +372,8 @@ class BotEntity(object):
                 (perpedicular_dir.x * perpedicular_dir.x + perpedicular_dir.z * perpedicular_dir.z)
             if dot < 0:
                 dot *= -1
-                perpedicular_dir = (direction.z, - direction.x)
-            direction = (direction.x - perpedicular_dir.x * dot, direction.z - perpedicular_dir.z * dot)
+                perpedicular_dir = utils.Vector2D(direction.z, - direction.x)
+            direction = utils.Vector2D(direction.x - perpedicular_dir.x * dot, direction.z - perpedicular_dir.z * dot)
             self.turn_to_direction(b_obj, direction.x, direction.z)
         b_obj.velocities.x += direction.x
         b_obj.velocities.z += direction.z

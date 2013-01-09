@@ -106,10 +106,7 @@ class OrderedLinkedList(object):
             return
         for index, item in enumerate(self.olist):
             if item.order > order:
-                if index == len(self.olist) - 1:
-                    self.olist.append(new_item)
-                else:
-                    self.olist.insert(index, new_item)
+                self.olist.insert(index, new_item)
                 break
         else:
             self.olist.append(new_item)
@@ -119,10 +116,13 @@ class OrderedLinkedList(object):
             return
         if len(self) == 1:
             self.olist = []
+            self.pointer = None
             return
         for i, item in enumerate(self.olist):
             if item.obj == obj:
                 self.olist.pop(i)
+                if self.pointer is not None and i == self.pointer and self.pointer > 0:
+                     self.pointer -= 1
                 break
 
     def next_circulate(self):
@@ -160,8 +160,8 @@ class OrderedLinkedList(object):
             return None
         if self.is_empty:
             return None
-        obj = self.olist[self.pointer]
-        return obj
+        list_item = self.olist[self.pointer]
+        return list_item.obj
 
 
 class Vector(object):
@@ -235,11 +235,24 @@ class Vector(object):
             self.z *= -1
         return self
 
+
 class Vector2D(object):
     def __init__(self, x, z):
         self.x = x
         self.z = z
 
+    def __str__(self):
+        return "<%s %s>" % (self.x, self.z)
+
     @property
     def size(self):
         return math.hypot(self.x, self.z)
+
+    def normalize(self):
+        d = self.size
+        if d < 0.0001:
+            self.x = 0
+            self.z = 0
+        else:
+            self.x = self.x / d
+            self.z = self.z / d
