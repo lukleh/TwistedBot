@@ -8,10 +8,10 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 import config
 import utils
 import logbot
-import gridspace
 import fops
 from pathfinding import AStar
 from axisbox import AABB
+from gridspace import GridSpace
 
 
 log = logbot.getlogger("BEHAVIOURS")
@@ -207,6 +207,7 @@ class FollowPlayerBehaviour(BehaviourBase):
         super(FollowPlayerBehaviour, self).__init__(*args, **kwargs)
         self.last_block = None
         self.last_position = None
+        self.name = "Following %s" % self.world.commander.name
 
     def from_child(self, g):
         self.status = Status.running
@@ -246,8 +247,7 @@ class TravelToBehaviour(BehaviourBase):
             t_start = time.time()
             d = cooperate(AStar(dimension=self.world.dimension,
                                 start_coords=sb.coords,
-                                end_coords=self.travel_coords,
-                                start_aabb=self.bot.bot_object.aabb)).whenDone()
+                                end_coords=self.travel_coords)).whenDone()
             d.addErrback(logbot.exit_on_error)
             astar = yield d
             if astar.path is None:
@@ -307,9 +307,10 @@ class MoveToBehaviour(BehaviourBase):
         log.msg(self.name)
 
     def check_status(self, b_obj):
-        self.start_state = gridspace.NodeState(self.world.grid, vector=self.start_coords)
-        self.target_state = gridspace.NodeState(self.world.grid, vector=self.target_coords)
-        go = gridspace.can_go(self.start_state, self.target_state)
+        gs = GridSpace(self.world.grid)
+        self.start_state = gs.get_state_coords(self.start_coords)
+        self.target_state = gs.get_state_coords(self.target_coords)
+        go = gs.can_go(self.start_state, self.target_state)
         if not go:
             log.msg('Cannot go between %s %s' % (self.start_state, self.target_state))
             return Status.failure

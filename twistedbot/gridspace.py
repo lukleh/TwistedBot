@@ -11,14 +11,9 @@ log = logbot.getlogger("GRIDSPACE")
 class NodeState(object):
     def __init__(self, grid, x=None, y=None, z=None, vector=None):
         self.grid = grid
-        if vector is not None:
-            self.x = vector.x
-            self.y = vector.y
-            self.z = vector.z
-        else:
-            self.x = x
-            self.y = y
-            self.z = z
+        self.x = x
+        self.y = y
+        self.z = z
         self.coords = utils.Vector(self.x, self.y, self.z)
         self.block_0 = grid.get_block(self.x, self.y - 1, self.z)
         self.block_1 = grid.get_block(self.x, self.y, self.z)
@@ -54,155 +49,174 @@ class NodeState(object):
             return self.y < center.y and center.y < (self.y + 1)
 
 
-def neighbours_of(grid, base_state, go_fire=False):
-    x = base_state.x
-    y = base_state.y
-    z = base_state.z
-    if base_state.in_water:
-        for k in [0, 1, -1]:
-            for i, j in utils.adjacency:
-                to_state = NodeState(grid, x + i, y + k, z + j)
-                if to_state.in_water:
-                    go = can_swim(base_state, to_state)
-                    if go:
-                        yield to_state
-                elif to_state.can_stand:
-                    if i != 0 and j != 0:
-                        continue
-                    if k == 0:
-                        yield to_state
-                    else:
-                        go = can_go(base_state, to_state)
+class GridSpace(object):
+
+    def __init__(self, grid):
+        self.grid = grid
+        self.cache = {}
+
+    def get_state_coords(self, coords):
+        return self._get_state(coords.tuple)
+
+    def get_state(self, x, y, z):
+        return self._get_state((x, y, z))
+
+    def _get_state(self, t_coords):
+        try:
+            return self.cache[t_coords]
+        except KeyError:
+            state = NodeState(self.grid, t_coords[0], t_coords[1], t_coords[2])
+            self.cache[t_coords] = state
+            return state
+
+    def neighbours_of(self, coords, go_fire=False):
+        x = coords.x
+        y = coords.y
+        z = coords.z
+        base_state = self.get_state_coords(coords)
+        if base_state.in_water:
+            for k in [0, 1, -1]:
+                for i, j in utils.adjacency:
+                    to_state = self.get_state(x + i, y + k, z + j)
+                    if to_state.in_water:
+                        go = self.can_swim(base_state, to_state)
                         if go:
                             yield to_state
-                elif to_state.can_hold:
-                    if (i != 0 and j != 0) or k != 0:
-                        continue
-                    yield to_state
-        to_state = NodeState(grid, x, y + 1, z)
-        if to_state.in_water:
-            yield to_state
-        to_state = NodeState(grid, x, y - 1, z)
-        if to_state.can_stand or to_state.in_water:
-            yield to_state
-    elif base_state.can_hold:
-        for k in [0, 1, -1]:
-            for i, j in utils.cross:
-                to_state = NodeState(grid, x + i, y + k, z + j)
-                if to_state.can_stand:
-                    go = can_go(base_state, to_state)
-                    if go:
+                    elif to_state.can_stand:
+                        if i != 0 and j != 0:
+                            continue
+                        if k == 0:
+                            yield to_state
+                        else:
+                            go = self.can_go(base_state, to_state)
+                            if go:
+                                yield to_state
+                    elif to_state.can_hold:
+                        if (i != 0 and j != 0) or k != 0:
+                            continue
                         yield to_state
-                elif to_state.can_hold:
-                    if k == 0:
-                        yield to_state
-        to_state = NodeState(grid, x, y + 1, z)
-        if to_state.can_hold:
-            yield to_state
-        to_state = NodeState(grid, x, y - 1, z)
-        if to_state.can_stand or to_state.can_hold:
-            yield to_state
-    else:
-        for i, j in utils.adjacency:
-            to_state = NodeState(grid, x + i, y, z + j)
+            to_state = self.get_state(x, y + 1, z)
+            if to_state.in_water:
+                yield to_state
+            to_state = self.get_state(x, y - 1, z)
+            if to_state.can_stand or to_state.in_water:
+                yield to_state
+        elif base_state.can_hold:
+            for k in [0, 1, -1]:
+                for i, j in utils.cross:
+                    to_state = self.get_state(x + i, y + k, z + j)
+                    if to_state.can_stand:
+                        go = self.can_go(base_state, to_state)
+                        if go:
+                            yield to_state
+                    elif to_state.can_hold:
+                        if k == 0:
+                            yield to_state
+            to_state = self.get_state(x, y + 1, z)
+            if to_state.can_hold:
+                yield to_state
+            to_state = self.get_state(x, y - 1, z)
             if to_state.can_stand or to_state.can_hold:
-                go = can_go(base_state, to_state)
-                if go:
-                    yield to_state
-            elif to_state.can_fall:
-                for k in [-1, -2, -3]:
-                    to_state = NodeState(grid, x + i, y + k, z + j)
-                    if to_state.can_stand or to_state.can_hold:
-                        go = can_go(base_state, to_state)
-                        if go:
-                            yield to_state
-                        break
-                    elif to_state.can_fall:
-                        continue
-                    else:
-                        break
-            else:
-                to_state = NodeState(grid, x + i, y + 1, z + j)
+                yield to_state
+        else:
+            for i, j in utils.adjacency:
+                to_state = self.get_state(x + i, y, z + j)
                 if to_state.can_stand or to_state.can_hold:
-                    go = can_go(base_state, to_state)
+                    go = self.can_go(base_state, to_state)
                     if go:
                         yield to_state
+                elif to_state.can_fall:
+                    for k in [-1, -2, -3]:
+                        to_state = self.get_state(x + i, y + k, z + j)
+                        if to_state.can_stand or to_state.can_hold:
+                            go = self.can_go(base_state, to_state)
+                            if go:
+                                yield to_state
+                            break
+                        elif to_state.can_fall:
+                            continue
+                        else:
+                            break
+                else:
+                    to_state = self.get_state(x + i, y + 1, z + j)
+                    if to_state.can_stand or to_state.can_hold:
+                        go = self.can_go(base_state, to_state)
+                        if go:
+                            yield to_state
 
+    def can_swim(self, from_state, to_state):
+        grid = from_state.grid
+        for x in xrange(from_state.x, to_state.x + 1):
+            for y in xrange(from_state.y, to_state.y + 1):
+                for z in xrange(from_state.z, to_state.z + 1):
+                    if from_state.x == x and from_state.y == y and from_state.z == z:
+                        continue
+                    if to_state.x == x and to_state.y == y and to_state.z == z:
+                        continue
+                    to_state = self.get_state(x, y, z)
+                    if not to_state.can_be:
+                        return False
+        return True
 
-def can_swim(from_state, to_state):
-    grid = from_state.grid
-    for x in xrange(from_state.x, to_state.x + 1):
-        for y in xrange(from_state.y, to_state.y + 1):
-            for z in xrange(from_state.z, to_state.z + 1):
-                if from_state.x == x and from_state.y == y and from_state.z == z:
-                    continue
-                if to_state.x == x and to_state.y == y and to_state.z == z:
-                    continue
-                to_state = NodeState(grid, x, y, z)
-                if not to_state.can_be:
+    def can_go(self, from_state, to_state):
+        vertical = from_state.y != to_state.y and from_state.x == to_state.x and from_state.z == to_state.z
+        cross = from_state.x == to_state.x or from_state.z == to_state.z
+        if vertical:
+            if from_state.y > to_state.y:
+                if from_state.can_climb:
+                    return True
+                else:
                     return False
-    return True
-
-
-def can_go(from_state, to_state):
-    grid = from_state.grid
-    vertical = from_state.y != to_state.y and from_state.x == to_state.x and from_state.z == to_state.z
-    cross = from_state.x == to_state.x or from_state.z == to_state.z
-    if vertical:
-        if from_state.y > to_state.y:
-            if from_state.can_climb:
+            else:
+                return True
+        elif not cross:
+            if from_state.y == to_state.y:
+                return self.diagonal_free(from_state, to_state, from_state.y)
+            elif from_state.y < to_state.y:
+                down = self.get_state(to_state.x, from_state.y, to_state.z)
+                if not down.can_be:
+                    return False
+                return self.diagonal_free(from_state, to_state, to_state.y)
+            else:
+                go = self.diagonal_free(from_state, to_state, from_state.y)
+                if not go:
+                    return False
+                for i in xrange(from_state.y - to_state.y):
+                    down = self.get_state(to_state.x, from_state.y - i, to_state.z)
+                    if not down.can_be:
+                        return False
+                return True
+        else:
+            if from_state.y == to_state.y:
+                return True
+            elif from_state.y < to_state.y:
+                up = self.get_state(from_state.x, from_state.y + 1, from_state.z)
+                if not up.can_be:
+                    return False
                 return True
             else:
-                return False
-        else:
-            return True
-    elif not cross:
-        if from_state.y == to_state.y:
-            return diagonal_free(from_state, to_state, from_state.y)
-        elif from_state.y < to_state.y:
-            down = NodeState(grid, to_state.x, from_state.y, to_state.z)
-            if not down.can_be:
-                return False
-            return diagonal_free(from_state, to_state, to_state.y)
-        else:
-            go = diagonal_free(from_state, to_state, from_state.y)
-            if not go:
-                return False
-            for i in xrange(from_state.y - to_state.y):
-                down = NodeState(grid, to_state.x, from_state.y - i, to_state.z)
-                if not down.can_be:
-                    return False
-            return True
-    else:
-        if from_state.y == to_state.y:
-            return True
-        elif from_state.y < to_state.y:
-            up = NodeState(grid, from_state.x, from_state.y + 1, from_state.z)
-            if not up.can_be:
-                return False
-            return True
-        else:
-            for i in xrange(from_state.y - to_state.y):
-                down = NodeState(grid, to_state.x, from_state.y - i, to_state.z)
-                if not down.can_be:
-                    return False
-            return True
+                for i in xrange(from_state.y - to_state.y):
+                    down = self.get_state(to_state.x, from_state.y - i, to_state.z)
+                    if not down.can_be:
+                        return False
+                return True
 
 
-def diagonal_free(from_state, to_state, y_level):
-    grid = from_state.grid
-    left = NodeState(grid, to_state.x, y_level, from_state.z)
-    if not left.can_be:
-        return False
-    right = NodeState(grid, from_state.x, y_level, to_state.z)
-    if not right.can_be:
-        return False
-    return True
+    def diagonal_free(self, from_state, to_state, y_level):
+        grid = from_state.grid
+        left = self.get_state(to_state.x, y_level, from_state.z)
+        if not left.can_be:
+            return False
+        right = self.get_state(from_state.x, y_level, to_state.z)
+        if not right.can_be:
+            return False
+        return True
 
 
-def can_stand(grid, x, y, z):
-    return NodeState(grid, x, y, z).can_stand
+    def can_stand(self, x, y, z):
+        return self.get_state(x, y, z).can_stand
 
 
 def can_stand_coords(grid, coords):
-    return can_stand(grid, coords.x, coords.y, coords.z)
+    gs = GridSpace(grid)
+    return gs.can_stand(coords.x, coords.y, coords.z)

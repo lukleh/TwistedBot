@@ -3,19 +3,15 @@ import heapq
 
 import config
 import logbot
-import gridspace
+from gridspace import GridSpace
 
 
 log = logbot.getlogger("ASTAR")
 
 
 class PathNode(object):
-    def __init__(self, coords=None, state=None, cost=1):
-        if coords:
-            self.coords = coords
-        else:
-            self.coords = state.coords
-        self.state = state
+    def __init__(self, coords=None, cost=1):
+        self.coords = coords
         self.cost = cost
         self.g = 0
         self.h = 0
@@ -86,17 +82,16 @@ class Path(object):
 
 class AStar(object):
 
-    def __init__(self, dimension=None, start_coords=None, end_coords=None, start_aabb=None, max_cost=config.PATHFIND_LIMIT):
+    def __init__(self, dimension=None, start_coords=None, end_coords=None, max_cost=config.PATHFIND_LIMIT):
         self.dimension = dimension
         self.grid = dimension.grid
-        start_state = gridspace.NodeState(self.grid, start_coords.x, start_coords.y, start_coords.z)
-        goal_state = gridspace.NodeState(self.grid, end_coords.x, end_coords.y, end_coords.z)
-        self.start_node = PathNode(state=start_state)
-        self.goal_node = PathNode(state=goal_state)
-        self.start_aabb = start_aabb
+        self.start_node = PathNode(start_coords)
+        self.goal_node = PathNode(end_coords)
+        self.gridspace = GridSpace(self.grid)
         self.max_cost = max_cost
         self.path = None
         self.closed_set = set()
+        goal_state = self.gridspace.get_state_coords(end_coords)
         if goal_state.can_stand or goal_state.can_hold:
             self.open_heap = [self.start_node]
             self.open_set = set([self.start_node])
@@ -119,9 +114,9 @@ class AStar(object):
         return config.COST_DIRECT
 
     def neighbours(self, node):
-        for state in gridspace.neighbours_of(self.grid, node.state):
+        for state in self.gridspace.neighbours_of(node.coords):
             if state.coords not in self.closed_set:
-                yield PathNode(state=state)
+                yield PathNode(state.coords)
 
     def heuristic_cost_estimate(self, start, goal):
         adx = abs(start.coords.x - goal.coords.x)
@@ -138,7 +133,8 @@ class AStar(object):
             raise StopIteration()
         x = heapq.heappop(self.open_heap)
         if x == self.goal_node:
-            self.path = Path(dimension=self.dimension, nodes=self.reconstruct_path(x), start_aabb=self.start_aabb)
+            self.path = Path(dimension=self.dimension, nodes=self.reconstruct_path(x))
+            self.gridspace = None
             raise StopIteration()
         self.open_set.remove(x)
         self.closed_set.add(x.coords)
