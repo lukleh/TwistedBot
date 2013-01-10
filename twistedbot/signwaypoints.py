@@ -1,18 +1,64 @@
 
+import re
 
 import logbot
-import tools
-
+import utils
+import gridspace
 
 log = logbot.getlogger("SIGNS")
 
 
+class Sign(object):
+    def __init__(self, coords, line1, line2, line3, line4):
+        self.coords = coords
+        self.line1 = line1
+        self.line2 = line2
+        self.line3 = line3
+        self.line4 = line4
+        self.is_waypoint = line1.strip().lower() == "waypoint"
+        self.decode()
+        self.is_groupable = self.group and self.value is not None
+
+    def decode(self):
+        self.line2 = re.sub(ur"\s+", " ", self.line2.strip().lower())
+        try:
+            self.name = self.line4
+            self.value = float(re.sub(ur",", ".", self.line2))
+        except ValueError:
+            self.name = self.line2
+            self.value = None
+        self.group = self.line3
+
+    def __eq__(self, sgn):
+        return self.coords == sgn.coords
+
+    def __str__(self):
+        return "$coords:%s group:%s value:%s name:%s$" % \
+            (str(self.coords), self.group, self.value, self.name)
+
+    def __repr__(self):
+        return self.__str__()
+
+
 class SignWayPoints(object):
-    def __init__(self, navgrid):
-        self.navgrid = navgrid
+    def __init__(self, dimension):
+        self.dimension = dimension
         self.sign_points = {}
         self.crd_to_sign = {}
         self.ordered_sign_groups = {}
+
+    def on_new_sign(self, x, y, z, line1, line2, line3, line4):
+        sign = Sign(utils.Vector(x, y, z), line1, line2, line3, line4)
+        if sign.is_waypoint:
+            self.new(sign)
+
+    def check_sign(self, sign):
+        sblk = self.dimension.grid.get_block_coords(sign.coords)
+        if not sblk.is_sign:
+            self.remove(sign.coords)
+            return False
+        else:
+            return self.has_sign_at(sign.coords)
 
     def has_sign_at(self, crd):
         return crd in self.crd_to_sign
@@ -26,8 +72,7 @@ class SignWayPoints(object):
     def new(self, sign):
         if sign.is_groupable:
             if sign.group not in self.ordered_sign_groups:
-                self.ordered_sign_groups[
-                    sign.group] = tools.OrderedLinkedList(name=sign.group)
+                self.ordered_sign_groups[sign.group] = utils.OrderedLinkedList(name=sign.group)
             self.ordered_sign_groups[sign.group].add(sign.value, sign)
         if sign.name:
             self.sign_points[sign.name] = sign
@@ -85,7 +130,7 @@ class SignWayPoints(object):
             s = sgroup.next_rotate()
             if s == cs:
                 return None
-            if self.navgrid.graph.has_node(tools.lower_y(s.coords)):
+            if gridspace.can_stand_coords(self.dimension.grid, s.coords):
                 return s
 
     def get_groupnext_circulate(self, group):
@@ -103,7 +148,7 @@ class SignWayPoints(object):
                 n_pass += 1
                 if n_pass == 2:
                     return None
-            if self.navgrid.graph.has_node(tools.lower_y(s.coords)):
+            if gridspace.can_stand_coords(self.dimension.grid, s.coords):
                 return s
 
     def reset_group(self, group):

@@ -14,131 +14,11 @@ except ImportError:
     setgroups = getgroups = None
 from UserDict import UserDict
 
+from twisted.python._utilpy3 import (FancyEqMixin, setIDFunction, unsignedID,
+                                     untilConcludes, runWithWarningsSuppressed,
+                                     FancyStrMixin, nameToLabel, InsensitiveDict)
 
-class InsensitiveDict:
-    """Dictionary, that has case-insensitive keys.
 
-    Normally keys are retained in their original form when queried with
-    .keys() or .items().  If initialized with preserveCase=0, keys are both
-    looked up in lowercase and returned in lowercase by .keys() and .items().
-    """
-    """
-    Modified recipe at
-    http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/66315 originally
-    contributed by Sami Hangaslammi.
-    """
-
-    def __init__(self, dict=None, preserve=1):
-        """Create an empty dictionary, or update from 'dict'."""
-        self.data = {}
-        self.preserve=preserve
-        if dict:
-            self.update(dict)
-
-    def __delitem__(self, key):
-        k=self._lowerOrReturn(key)
-        del self.data[k]
-
-    def _lowerOrReturn(self, key):
-        if isinstance(key, str) or isinstance(key, unicode):
-            return key.lower()
-        else:
-            return key
-
-    def __getitem__(self, key):
-        """Retrieve the value associated with 'key' (in any case)."""
-        k = self._lowerOrReturn(key)
-        return self.data[k][1]
-
-    def __setitem__(self, key, value):
-        """Associate 'value' with 'key'. If 'key' already exists, but
-        in different case, it will be replaced."""
-        k = self._lowerOrReturn(key)
-        self.data[k] = (key, value)
-
-    def has_key(self, key):
-        """Case insensitive test whether 'key' exists."""
-        k = self._lowerOrReturn(key)
-        return k in self.data
-
-    __contains__=has_key
-
-    def _doPreserve(self, key):
-        if not self.preserve and (isinstance(key, str)
-                                  or isinstance(key, unicode)):
-            return key.lower()
-        else:
-            return key
-
-    def keys(self):
-        """List of keys in their original case."""
-        return list(self.iterkeys())
-
-    def values(self):
-        """List of values."""
-        return list(self.itervalues())
-
-    def items(self):
-        """List of (key,value) pairs."""
-        return list(self.iteritems())
-
-    def get(self, key, default=None):
-        """Retrieve value associated with 'key' or return default value
-        if 'key' doesn't exist."""
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-    def setdefault(self, key, default):
-        """If 'key' doesn't exists, associate it with the 'default' value.
-        Return value associated with 'key'."""
-        if not self.has_key(key):
-            self[key] = default
-        return self[key]
-
-    def update(self, dict):
-        """Copy (key,value) pairs from 'dict'."""
-        for k,v in dict.items():
-            self[k] = v
-
-    def __repr__(self):
-        """String representation of the dictionary."""
-        items = ", ".join([("%r: %r" % (k,v)) for k,v in self.items()])
-        return "InsensitiveDict({%s})" % items
-
-    def iterkeys(self):
-        for v in self.data.itervalues():
-            yield self._doPreserve(v[0])
-
-    def itervalues(self):
-        for v in self.data.itervalues():
-            yield v[1]
-
-    def iteritems(self):
-        for (k, v) in self.data.itervalues():
-            yield self._doPreserve(k), v
-
-    def popitem(self):
-        i=self.items()[0]
-        del self[i[0]]
-        return i
-
-    def clear(self):
-        for k in self.keys():
-            del self[k]
-
-    def copy(self):
-        return InsensitiveDict(self, self.preserve)
-
-    def __len__(self):
-        return len(self.data)
-
-    def __eq__(self, other):
-        for k,v in self.items():
-            if not (k in other) or not (other[k]==v):
-                return 0
-        return len(self)==len(other)
 
 class OrderedDict(UserDict):
     """A UserDict that preserves insert order whenever possible."""
@@ -538,49 +418,16 @@ class _IntervalDifferentialIterator:
         raise ValueError, "Specified interval not in IntervalDifferential"
 
 
-class FancyStrMixin:
-    """
-    Set showAttributes to a sequence of strings naming attributes, OR
-    sequences of C{(attributeName, displayName, formatCharacter)}.
-    """
-    showAttributes = ()
-    def __str__(self):
-        r = ['<', hasattr(self, 'fancybasename') and self.fancybasename or self.__class__.__name__]
-        for attr in self.showAttributes:
-            if isinstance(attr, str):
-                r.append(' %s=%r' % (attr, getattr(self, attr)))
-            else:
-                r.append((' %s=' + attr[2]) % (attr[1], getattr(self, attr[0])))
-        r.append('>')
-        return ''.join(r)
-    __repr__ = __str__
-
-
-
-class FancyEqMixin:
-    compareAttributes = ()
-    def __eq__(self, other):
-        if not self.compareAttributes:
-            return self is other
-        if isinstance(self, other.__class__):
-            return (
-                [getattr(self, name) for name in self.compareAttributes] ==
-                [getattr(other, name) for name in self.compareAttributes])
-        return NotImplemented
-
-
-    def __ne__(self, other):
-        result = self.__eq__(other)
-        if result is NotImplemented:
-            return result
-        return not result
-
-
 
 try:
-    from twisted.python._initgroups import initgroups as _c_initgroups
+    # Python 2.7 / Python 3.3
+    from os import initgroups as _c_initgroups
 except ImportError:
-    _c_initgroups = None
+    try:
+        # Python 2.6
+        from twisted.python._initgroups import initgroups as _c_initgroups
+    except ImportError:
+        _c_initgroups = None
 
 
 
@@ -770,53 +617,6 @@ class SubclassableCStringIO(object):
 
 
 
-def untilConcludes(f, *a, **kw):
-    while True:
-        try:
-            return f(*a, **kw)
-        except (IOError, OSError), e:
-            if e.args[0] == errno.EINTR:
-                continue
-            raise
-
-_idFunction = id
-
-def setIDFunction(idFunction):
-    """
-    Change the function used by L{unsignedID} to determine the integer id value
-    of an object.  This is largely useful for testing to give L{unsignedID}
-    deterministic, easily-controlled behavior.
-
-    @param idFunction: A function with the signature of L{id}.
-    @return: The previous function being used by L{unsignedID}.
-    """
-    global _idFunction
-    oldIDFunction = _idFunction
-    _idFunction = idFunction
-    return oldIDFunction
-
-
-# A value about twice as large as any Python int, to which negative values
-# from id() will be added, moving them into a range which should begin just
-# above where positive values from id() leave off.
-_HUGEINT = (sys.maxint + 1L) * 2L
-def unsignedID(obj):
-    """
-    Return the id of an object as an unsigned number so that its hex
-    representation makes sense.
-
-    This is mostly necessary in Python 2.4 which implements L{id} to sometimes
-    return a negative value.  Python 2.3 shares this behavior, but also
-    implements hex and the %x format specifier to represent negative values as
-    though they were positive ones, obscuring the behavior of L{id}.  Python
-    2.5's implementation of L{id} always returns positive values.
-    """
-    rval = _idFunction(obj)
-    if rval < 0:
-        rval += _HUGEINT
-    return rval
-
-
 def mergeFunctionMetadata(f, g):
     """
     Overwrite C{g}'s name and docstring with values from C{f}.  Update
@@ -852,52 +652,6 @@ def mergeFunctionMetadata(f, g):
         pass
     merged.__module__ = f.__module__
     return merged
-
-
-def nameToLabel(mname):
-    """
-    Convert a string like a variable name into a slightly more human-friendly
-    string with spaces and capitalized letters.
-
-    @type mname: C{str}
-    @param mname: The name to convert to a label.  This must be a string
-    which could be used as a Python identifier.  Strings which do not take
-    this form will result in unpredictable behavior.
-
-    @rtype: C{str}
-    """
-    labelList = []
-    word = ''
-    lastWasUpper = False
-    for letter in mname:
-        if letter.isupper() == lastWasUpper:
-            # Continuing a word.
-            word += letter
-        else:
-            # breaking a word OR beginning a word
-            if lastWasUpper:
-                # could be either
-                if len(word) == 1:
-                    # keep going
-                    word += letter
-                else:
-                    # acronym
-                    # we're processing the lowercase letter after the acronym-then-capital
-                    lastWord = word[:-1]
-                    firstLetter = word[-1]
-                    labelList.append(lastWord)
-                    word = firstLetter + letter
-            else:
-                # definitely breaking: lower to upper
-                labelList.append(word)
-                word = letter
-        lastWasUpper = letter.isupper()
-    if labelList:
-        labelList[0] = labelList[0].capitalize()
-    else:
-        return mname.capitalize()
-    labelList.append(word)
-    return ' '.join(labelList)
 
 
 
@@ -995,4 +749,6 @@ __all__ = [
     "raises", "IntervalDifferential", "FancyStrMixin", "FancyEqMixin",
     "switchUID", "SubclassableCStringIO", "unsignedID", "mergeFunctionMetadata",
     "nameToLabel", "uidFromString", "gidFromString", "runAsEffectiveUser",
-]
+    "untilConcludes",
+    "runWithWarningsSuppressed",
+    ]

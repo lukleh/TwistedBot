@@ -1,9 +1,10 @@
 
 
+import signal
+import argparse
+
 import syspath_fix
 syspath_fix.update_sys_path()
-
-import argparse
 
 from twisted.internet import reactor
 from twisted.protocols import basic
@@ -14,12 +15,13 @@ import twistedbot.config as config
 import twistedbot.logbot as logbot
 
 
-class ConsoleChat(basic.LineReceiver):
-    from os import linesep as delimiter
+log = logbot.getlogger("MAIN")
 
+
+class ConsoleChat(basic.LineReceiver):
     def __init__(self, world):
         self.world = world
-        
+
     def lineReceived(self, line):
         try:
             self.world.chat.process_command(line)
@@ -28,7 +30,6 @@ class ConsoleChat(basic.LineReceiver):
 
 
 def start():
-
     parser = argparse.ArgumentParser(description='Bot arguments.')
     parser.add_argument('--serverhost', default=config.SERVER_HOST,
                         dest='serverhost', help='Minecraft server host')
@@ -51,8 +52,16 @@ def start():
         stdio.StandardIO(ConsoleChat(world))
     except ImportError:
         pass
+    mc_factory = MineCraftFactory(world)
+
+    def customKeyboardInterruptHandler(signum, stackframe):
+        log.msg("CTRL-C from user, exiting....")
+        mc_factory.log_connection_lost = False
+        reactor.callFromThread(reactor.stop)
+
+    signal.signal(signal.SIGINT, customKeyboardInterruptHandler)
     reactor.addSystemEventTrigger("before", "shutdown", world.on_shutdown)
-    reactor.connectTCP(host, port, MineCraftFactory(world))
+    reactor.connectTCP(host, port, mc_factory)
     reactor.run()
 
 

@@ -1,9 +1,11 @@
 # Bot/Proxy for Minecraft
-- Support for 1.4.2 protocol version 47
+- Support for 1.4.7 protocol version 51
 - Running under [PyPy](http://pypy.org/ "PyPy")
 - flake8 clean with long lines
-- Optional [PyCrypto](https://www.dlitz.net/software/pycrypto/ "PyCrypto") dependency if you want the datastream to be encrypted. Also configurable in config.
+- Optional (mandatory for proxy mode) [PyCrypto](https://www.dlitz.net/software/pycrypto/ "PyCrypto") dependency if you want the datastream to be encrypted. Also configurable in config.
+- Twisted needs pywin32 dependency under Windows in proxy mode.
 - Rest of the dependencies is included in "libs" directory.
+
 
 ## Bot
 - Client side artificial player for Minecraft that runs on vanilla server in offline mode. No modification on server/client side needed.
@@ -32,6 +34,7 @@ If your username (commander) is set, then you can use chat to send commands to b
 - "circulate 'group'" circulates (at the end, goes backward towards the beginnings) between signs -> details below
 - "go 'name'" go to specific waypoint identified by name, or if name is group and order separated with space
 - "show 'wp'" show in chat waypoint, group or waypoint in group with name 'wp'
+- "follow me" bot starts following you
 - "cancel" cancel current activity
 
 #### Sign waypoints
