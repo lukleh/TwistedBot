@@ -145,7 +145,6 @@ class GridSpace(object):
                             yield to_state
 
     def can_swim(self, from_state, to_state):
-        grid = from_state.grid
         for x in xrange(from_state.x, to_state.x + 1):
             for y in xrange(from_state.y, to_state.y + 1):
                 for z in xrange(from_state.z, to_state.z + 1):
@@ -201,9 +200,7 @@ class GridSpace(object):
                         return False
                 return True
 
-
     def diagonal_free(self, from_state, to_state, y_level):
-        grid = from_state.grid
         left = self.get_state(to_state.x, y_level, from_state.z)
         if not left.can_be:
             return False
@@ -211,7 +208,6 @@ class GridSpace(object):
         if not right.can_be:
             return False
         return True
-
 
     def can_stand(self, x, y, z):
         return self.get_state(x, y, z).can_stand
