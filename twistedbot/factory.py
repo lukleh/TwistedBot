@@ -78,6 +78,7 @@ class MineCraftProtocol(Protocol):
             201: self.p_players,
             202: self.p_abilities,
             203: self.p_tab_complete,
+            250: self.p_plugin_message,
             252: self.p_encryption_key_response,
             253: self.p_encryption_key_request,
             255: self.p_error,
@@ -344,9 +345,15 @@ class MineCraftProtocol(Protocol):
                 pass
 
     def p_abilities(self, c):
+        # TODO ignore now now
         pass
 
     def p_tab_complete(self, c):
+        # ignore
+        pass
+
+    def p_plugin_message(self, c):
+        # ignore
         pass
 
     def p_encryption_key_response(self, c):
