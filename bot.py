@@ -41,7 +41,16 @@ def start():
     parser.add_argument('--commandername', default=config.COMMANDER,
                         dest='commandername',
                         help='your username that you use in Minecraft')
+    parser.add_argument('--log2file',
+                        action='store_true',
+                        help='Save log data to file')
     args = parser.parse_args()
+    try:
+        if args.log2file:
+            logbot.start_bot_filelog()
+    except:
+        logbot.exit_on_error(_why="Cannot open log file for writing")
+        exit()
     config.USERNAME = args.botname
     config.COMMANDER = args.commandername
     host = args.serverhost

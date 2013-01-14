@@ -1,6 +1,7 @@
 *.pyc
 *.py~
 *.swp
+*_log*.txt
 NOTEPAD
 TODO
 libs/originals

@@ -284,7 +284,7 @@ if __name__ == '__main__':
         exit()
     try:
         if args.log2file:
-            logbot.start_filelog()
+            logbot.start_proxy_filelog()
     except:
         logbot.exit_on_error(_why="Cannot open log file for writing")
         exit()

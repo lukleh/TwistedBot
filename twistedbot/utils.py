@@ -122,7 +122,7 @@ class OrderedLinkedList(object):
             if item.obj == obj:
                 self.olist.pop(i)
                 if self.pointer is not None and i == self.pointer and self.pointer > 0:
-                     self.pointer -= 1
+                    self.pointer -= 1
                 break
 
     def next_circulate(self):

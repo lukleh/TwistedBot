@@ -8,8 +8,10 @@ from twisted.python import log, util
 
 def exit_on_error(_stuff=None, _why=None):
     log.err(_stuff=_stuff, _why=_why)
-    if reactor.running:
+    try:
         reactor.stop()
+    except:
+        pass
     sys.exit(1)
 
 
@@ -66,14 +68,18 @@ def getlogger(name):
     return loggers[name]
 
 
-def start_filelog(filename=None):
+def start_filelog(filename=None, kind="other_log"):
     if filename is None:
-        filename = "%s.proxy_log.txt" % datetime.now(
-        ).strftime("%Y.%m.%d_%H.%M.%S")
+        filename = "%s.%s.txt" % (kind, datetime.now().strftime("%Y.%m.%d_%H.%M.%S"))
     f = open(filename, "w")
     log.addObserver(MinecraftLogObserver(f).emit)
     msg("Started logging to file %s" % filename)
 
+def start_bot_filelog():
+    start_filelog(kind="bot_log")
+
+def start_proxy_filelog():
+    start_filelog(kind="proxy_log")
 
 log.startLoggingWithObserver(
     MinecraftLogObserver(sys.stdout).emit, setStdout=0)
