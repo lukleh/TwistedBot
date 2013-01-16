@@ -37,6 +37,7 @@ class World(object):
         self.connected = False
         self.logged_in = False
         self.protocol = None
+        self.factory = None
         self.entities = None
         self.grid = None
         self.sign_waypoints = None
@@ -70,7 +71,7 @@ class World(object):
 
     def on_shutdown(self):
         log.msg("Reactor shutdown")
-        self.protocol.factory.log_connection_lost = False
+        self.factory.log_connection_lost = False
 
     def send_packet(self, name, payload):
         if self.protocol is not None:

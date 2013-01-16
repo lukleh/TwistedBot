@@ -73,6 +73,7 @@ class MineCraftProtocol(Protocol):
             103: self.p_window_slot,
             104: self.p_inventory,
             130: self.p_sign,
+            131: self.p_item_data,
             132: self.p_update_tile,
             200: self.p_stats,
             201: self.p_players,
@@ -328,6 +329,10 @@ class MineCraftProtocol(Protocol):
     def p_sign(self, c):
         self.world.sign_waypoints.on_new_sign(c.x, c.y, c.z, c.line1, c.line2, c.line3, c.line4)
 
+    def p_item_data(self, c):
+        """ data for map item """
+        pass
+
     def p_update_tile(self, c):
         pass
         #log.msg('Tile entity %s' % str(c))
@@ -391,6 +396,7 @@ class MineCraftProtocol(Protocol):
 class MineCraftFactory(ReconnectingClientFactory):
     def __init__(self, world):
         self.world = world
+        self.world.factory = self
         self.maxDelay = config.CONNECTION_MAX_DELAY
         self.initialDelay = config.CONNECTION_INITIAL_DELAY
         self.delay = self.initialDelay
