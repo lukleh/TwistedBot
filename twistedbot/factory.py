@@ -45,6 +45,7 @@ class MineCraftProtocol(Protocol):
             22: self.p_collect,
             23: self.p_vehicle,
             24: self.p_mob,
+            25: self.p_spawn_painting,
             26: self.p_experience_orb,
             28: self.p_entity_velocity,
             29: self.p_entity_destroy,
@@ -235,9 +236,11 @@ class MineCraftProtocol(Protocol):
                                        velocity_z=c.velocity_z,
                                        metadata=c.metadata)
 
+    def p_spawn_painting(self, c):
+        self.world.entities.on_new_painting(eid=c.eid, x=c.x, y=c.y, z=c.z, title=c.title)
+
     def p_experience_orb(self, c):
-        self.world.entities.on_new_experience_orb(
-            eid=c.eid, count=c.count, x=c.x, y=c.y, z=c.z)
+        self.world.entities.on_new_experience_orb(eid=c.eid, count=c.count, x=c.x, y=c.y, z=c.z)
 
     def p_entity_velocity(self, c):
         self.world.entities.on_velocity(c.eid, c.dx, c.dy, c.dz)

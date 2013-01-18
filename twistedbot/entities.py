@@ -91,6 +91,12 @@ class EntityDroppedItem(Entity):
         self.nbt = kwargs["slotdata"]
 
 
+class EntityPainting(Entity):
+    def __init__(self, **kwargs):
+        super(EntityPainting, self).__init__(**kwargs)
+        self.title = kwargs["title"]
+
+
 class Entities(object):
     def __init__(self, dimension):
         self.dimension = dimension
@@ -141,9 +147,6 @@ class Entities(object):
     def new_bot(self, eid):
         self.entities[eid] = EntityBot(eid=eid, x=0, y=0, z=0)
 
-    def on_new_mob(self, **kwargs):
-        self.entities[kwargs["eid"]] = EntityMob(**kwargs)
-
     def on_new_player(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityPlayer(**kwargs)
         if self.world.commander.name == kwargs["username"]:
@@ -154,6 +157,12 @@ class Entities(object):
 
     def on_new_vehicle(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityVehicle(**kwargs)
+
+    def on_new_mob(self, **kwargs):
+        self.entities[kwargs["eid"]] = EntityMob(**kwargs)
+
+    def on_new_painting(self, **kwargs):
+        self.entities[kwargs["eid"]] = EntityPainting(**kwargs)
 
     def on_new_experience_orb(self, **kwargs):
         self.entities[kwargs["eid"]] = EntityExperienceOrb(**kwargs)
