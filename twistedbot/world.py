@@ -117,3 +117,7 @@ class Commander(object):
         self.eid = None
         self.last_possition = None
         self.last_block = None
+
+    @property
+    def in_game(self):
+        return self.eid != None

@@ -99,6 +99,12 @@ class OrderedLinkedList(object):
     def start(self):
         self.pointer = 0
 
+    def get_by_order(self, o_val):
+        for li in self.olist:
+            if li.order == o_val:
+                return li.obj
+        return None
+
     def add(self, order, obj):
         new_item = ListItem(order, obj)
         if self.is_empty:

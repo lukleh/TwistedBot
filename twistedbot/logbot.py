@@ -75,8 +75,10 @@ def start_filelog(filename=None, kind="other_log"):
     log.addObserver(MinecraftLogObserver(f).emit)
     msg("Started logging to file %s" % filename)
 
+
 def start_bot_filelog():
     start_filelog(kind="bot_log")
+
 
 def start_proxy_filelog():
     start_filelog(kind="proxy_log")

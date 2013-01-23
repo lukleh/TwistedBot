@@ -111,7 +111,7 @@ class Entities(object):
             return None
         e = self.entities.get(eid, None)
         if e is None:
-            log.msg("Entity %d not in mobs list" % eid)
+            log.msg("Entity ID %d not in mobs list" % eid)
         return e
 
     def maybe_commander(self, entity):

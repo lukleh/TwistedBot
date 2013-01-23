@@ -25,12 +25,16 @@ class Chat(object):
             self.send_chat_message(self.chat_spam_treshold_buffer.popleft())
 
     def send_chat_message(self, msg):
-        self.chat_spam_treshold_count += 20
-        if self.chat_spam_treshold_count > 180:
-            self.chat_spam_treshold_buffer.append(msg)
-            return
         log.msg(msg)
-        self.world.send_packet("chat message", {"message": msg})
+        if self.world.commander.in_game:
+            self.chat_spam_treshold_count += 20
+            if self.chat_spam_treshold_count > 180:
+                self.chat_spam_treshold_buffer.append(msg)
+                return
+            msg = "/tell %s %s" % (self.world.commander.name, msg)
+            self.world.send_packet("chat message", {"message": msg})
+        elif self.chat_spam_treshold_buffer:
+            self.chat_spam_treshold_buffer = deque()
 
     def clean(self, orig_msg):
         msg = self.clean_colors_re.sub('', orig_msg)

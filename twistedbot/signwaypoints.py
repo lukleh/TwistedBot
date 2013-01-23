@@ -112,11 +112,7 @@ class SignWayPoints(object):
             order = float(order)
         except ValueError:
             return None
-        sgroup = self.ordered_sign_groups[group]
-        for o in sgroup.iter():
-            if o.order == order:
-                return o.obj
-        return None
+        return self.ordered_sign_groups[group].get_by_order(order)
 
     def get_groupnext_rotate(self, group):
         if not self.has_group(group):

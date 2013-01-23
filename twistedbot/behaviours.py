@@ -133,10 +133,9 @@ class LookAtPlayerBehaviour(BehaviourBase):
         log.msg(self.name)
 
     def _tick(self):
-        eid = self.world.commander.eid
-        if eid is None:
+        if not self.world.commander.in_game:
             return
-        player = self.world.entities.get_entity(eid)
+        player = self.world.entities.get_entity(self.world.commander.eid)
         if player is None:
             return
         p = player.position
@@ -214,9 +213,9 @@ class FollowPlayerBehaviour(BehaviourBase):
         self.last_position = self.bot.bot_object.position_grid
 
     def _tick(self):
-        entity = self.world.entities.get_entity(self.world.commander.eid)
-        if entity is None:
+        if not self.world.commander.in_game:
             return
+        entity = self.world.entities.get_entity(self.world.commander.eid)
         block = self.world.grid.standing_on_block(AABB.from_player_coords(*entity.position))
         if block is None:
             return
