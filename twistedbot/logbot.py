@@ -1,5 +1,6 @@
 
 import sys
+import os
 from datetime import datetime
 
 from twisted.internet import reactor
@@ -12,7 +13,6 @@ def exit_on_error(_stuff=None, _why=None):
         reactor.stop()
     except:
         pass
-    sys.exit(1)
 
 
 class MinecraftLogObserver(object):
@@ -71,9 +71,16 @@ def getlogger(name):
 def start_filelog(filename=None, kind="other_log"):
     if filename is None:
         filename = "%s.%s.txt" % (kind, datetime.now().strftime("%Y.%m.%d_%H.%M.%S"))
-    f = open(filename, "w")
+    fullfile = os.getcwd() + filename
+    try:
+        f = open(filename, "w")
+    except IOError as e:
+        msg("Cannot open log file %s for writing" % fullfile)
+        msg("%s" % e)
+        msg("Exiting...")
+        sys.exit()
     log.addObserver(MinecraftLogObserver(f).emit)
-    msg("Started logging to file %s" % filename)
+    msg("Started logging to file %s" % fullfile)
 
 
 def start_bot_filelog():
@@ -83,9 +90,8 @@ def start_bot_filelog():
 def start_proxy_filelog():
     start_filelog(kind="proxy_log")
 
-log.startLoggingWithObserver(
-    MinecraftLogObserver(sys.stdout).emit, setStdout=0)
 
+log.startLoggingWithObserver(MinecraftLogObserver(sys.stdout).emit, setStdout=0)
 default_logger = getlogger("-")
 default_logger.msg("Start logging")
 msg = default_logger.msg

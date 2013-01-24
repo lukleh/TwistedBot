@@ -2,6 +2,7 @@
 
 import logbot
 from axisbox import AABB
+from utils import Vector
 
 
 log = logbot.getlogger("ENTITIES")
@@ -18,14 +19,14 @@ class Entity(object):
 
     @property
     def position(self):
-        return (self.x / 32.0, self.y / 32.0, self.z / 32.0)
+        return Vector(self.x / 32.0, self.y / 32.0, self.z / 32.0)
 
     @property
     def grid_position(self):
         x = self.x / 32
         y = self.y / 32
         z = self.z / 32
-        return (x, y, z)
+        return Vector(x, y, z)
 
 
 class EntityBot(Entity):
@@ -109,16 +110,13 @@ class Entities(object):
     def get_entity(self, eid):
         if eid is None:
             return None
-        e = self.entities.get(eid, None)
-        if e is None:
-            log.msg("Entity ID %d not in mobs list" % eid)
-        return e
+        return self.entities.get(eid, None)
 
     def maybe_commander(self, entity):
         if self.world.commander.eid != entity.eid:
             return
         gpos = entity.grid_position
-        block = self.dimension.grid.standing_on_block(AABB.from_player_coords(*entity.position))
+        block = self.dimension.grid.standing_on_block(AABB.from_player_coords(entity.position))
         if block is None:
             return
         if self.world.commander.last_block is not None and self.world.commander.last_block == block:
@@ -134,11 +132,10 @@ class Entities(object):
             if entity is None:
                 # received entity update packet for entity
                 # that was not initialized with new_*, this should not happen
-                log.msg("do not have entity %d registered" % eid)
+                log.msg("do not have entity id %d registered" % eid)
                 return
             if entity.is_bot:
-                #log.msg("Server is changing my %s" % fn.__name__)
-                        #(fn.__name__, args, kwargs))
+                #log.msg("Server is changing my %s with %s %s" % (fn.__name__, args, kwargs))
                 pass
             fn(self, entity, *args[1:], **kwargs)
             self.maybe_commander(entity)
@@ -174,6 +171,8 @@ class Entities(object):
                 del self.entities[eid]
                 if self.world.commander.eid == eid:
                     self.world.commander.eid = None
+            else:
+                log.msg('Cannot destroy entity id %d because it is not registered' % eid)
 
     @entityupdate
     def on_move(self, entity, dx, dy, dz):

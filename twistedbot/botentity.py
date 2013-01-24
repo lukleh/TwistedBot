@@ -1,7 +1,6 @@
 
 
 import math
-from datetime import datetime
 
 import config
 import utils
@@ -32,13 +31,13 @@ class BotObject(object):
         self.action = 2  # normal
         self._action = self.action
         self.is_jumping = False
-        self.floating_flag = True
+        self.hold_position_flag = True
 
     def set_xyz(self, x, y, z):
         self._x = x
         self._y = y
         self._z = z
-        self._aabb = AABB.from_player_coords(self.x, self.y, self.z)
+        self._aabb = AABB.from_player_coords(self.position)
 
     @property
     def x(self):
@@ -47,11 +46,6 @@ class BotObject(object):
     @property
     def y(self):
         return self._y
-
-    @y.setter
-    def y(self, v):
-        self._y = v
-        self._aabb = AABB.from_player_coords(self.x, self.y, self.z)
 
     @property
     def z(self):
@@ -110,9 +104,7 @@ class BotEntity(object):
         self.location_received = False
         self.check_location_received = False
         self.spawn_point_received = False
-        self.last_tick_time = datetime.now()
-        self.period_time_estimation = 1 / 20.0
-        self.behaviour_manager = behaviours.BehaviourManager(self.world, self)
+        self.behaviour_tree = behaviours.BehaviourTree(self.world, self)
 
     def on_connection_lost(self):
         if self.location_received:
@@ -136,36 +128,20 @@ class BotEntity(object):
     def in_complete_chunks(self, b_obj):
         return self.world.grid.aabb_in_complete_chunks(b_obj.aabb)
 
-    def predict_next_ticktime(self, tick_start):
-        tick_end = datetime.now()
-        d_run = (tick_end - tick_start).total_seconds()  # time this step took
-        t = config.TIME_STEP - d_run  # decreased by computation in tick
-        d_iter = (tick_start - self.last_tick_time).total_seconds()  # real tick period
-        r_over = d_iter - self.period_time_estimation  # diff from scheduled by
-        t -= r_over
-        t = max(0, t)  # cannot delay into past
-        self.period_time_estimation = t + d_run
-        self.last_tick_time = tick_start
-        return t
-
     def tick(self):
-        tick_start = datetime.now()
         if self.location_received is False:
-            self.last_tick_time = tick_start
-            return config.TIME_STEP
+            return
         if not self.ready:
             self.ready = self.in_complete_chunks(self.bot_object) and self.spawn_point_received
             if not self.ready:
-                self.last_tick_time = tick_start
-                return config.TIME_STEP
+                return
         self.move(self.bot_object)
         self.bot_object.direction = utils.Vector2D(0, 0)
         self.send_location(self.bot_object)
         self.send_action(self.bot_object)
         self.stop_sneaking(self.bot_object)
         if not self.i_am_dead:
-            utils.do_later(0, self.behaviour_manager.run)
-        return self.predict_next_ticktime(tick_start)
+            utils.do_now(self.behaviour_tree.tick)
 
     def send_location(self, b_obj):
         self.world.send_packet("player position&look", {
@@ -314,7 +290,7 @@ class BotEntity(object):
                 b_obj.velocities.y = config.SPEED_CLIMB
             b_obj.is_jumping = False
         if is_in_water:
-            if b_obj.floating_flag:
+            if b_obj.hold_position_flag:
                 b_obj.velocities.y = 0
             orig_y = b_obj.y
             self.update_directional_speed(b_obj, 0.02, balance=True)
@@ -330,7 +306,7 @@ class BotEntity(object):
                                              b_obj.velocities.z):
                 b_obj.velocities.y = 0.3
         elif is_in_lava:
-            if b_obj.floating_flag:
+            if b_obj.hold_position_flag:
                 b_obj.velocities.y = 0
             orig_y = self.y
             self.update_directional_speed(b_obj, 0.02)
@@ -346,7 +322,7 @@ class BotEntity(object):
                                              self.velocities.z):
                 self.velocities.y = 0.3
         else:
-            if self.is_on_ladder(b_obj) and b_obj.floating_flag:
+            if self.is_on_ladder(b_obj) and b_obj.hold_position_flag:
                 self.start_sneaking(b_obj)
             slowdown = self.current_slowdown(b_obj)
             self.update_directional_speed(b_obj, self.current_speed_factor(b_obj))
@@ -375,6 +351,10 @@ class BotEntity(object):
                 perpedicular_dir = utils.Vector2D(direction.z, - direction.x)
             direction = utils.Vector2D(direction.x - perpedicular_dir.x * dot, direction.z - perpedicular_dir.z * dot)
             self.turn_to_direction(b_obj, direction.x, direction.z)
+        if balance and b_obj.hold_position_flag:
+            self.turn_to_direction(b_obj, -b_obj.velocities.x, -b_obj.velocities.z)
+            b_obj.velocities.x = 0
+            b_obj.velocities.z = 0
         b_obj.velocities.x += direction.x
         b_obj.velocities.z += direction.z
 

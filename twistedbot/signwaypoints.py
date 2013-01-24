@@ -3,7 +3,6 @@ import re
 
 import logbot
 import utils
-import gridspace
 
 log = logbot.getlogger("SIGNS")
 
@@ -11,16 +10,19 @@ log = logbot.getlogger("SIGNS")
 class Sign(object):
     def __init__(self, coords, line1, line2, line3, line4):
         self.coords = coords
-        self.line1 = line1
-        self.line2 = line2
-        self.line3 = line3
-        self.line4 = line4
-        self.is_waypoint = line1.strip().lower() == "waypoint"
+        self.line1 = line1.strip().lower()
+        self.line2 = line2.strip().lower()
+        self.line3 = line3.strip().lower()
+        self.line4 = line4.strip().lower()
+        self.value = None
         self.decode()
+        self.is_waypoint = self.line1 == "waypoint"
         self.is_groupable = self.group and self.value is not None
 
     def decode(self):
-        self.line2 = re.sub(ur"\s+", " ", self.line2.strip().lower())
+        self.line2 = re.sub(ur"\s+", " ", self.line2)
+        self.line3 = re.sub(ur"\s+", " ", self.line3)
+        self.line4 = re.sub(ur"\s+", " ", self.line4)
         try:
             self.name = self.line4
             self.value = float(re.sub(ur",", ".", self.line2))
@@ -29,12 +31,19 @@ class Sign(object):
             self.value = None
         self.group = self.line3
 
+    def __gt__(self, sign):
+        return self.value > sign.value
+
+    def __lt__(self, sign):
+        return self.value < sign.value
+
     def __eq__(self, sgn):
+        if sgn is None:
+            return False
         return self.coords == sgn.coords
 
     def __str__(self):
-        return "$coords:%s group:%s value:%s name:%s$" % \
-            (str(self.coords), self.group, self.value, self.name)
+        return "$coords:%s group:%s value:%s name:%s$" % (str(self.coords), self.group, self.value, self.name)
 
     def __repr__(self):
         return self.__str__()
@@ -70,6 +79,8 @@ class SignWayPoints(object):
         return name in self.sign_points
 
     def new(self, sign):
+        if self.has_sign_at(sign.coords):
+            self.remove(sign.coords)
         if sign.is_groupable:
             if sign.group not in self.ordered_sign_groups:
                 self.ordered_sign_groups[sign.group] = utils.OrderedLinkedList(name=sign.group)
@@ -77,14 +88,14 @@ class SignWayPoints(object):
         if sign.name:
             self.sign_points[sign.name] = sign
         if sign.coords not in self.crd_to_sign:
-            msg = "Adding sign: coordinates %s" % str(sign.coords)
+            msg = "Adding sign at %s" % str(sign.coords)
             if sign.group:
-                msg += "group '%s' " % sign.group
+                msg += " group '%s'" % sign.group
             if sign.value:
-                msg += "value '%s' " % sign.value
+                msg += " value '%s'" % sign.value
             if sign.name:
-                msg += "name '%s'" % sign.name
-            #log.msg(msg)
+                msg += " name '%s'" % sign.name
+            log.msg(msg)
         self.crd_to_sign[sign.coords] = sign
 
     def remove(self, crd):
@@ -114,41 +125,33 @@ class SignWayPoints(object):
             return None
         return self.ordered_sign_groups[group].get_by_order(order)
 
-    def get_groupnext_rotate(self, group):
-        if not self.has_group(group):
-            return None
+    def get_groupnext_rotate(self, group, current_sign=None, forward_direction=None):
         sgroup = self.ordered_sign_groups[group]
-        cs = sgroup.current_point()
-        if cs is None:
-            sgroup.start()
-            return sgroup.current_point()
-        while True:
-            s = sgroup.next_rotate()
-            if s == cs:
-                return None
-            if gridspace.can_stand_coords(self.dimension.grid, s.coords):
-                return s
-
-    def get_groupnext_circulate(self, group):
-        if not self.has_group(group):
-            return None
-        sgroup = self.ordered_sign_groups[group]
-        cs = sgroup.current_point()
-        if cs is None:
-            sgroup.start()
-            return sgroup.current_point()
-        n_pass = 0
-        while True:
-            s = sgroup.next_circulate()
-            if s == cs:
-                n_pass += 1
-                if n_pass == 2:
-                    return None
-            if gridspace.can_stand_coords(self.dimension.grid, s.coords):
-                return s
-
-    def reset_group(self, group):
-        if not self.has_group(group):
-            return
+        if current_sign is None:
+            return sgroup.first_sign, None
+        for sign in sgroup.iter():
+            if sign > current_sign:
+                return sign, None
         else:
-            self.ordered_sign_groups[group].reset()
+            return sgroup.first_sign, None
+
+    def get_groupnext_circulate(self, group, current_sign=None, forward_direction=True):
+        sgroup = self.ordered_sign_groups[group]
+        if current_sign is None:
+            return sgroup.first_sign, forward_direction
+        for sign in sgroup.iter(forward_direction):
+            if forward_direction:
+                if sign > current_sign:
+                    return sign, forward_direction
+            else:
+                if sign < current_sign:
+                    return sign, forward_direction
+        else:
+            forward_direction = not forward_direction
+            for sign in sgroup.iter(forward_direction):
+                if forward_direction:
+                    if sign > current_sign:
+                        return sign, forward_direction
+                else:
+                    if sign < current_sign:
+                        return sign, forward_direction

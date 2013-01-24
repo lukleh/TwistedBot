@@ -460,7 +460,7 @@ class BlockStairs(BlockMultiBox):
                 check[3] = check[1]
             yield AABB.from_block_coords(self.x + check[2] * config.PLAYER_RADIUS, self.y + 0.5, self.z + check[3] * config.PLAYER_RADIUS)
         else:
-            if  check[0] != 0:
+            if check[0] != 0:
                 yield AABB.from_block_coords(self.x + check[0] * config.PLAYER_RADIUS, self.y + 0.5, self.z)
             if check[1] != 0:
                 yield AABB.from_block_coords(self.x, self.y + 0.5, self.z + check[1] * config.PLAYER_RADIUS)

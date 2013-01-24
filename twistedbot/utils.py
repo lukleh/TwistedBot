@@ -77,27 +77,29 @@ ListItem = namedtuple('ListItem', ["order", "obj"])
 class OrderedLinkedList(object):
     def __init__(self, name=None):
         self.name = name
-        self.pointer = None
         self.olist = []
-        self.head_to_tail = True
-        self.reset()
 
     def __len__(self):
         return len(self.olist)
 
     def __str__(self):
-        return "%s %s [%s]" % \
-            (self.name, len(self), ",".join([str((o.order, o.obj)) for o in self.olist]))
+        return "%s %s [%s]" % (self.name, len(self), ",".join([str((o.order, o.obj)) for o in self.olist]))
+
+    def iter(self, forward_direction=True):
+        if forward_direction:
+            for i in self.olist:
+                yield i.obj
+        else:
+            for i in reversed(self.olist):
+                yield i.obj
 
     @property
     def is_empty(self):
         return len(self) == 0
 
-    def reset(self):
-        self.pointer = None
-
-    def start(self):
-        self.pointer = 0
+    @property
+    def first_sign(self):
+        return self.olist[0].obj
 
     def get_by_order(self, o_val):
         for li in self.olist:
@@ -110,6 +112,9 @@ class OrderedLinkedList(object):
         if self.is_empty:
             self.olist.append(new_item)
             return
+        for item in self.olist:
+            if item.obj == obj:
+                return
         for index, item in enumerate(self.olist):
             if item.order > order:
                 self.olist.insert(index, new_item)
@@ -122,52 +127,11 @@ class OrderedLinkedList(object):
             return
         if len(self) == 1:
             self.olist = []
-            self.pointer = None
             return
         for i, item in enumerate(self.olist):
             if item.obj == obj:
                 self.olist.pop(i)
-                if self.pointer is not None and i == self.pointer and self.pointer > 0:
-                    self.pointer -= 1
                 break
-
-    def next_circulate(self):
-        if self.pointer is None:
-            self.pointer = 0
-            return self.current_point()
-        if self.head_to_tail:
-            if self.pointer == len(self) - 1:
-                self.head_to_tail = False
-                if len(self) > 1:
-                    self.pointer -= 1
-            else:
-                self.pointer += 1
-        else:
-            if self.pointer == 0:
-                self.head_to_tail = True
-                if len(self) > 1:
-                    self.pointer += 1
-            else:
-                self.pointer -= 1
-        return self.current_point()
-
-    def next_rotate(self):
-        if self.pointer is None:
-            self.pointer = 0
-            return self.current_point()
-        if self.pointer == len(self) - 1:
-            self.pointer = 0
-        else:
-            self.pointer += 1
-        return self.current_point()
-
-    def current_point(self):
-        if self.pointer is None:
-            return None
-        if self.is_empty:
-            return None
-        list_item = self.olist[self.pointer]
-        return list_item.obj
 
 
 class Vector(object):

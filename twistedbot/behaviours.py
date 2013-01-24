@@ -1,7 +1,5 @@
 
 
-import time
-
 from twisted.internet.task import cooperate
 from twisted.internet.defer import inlineCallbacks, returnValue
 
@@ -14,7 +12,7 @@ from axisbox import AABB
 from gridspace import GridSpace
 
 
-log = logbot.getlogger("BEHAVIOURS")
+log = logbot.getlogger("BEHAVIOUR_TREE")
 
 
 class Status(object):
@@ -24,79 +22,105 @@ class Status(object):
     suspended = 50
 
 
-class BehaviourManager(object):
+class Priorities(object):
+    user_command = 10
+
+
+class BehaviourTree(object):
     def __init__(self, world, bot):
         self.world = world
         self.bot = bot
         self.bqueue = []
-        self.default_behaviour = LookAtPlayerBehaviour(self)
         self.running = False
-        self.new_command = None
+        self.user_command = None
 
     @property
     def current_behaviour(self):
-        if self.bqueue:
-            return self.bqueue[-1]
-        else:
-            return self.default_behaviour
+        return self.bqueue[-1]
 
-    def run(self):
+    @property
+    def recheck_goal(self):
+        return False
+
+    def select_goal(self):
+        """
+        select survival goal if necessary, if same as current then pass
+        right now only assign idle behaviour
+        """
+        bh = LookAtPlayerBehaviour(self)
+        self.bqueue.append(bh)
+        self.announce_behaviour(bh)
+
+    def tick(self):
+        if not self.bqueue or self.recheck_goal:
+            self.select_goal()
         if self.running:
             return
-        self.tick()
+        self.run()
 
     @inlineCallbacks
-    def tick(self):
+    def run(self):
         self.running = True
         try:
             while 1:
+                yield utils.reactor_break()
                 self.check_new_command()
                 g = self.current_behaviour
-                if g.cancelled:
-                    break
                 if g.status == Status.running:
                     yield g.tick()
-                self.bot.bot_object.floating_flag = g.floating_flag
-                if g.status == Status.running:
+                self.bot.bot_object.hold_position_flag = g.hold_position_flag
+                if g.cancelled:
+                    break
+                elif g.status == Status.running:
                     break
                 elif g.status == Status.suspended:
-                    yield utils.reactor_break()
                     continue
                 else:
-                    yield utils.reactor_break()
-                    g.return_to_parent()
+                    self.leaf_to_parent()
         except:
             logbot.exit_on_error()
         self.running = False
 
-    def cancel_running(self):
+    def leaf_to_parent(self):
+        leaf = self.bqueue.pop()
         if self.bqueue:
-            log.msg('Cancelling %s' % self.bqueue[0])
+            self.current_behaviour.from_child(leaf.status)
+        else:
+            self.select_goal()
+
+    def cancel_running(self):
+        log.msg('Cancelling %s' % self.bqueue[0])
         for b in self.bqueue:
             b.cancel()
         self.bqueue = []
+        self.user_command = None
 
     def check_new_command(self):
-        if self.new_command is not None:
+        if self.user_command is not None and self.current_behaviour.priority <= Priorities.user_command:
+            behaviour, args, kwargs = self.user_command
             self.cancel_running()
-            behaviour, args, kwargs = self.new_command
-            self.bqueue.append(behaviour(manager=self, parent=None, *args, **kwargs))
-            self.new_command = None
+            bh = behaviour(manager=self, parent=None, *args, **kwargs)
+            self.bqueue.append(bh)
+            self.announce_behaviour(bh)
 
-    def command(self, behaviour, *args, **kwargs):
-        self.new_command = (behaviour, args, kwargs)
+    def new_command(self, behaviour, *args, **kwargs):
+        self.user_command = (behaviour, args, kwargs)
         log.msg("Added command %s" % self.current_behaviour.name)
+
+    def announce_behaviour(self, bh):
+        log.msg("Current top behaviour '%s'" % bh.name)
+        self.world.chat.send_chat_message("New behaviour: %s" % bh.name)
 
 
 class BehaviourBase(object):
-    def __init__(self, manager=None, parent=None, **kwargs):
+    def __init__(self, manager=None, **kwargs):
+        self.priority = Priorities.user_command
         self.manager = manager
         self.world = manager.world
         self.bot = manager.bot
-        self.parent = parent
         self.cancelled = False
         self.status = Status.running
-        self.floating_flag = True
+        self.hold_position_flag = True
 
     @inlineCallbacks
     def tick(self):
@@ -110,7 +134,7 @@ class BehaviourBase(object):
     def _tick(self):
         raise NotImplemented('_tick')
 
-    def from_child(self, g):
+    def from_child(self, status):
         self.status = Status.running
 
     def add_subbehaviour(self, behaviour, *args, **kwargs):
@@ -118,19 +142,12 @@ class BehaviourBase(object):
         self.manager.bqueue.append(g)
         self.status = Status.suspended
 
-    def return_to_parent(self):
-        for i, b in enumerate(self.manager.bqueue):
-            if b == self:
-                self.manager.bqueue.pop(i)
-        if self.parent is not None:
-            self.parent.from_child(self)
-
 
 class LookAtPlayerBehaviour(BehaviourBase):
     def __init__(self, *args, **kwargs):
         super(LookAtPlayerBehaviour, self).__init__(*args, **kwargs)
+        self.hold_position_flag = False
         self.name = 'Look at player %s' % config.COMMANDER
-        log.msg(self.name)
 
     def _tick(self):
         if not self.world.commander.in_game:
@@ -139,34 +156,38 @@ class LookAtPlayerBehaviour(BehaviourBase):
         if player is None:
             return
         p = player.position
-        self.bot.turn_to_point(self.bot.bot_object, (p[0], p[1] + config.PLAYER_EYELEVEL, p[2]))
+        self.bot.turn_to_point(self.bot.bot_object, (p.x, p.y + config.PLAYER_EYELEVEL, p.z))
 
 
 class WalkSignsBehaviour(BehaviourBase):
     def __init__(self, *args, **kwargs):
         super(WalkSignsBehaviour, self).__init__(*args, **kwargs)
         self.signpoint = None
+        self.signpoint_forward_direction = True
         self.group = kwargs.get("group")
         self.walk_type = kwargs.get("type")
         self.name = '%s signs in group "%s"' % (self.walk_type.capitalize(), self.group)
-        self.activate()
-        log.msg(self.name)
+        self._prepare()
 
-    def activate(self):
+    def _prepare(self):
         if self.walk_type == "circulate":
             self.next_sign = self.world.sign_waypoints.get_groupnext_circulate
         elif self.walk_type == "rotate":
             self.next_sign = self.world.sign_waypoints.get_groupnext_rotate
         else:
-            raise Exception("unknown walk type")
-        self.world.sign_waypoints.reset_group(self.group)
+            raise Exception("unknown walk sign type")
 
     def _tick(self):
         if not self.world.sign_waypoints.has_group(self.group):
-            self.world.chat.send_chat_message("cannnot %s group named %s" % (self.walk_type, self.group))
+            self.world.chat.send_chat_message("No group named '%s'" % self.group)
             self.status = Status.failure
             return
-        self.signpoint = self.next_sign(self.group)
+        new_signpoint, self.signpoint_forward_direction = self.next_sign(self.group, self.signpoint, self.signpoint_forward_direction)
+        if new_signpoint == self.signpoint:
+            self.status = Status.success
+            return
+        else:
+            self.signpoint = new_signpoint
         if self.signpoint is not None:
             if not self.world.sign_waypoints.check_sign(self.signpoint):
                 return
@@ -181,10 +202,9 @@ class GoToSignBehaviour(BehaviourBase):
         super(GoToSignBehaviour, self).__init__(*args, **kwargs)
         self.sign_name = kwargs.get("sign_name", "")
         self.name = 'Go to %s' % self.sign_name
-        log.msg(self.name)
 
-    def from_child(self, g):
-        self.status = g.status
+    def from_child(self, status):
+        self.status = status
 
     def _tick(self):
         self.signpoint = self.world.sign_waypoints.get_namepoint(self.sign_name)
@@ -197,7 +217,7 @@ class GoToSignBehaviour(BehaviourBase):
         if not self.world.sign_waypoints.check_sign(self.signpoint):
             self.status = Status.failure
             return
-        log.msg("Sign %s" % self.signpoint)
+        log.msg("Go To: sign details %s" % self.signpoint)
         self.add_subbehaviour(TravelToBehaviour, coords=self.signpoint.coords)
 
 
@@ -208,7 +228,7 @@ class FollowPlayerBehaviour(BehaviourBase):
         self.last_position = None
         self.name = "Following %s" % self.world.commander.name
 
-    def from_child(self, g):
+    def from_child(self, status):
         self.status = Status.running
         self.last_position = self.bot.bot_object.position_grid
 
@@ -216,7 +236,7 @@ class FollowPlayerBehaviour(BehaviourBase):
         if not self.world.commander.in_game:
             return
         entity = self.world.entities.get_entity(self.world.commander.eid)
-        block = self.world.grid.standing_on_block(AABB.from_player_coords(*entity.position))
+        block = self.world.grid.standing_on_block(AABB.from_player_coords(entity.position))
         if block is None:
             return
         if self.last_block != block or self.last_position != self.bot.bot_object.position_grid:
@@ -238,43 +258,36 @@ class TravelToBehaviour(BehaviourBase):
         return 'Travel to %s from %s' % (self.world.grid.get_block_coords(self.travel_coords), self.bot.standing_on_block(self.bot.bot_object))
 
     @inlineCallbacks
-    def activate(self):
+    def _prepare(self):
         sb = self.bot.standing_on_block(self.bot.bot_object)
         if sb is None:
             self.ready = False
         else:
-            t_start = time.time()
             d = cooperate(AStar(dimension=self.world.dimension,
                                 start_coords=sb.coords,
                                 end_coords=self.travel_coords)).whenDone()
             d.addErrback(logbot.exit_on_error)
             astar = yield d
             if astar.path is None:
-                log.msg('ASTAR time consumed %s sec, made %d iterations' % (time.time() - t_start, astar.iter_count))
                 self.status = Status.failure
             else:
-                log.msg('ASTAR finished in %s sec, length %d, made %d iterations' % (time.time() - t_start, len(astar.path.nodes), astar.iter_count))
-                log.msg('ASTAR nodes %s' % astar.path.nodes)
                 current_start = self.bot.standing_on_block(self.bot.bot_object)
                 if sb == current_start:
                     self.path = astar.path
                     self.path.remove_last(self.shorten_path_by)
                     self.ready = True
+                    if len(astar.path) < 2:
+                        self.status = Status.success
 
-    def from_child(self, g):
-        if g.status != Status.success:
-            self.status = Status.failure
-        else:
-            self.status = Status.running
+    def from_child(self, status):
+        if status != Status.success:
+            self.ready = False
+        self.status = Status.running
 
     @inlineCallbacks
     def _tick(self):
         if not self.ready:
-            yield self.activate()
-            if self.status == Status.failure:
-                return
-            if not self.ready:
-                return
+            yield self._prepare()
         self.follow(self.path, self.bot.bot_object)
 
     def follow(self, path, b_obj):
@@ -301,9 +314,9 @@ class MoveToBehaviour(BehaviourBase):
         self.target_coords = kwargs["target"]
         self.start_coords = kwargs["start"]
         self.was_at_target = False
-        self.floating_flag = False
+        self.hold_position_flag = False
         self.name = 'Move to %s' % str(self.target_coords)
-        log.msg(self.name)
+        #log.msg(self.name)
 
     def check_status(self, b_obj):
         gs = GridSpace(self.world.grid)

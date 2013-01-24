@@ -1,5 +1,6 @@
 
 import heapq
+import time
 
 import config
 import logbot
@@ -62,6 +63,9 @@ class Path(object):
     def __str__(self):
         return "Path nodes %d\n\t%s" % (len(self.nodes), '\n\t'.join([str(n) for n in self.nodes]))
 
+    def __len__(self):
+        return len(self.nodes)
+
     def take_step(self):
         try:
             step = self.nodes[self.node_step]
@@ -100,6 +104,7 @@ class AStar(object):
             self.open_set = set([])
         self.start_node.set_score(0, self.heuristic_cost_estimate(self.start_node, self.goal_node))
         self.iter_count = 0
+        self.t_start = time.time()
 
     def reconstruct_path(self, current):
         nodes = []
@@ -129,12 +134,15 @@ class AStar(object):
     def next(self):
         self.iter_count += 1
         if not self.open_set:
+            log.msg('time consumed %s sec, made %d iterations' % (time.time() - self.t_start, self.iter_count))
             log.err("Did not find path between %s and %s" % (self.start_node.coords, self.goal_node.coords))
             raise StopIteration()
         x = heapq.heappop(self.open_heap)
         if x == self.goal_node:
             self.path = Path(dimension=self.dimension, nodes=self.reconstruct_path(x))
             self.gridspace = None
+            log.msg('finished in %s sec, length %d, made %d iterations' % (time.time() - self.t_start, len(self.path.nodes), self.iter_count))
+            log.msg('nodes %s' % self.path.nodes)
             raise StopIteration()
         self.open_set.remove(x)
         self.closed_set.add(x.coords)

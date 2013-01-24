@@ -2,6 +2,7 @@
 import re
 from collections import deque
 
+import config
 import behaviours
 import logbot
 
@@ -25,20 +26,21 @@ class Chat(object):
             self.send_chat_message(self.chat_spam_treshold_buffer.popleft())
 
     def send_chat_message(self, msg):
-        log.msg(msg)
+        log.msg(">> %s" % msg)
         if self.world.commander.in_game:
             self.chat_spam_treshold_count += 20
             if self.chat_spam_treshold_count > 180:
                 self.chat_spam_treshold_buffer.append(msg)
                 return
-            msg = "/tell %s %s" % (self.world.commander.name, msg)
+            if config.WHISPER:
+                msg = "/tell %s %s" % (self.world.commander.name, msg)
             self.world.send_packet("chat message", {"message": msg})
         elif self.chat_spam_treshold_buffer:
             self.chat_spam_treshold_buffer = deque()
 
     def clean(self, orig_msg):
         msg = self.clean_colors_re.sub('', orig_msg)
-        log.msg("Chat: %s" % msg)
+        msg = self.wspace_re.sub(" ", msg)
         msg = msg.strip().lower()
         return msg
 
@@ -46,9 +48,7 @@ class Chat(object):
         return self.commander_re.match(msg)
 
     def get_command(self, msg):
-        msg = msg[msg.find(">") + 2:]
-        msg = self.wspace_re.sub(" ", msg)
-        return msg
+        return msg[msg.find(">") + 2:]
 
     def get_verb(self, msg):
         return msg.partition(" ")[0]
@@ -58,6 +58,7 @@ class Chat(object):
 
     def on_chat_message(self, msg):
         msg = self.clean(msg)
+        log.msg("<< %s" % msg)
         if self.from_commander(msg):
             command = self.get_command(msg)
             self.process_command(command, msg)
@@ -73,24 +74,23 @@ class Chat(object):
     def parse_command(self, verb, subject, original):
         if verb == "rotate" or verb == "circulate":
             if subject:
-                self.world.bot.behaviour_manager.command(
-                    behaviours.WalkSignsBehaviour, group=subject, type=verb)
+                self.world.bot.behaviour_tree.new_command(behaviours.WalkSignsBehaviour, group=subject, type=verb)
             else:
                 self.send_chat_message("which sign group to %s?" % verb)
         elif verb == "go":
             if subject:
-                self.world.bot.behaviour_manager.command(behaviours.GoToSignBehaviour, sign_name=subject)
+                self.world.bot.behaviour_tree.new_command(behaviours.GoToSignBehaviour, sign_name=subject)
             else:
                 self.send_chat_message("go where?")
         elif verb == "look":
             if subject == "at me":
-                self.world.bot.behaviour_manager.command(behaviours.LookAtPlayerBehaviour)
+                self.world.bot.behaviour_tree.new_command(behaviours.LookAtPlayerBehaviour)
             else:
                 self.send_chat_message("look at what?")
         elif verb == "follow":
-            self.world.bot.behaviour_manager.command(behaviours.FollowPlayerBehaviour)
+            self.world.bot.behaviour_tree.new_command(behaviours.FollowPlayerBehaviour)
         elif verb == "cancel":
-            self.world.bot.behaviour_manager.cancel_running()
+            self.world.bot.behaviour_tree.cancel_running()
         elif verb == "show":
             if subject:
                 sign = self.world.sign_waypoints.get_namepoint(subject)
@@ -109,4 +109,4 @@ class Chat(object):
             else:
                 self.send_chat_message("show what?")
         else:
-            log.msg("Unknown command: %s" % original)
+            self.send_chat_message("Unknown command: %s" % original)

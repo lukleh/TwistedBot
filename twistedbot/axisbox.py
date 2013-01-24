@@ -98,14 +98,14 @@ class AABB(object):
         return utils.grid_shift(self.posz)
 
     @classmethod
-    def from_player_coords(cls, x, y, z):
+    def from_player_coords(cls, coords):
         return cls(
-            x - config.PLAYER_RADIUS,
-            y,
-            z - config.PLAYER_RADIUS,
-            x + config.PLAYER_RADIUS,
-            y + config.PLAYER_HEIGHT,
-            z + config.PLAYER_RADIUS)
+            coords.x - config.PLAYER_RADIUS,
+            coords.y,
+            coords.z - config.PLAYER_RADIUS,
+            coords.x + config.PLAYER_RADIUS,
+            coords.y + config.PLAYER_HEIGHT,
+            coords.z + config.PLAYER_RADIUS)
 
     @classmethod
     def from_block_coords(cls, x, y, z):

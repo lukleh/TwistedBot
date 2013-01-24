@@ -3,6 +3,7 @@ import math
 
 DEBUG = False
 USE_ENCRYPTION = False
+WHISPER = False
 
 COMMANDER = "lukleh"
 

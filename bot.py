@@ -45,12 +45,8 @@ def start():
                         action='store_true',
                         help='Save log data to file')
     args = parser.parse_args()
-    try:
-        if args.log2file:
-            logbot.start_bot_filelog()
-    except:
-        logbot.exit_on_error(_why="Cannot open log file for writing")
-        exit()
+    if args.log2file:
+        logbot.start_bot_filelog()
     config.USERNAME = args.botname
     config.COMMANDER = args.commandername
     host = args.serverhost
