@@ -30,14 +30,14 @@ class NodeState(object):
         self.center_x = self.x + 0.5
         self.center_z = self.z + 0.5
 
-    def __str__(self):
+    def __repr__(self):
         if self.can_stand:
             return "ON %s" % self.block_0
         else:
             return "IN %s" % self.block_1
 
     def vertical_center_in(self, center):
-        return self.x < center.x and center.x < (self.x + 1) and self.z < center.z and center.z < (self.z + 1)
+        return fops.lte(self.x, center.x) and fops.lte(center.x, (self.x + 1)) and fops.lte(self.z, center.z) and fops.lte(center.z, (self.z + 1))
 
     def base_in(self, bb):
         return self.vertical_center_in(utils.Vector2D(bb.min_x, bb.min_z)) and self.vertical_center_in(utils.Vector2D(bb.max_x, bb.max_z))

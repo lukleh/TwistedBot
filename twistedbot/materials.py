@@ -6,9 +6,9 @@ class Material(object):
     blocks_movement = True
     is_translucent = False
 
-    def __init__(self, translucent=None):
-        if translucent is not None:
-            self.is_translucent = translucent
+    def __init__(self, translucent=False, requires_no_tool=True):
+        self.is_translucent = translucent
+        self.is_tool_not_required = requires_no_tool
 
     @property
     def is_opaque(self):
@@ -51,8 +51,9 @@ air = MaterialTransparent()
 grass = Material()
 ground = Material()
 wood = Material()
-rock = Material()
-iron = Material()
+rock = Material(requires_no_tool=False)
+iron = Material(requires_no_tool=False)
+anvil = Material(requires_no_tool=False)
 water = MaterialLiquid()
 lava = MaterialLiquid()
 leaves = Material(translucent=True)
@@ -66,14 +67,15 @@ circuits = MaterialLogic()
 glass = Material(translucent=True)
 redstone_light = Material()
 tnt = Material(translucent=True)
+coral = Material()
 ice = Material(translucent=True)
-snow = Material(translucent=True)
-crafted_snow = Material()
+snow = Material(translucent=True, requires_no_tool=False)
+crafted_snow = Material(requires_no_tool=False)
 cactus = Material(translucent=True)
 clay = Material()
 pumpkin = Material()
 dragon_egg = Material()
 portal = MaterialPortal()
 cake = Material()
-web = MaterialWeb()
+web = MaterialWeb(requires_no_tool=False)
 piston = Material()

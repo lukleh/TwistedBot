@@ -19,12 +19,17 @@ log = logbot.getlogger("MAIN")
 
 
 class ConsoleChat(basic.LineReceiver):
+    from os import linesep as delimiter
+
     def __init__(self, world):
         self.world = world
 
+    def connectionMade(self):
+        log.msg("terminal chat available")
+
     def lineReceived(self, line):
         try:
-            self.world.chat.process_command(line)
+            self.world.chat.process_command_line(line)
         except Exception as e:
             logbot.exit_on_error(e)
 
@@ -48,7 +53,7 @@ def start():
     if args.log2file:
         logbot.start_bot_filelog()
     config.USERNAME = args.botname
-    config.COMMANDER = args.commandername
+    config.COMMANDER = args.commandername.lower()
     host = args.serverhost
     port = args.serverport
     world = World(host=host, port=port, commander_name=args.commandername, bot_name=args.botname)
@@ -56,7 +61,8 @@ def start():
         from twisted.internet import stdio
         stdio.StandardIO(ConsoleChat(world))
     except ImportError:
-        pass
+        log.msg("no terminal chat available")
+
     mc_factory = MineCraftFactory(world)
 
     def customKeyboardInterruptHandler(signum, stackframe):

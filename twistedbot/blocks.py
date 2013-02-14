@@ -1,16 +1,22 @@
 
-import inspect
-import sys
+import re
 
 import logbot
 import utils
 import materials
 import fops
 import config
+import block_details
 from axisbox import AABB
 
 
 log = logbot.getlogger("BLOCKS")
+
+block_list = [None for _ in xrange(256)]
+block_map = {}
+
+wood_names = ["Oak", "Spruce", "Birch", "Jungle"]
+stone_lab_names = ["Stone", "Sandstone", None, "Cobblestone", "Brick", "Stone Brick", "Nether Brick", "Quartz"]
 
 
 class BlockMetaClass(type):
@@ -34,6 +40,13 @@ class BlockMetaClass(type):
         cls.is_vine = name_or_class(cls, 'Vines')
         cls.is_single_slab = name_or_class(cls, 'BlockSingleSlab')
         cls.is_burning = cls.is_lava or name_or_class(cls, 'Fire')
+        if hasattr(cls, 'number'):
+            if not hasattr(cls, 'name'):
+                cls.name = " ".join(re.findall('[A-Z][^A-Z]*', cls.__name__))
+            cls.name = cls.name.lower()
+            cls.hardness = block_details.block_hardness.get(cls.number, 0.0)
+            block_list[cls.number] = cls
+            block_map[cls.name] = cls
         return cls
 
 
@@ -44,6 +57,10 @@ class Block(object):
     render_as_normal_block = True
     is_opaque_cube = True
 
+    inventory_avoid = False
+    has_common_type = True
+    sub_name_override = False
+
     def __init__(self, grid, x, y, z, meta):
         self.grid = grid
         self.x = x
@@ -52,7 +69,7 @@ class Block(object):
         self.meta = meta
         self.coords = utils.Vector(self.x, self.y, self.z)
 
-    def __str__(self):
+    def __repr__(self):
         return "|%s %s %s|" % (self.coords, self.name, utils.meta2str(self.meta))
 
     def __eq__(self, other):
@@ -149,6 +166,8 @@ class BlockNonSolid(Block):
 
 
 class BlockFluid(BlockNonSolid):
+    inventory_avoid = True
+
     @classmethod
     def fluid_aabb(cls, x, y, z):
         return AABB(x, y + 0.4, z, x + 1, y + 0.6, z + 1)
@@ -655,122 +674,116 @@ class BlockSign(BlockNonSolid):
     material = materials.wood
 
 
+class BlockChest(BlockSolid):
+    render_as_normal_block = False
+    is_opaque_cube = False
+    bounding_box = AABB(0.0625, 0.0, 0.0625, 0.9375, 0.875, 0.9375)
+
+
 class Air(BlockNonSolid):
+    inventory_avoid = True
     number = 0
-    name = "Air"
     material = materials.air
 
 
 class Stone(BlockCube):
     number = 1
-    name = "Stone"
     material = materials.rock
 
 
-class Grass(BlockCube):
+class GrassBlock(BlockCube):
     number = 2
-    name = "Grass Block"
     material = materials.grass
+    inventory_avoid = True
 
 
 class Dirt(BlockCube):
     number = 3
-    name = "Dirt"
     material = materials.ground
 
 
 class Cobblestone(BlockCube):
     number = 4
-    name = "Cobblestone"
     material = materials.rock
 
 
 class WoodenPlanks(BlockCube):
     number = 5
-    name = "Wooden Planks"
     material = materials.wood
+    sub_names = wood_names
 
 
 class Saplings(BlockFlower):
     number = 6
-    name = "Saplings"
+    sub_names = wood_names
 
 
 class Bedrock(BlockCube):
     number = 7
-    name = "Bedrock"
     material = materials.rock
+    inventory_avoid = True
 
 
 class FlowingWater(BlockWater):
     number = 8
-    name = "Flowing Water"
 
 
 class StillWater(BlockWater):
     number = 9
-    name = "Still Water"
 
 
 class FlowingLava(BlockLava):
     number = 10
-    name = "Flowing Lava"
 
 
 class StillLava(BlockLava):
     number = 11
-    name = "Still Lava"
 
 
 class Sand(BlockCube):
     number = 12
-    name = "Sand"
     material = materials.sand
 
 
 class Gravel(BlockCube):
     number = 13
-    name = "Gravel"
     material = materials.sand
 
 
 class GoldOre(BlockOre):
     number = 14
-    name = "Gold Ore"
 
 
 class IronOre(BlockOre):
     number = 15
-    name = "Iron Ore"
 
 
 class CoalOre(BlockOre):
     number = 16
-    name = "Coal Ore"
+    inventory_avoid = True
 
 
 class Wood(BlockCube):
     number = 17
-    name = "Wood"
     material = materials.wood
+    sub_names = wood_names
 
 
 class Leaves(BlockCube):
     number = 18
-    name = "Leaves"
     material = materials.leaves
     is_opaque_cube = False
+    sub_names = wood_names
 
 
 class Sponge(BlockCube):
     number = 19
-    name = "Sponge"
     material = materials.sponge
+    inventory_avoid = True
 
 
 class Glass(BlockCube):
     number = 20
-    name = "Glass"
     material = materials.glass
     render_as_normal_block = False
     is_opaque_cube = False
@@ -778,36 +791,34 @@ class Glass(BlockCube):
 
 class LapisLazuliOre(BlockOre):
     number = 21
-    name = "Lapis Lazuli Ore"
+    inventory_avoid = True
 
 
 class LapisLazuliBlock(BlockCube):
     number = 22
-    name = "Lapis Lazuli Block"
     material = materials.rock
 
 
 class Dispenser(BlockCube):
     number = 23
-    name = "Dispenser"
     material = materials.rock
 
 
 class Sandstone(BlockCube):
     number = 24
-    name = "Sandstone"
     material = materials.rock
+    sub_names = ["", "Chiseled", "Smooth"]
+    has_common_type = False
 
 
 class NoteBlock(BlockCube):
     number = 25
-    name = "Note Block"
     material = materials.wood
 
 
 class Bed(BlockSolid):
+    inventory_avoid = True
     number = 26
-    name = "Bed"
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.5625, 1.0)
     material = materials.cloth
     render_as_normal_block = False
@@ -820,54 +831,51 @@ class Bed(BlockSolid):
 
 class PoweredRail(BlockNonSolid):
     number = 27
-    name = "Powered Rail"
     material = materials.circuits
 
 
 class DetectorRail(BlockNonSolid):
     number = 28
-    name = "Detector Rail"
     material = materials.circuits
 
 
 class StickyPiston(BlockPiston):
     number = 29
-    name = "Sticky Piston"
 
 
 class Cobweb(BlockNonSolid):
     number = 30
-    name = "Cobweb"
     material = materials.web
+    inventory_avoid = True
 
     @property
     def can_fall_through(self):
         return False
 
 
-class TallGrass(BlockFlower):
+class Grass(BlockFlower):
     number = 31
-    name = "Tall Grass"
     material = materials.vine
+    sub_names = ["Dead Shrub", "Tall Grass", "Fern"]
+    sub_name_override = True
+    has_common_type = False
 
 
 class DeadBush(BlockFlower):
     number = 32
-    name = "Dead Bush"
     material = materials.vine
 
 
 class Piston(BlockPiston):
     number = 33
-    name = "Piston"
 
 
 class PistonExtension(BlockMultiBox):
     number = 34
-    name = "Piston Extension"
     material = materials.piston
     render_as_normal_block = False
     is_opaque_cube = False
+    inventory_avoid = True
 
     def add_grid_bounding_boxes_to(self, out):
         direction = self.meta & 7
@@ -893,17 +901,16 @@ class PistonExtension(BlockMultiBox):
 
 class Wool(BlockCube):
     number = 35
-    name = "Wool"
     material = materials.cloth
+    sub_names = ['White', 'Orange', 'Magenta', 'Light Blue', 'Yellow', 'Lime', 'Pink', 'Gray', 'Light Gray', 'Cyan', 'Purple', 'Blue', 'Brown', 'Green', 'Red', 'Black']
 
 
 class PistonMoving(BlockSolid):
-    #TODO
     number = 36
-    name = "Piston Moving"
     material = materials.piston
     render_as_normal_block = False
     is_opaque_cube = False
+    inventory_avoid = True
 
     @property
     def is_collidable(self):
@@ -930,51 +937,46 @@ class PistonMoving(BlockSolid):
 
 class Dandelion(BlockFlower):
     number = 37
-    name = "Dandelion"
 
 
 class Rose(BlockFlower):
     number = 38
-    name = "Rose"
 
 
 class BrownMushroom(BlockFlower):
     number = 39
-    name = "Brown Mushroom"
 
 
 class RedMushroom(BlockFlower):
     number = 40
-    name = "Red Mushroom"
 
 
 class BlockOfGold(BlockOfStorage):
     number = 41
-    name = "Block of Gold"
     material = materials.iron
 
 
 class BlockOfIron(BlockOfStorage):
     number = 42
-    name = "Block of Iron"
     material = materials.iron
 
 
-class DoubleSlab(BlockCube):
+class StoneDoubleSlab(BlockCube):
     number = 43
-    name = "Double Slab"
     material = materials.rock
+    sub_names = stone_lab_names
+    inventory_avoid = True
 
 
-class SingleSlab(BlockSingleSlab):
+class StoneSlab(BlockSingleSlab):
     number = 44
-    name = "Single Slab"
     material = materials.rock
+    name = "Slab"
+    sub_names = stone_lab_names
 
 
 class Bricks(BlockCube):
     number = 45
-    name = "Bricks"
     material = materials.rock
 
 
@@ -982,58 +984,50 @@ class TNT(BlockCube):
     number = 46
     name = "TNT"
     material = materials.tnt
+    inventory_avoid = True
 
 
 class Bookshelf(BlockCube):
     number = 47
-    name = "Bookshelf"
     material = materials.wood
 
 
 class MossStone(BlockCube):
     number = 48
-    name = "Moss Stone"
     material = materials.rock
 
 
 class Obsidian(BlockCube):
     number = 49
-    name = "Obsidian"
     material = materials.rock
 
 
 class Torch(BlockTorch):
     number = 50
-    name = "Torch"
     material = materials.circuits
 
 
 class Fire(BlockNonSolid):
     number = 51
-    name = "Fire"
     material = materials.fire
+    inventory_avoid = True
 
 
 class MonsterSpawner(BlockCube):
     number = 52
-    name = "Monster Spawner"
     material = materials.rock
     is_opaque_cube = False
+    inventory_avoid = True
 
 
 class WoodenStairs(BlockStairs):
     number = 53
-    name = "Wooden Stairs"
     material = WoodenPlanks.material
 
 
-class Chest(BlockSolid):
+class Chest(BlockChest):
     number = 54
-    name = "Chest"
     material = materials.wood
-    render_as_normal_block = False
-    is_opaque_cube = False
-    bounding_box = AABB(0.0625, 0.0, 0.0625, 0.9375, 0.875, 0.9375)
 
     @property
     def can_stand_in(self):
@@ -1041,67 +1035,63 @@ class Chest(BlockSolid):
 
 
 class RedstoneWire(BlockNonSolid):
+    inventory_avoid = True
     number = 55
-    name = "Redstone Wire"
     material = materials.circuits
 
 
 class DiamondOre(BlockOre):
     number = 56
-    name = "Diamond Ore"
+    inventory_avoid = True
 
 
 class BlockOfDiamond(BlockOfStorage):
     number = 57
-    name = "Block of Diamond"
     material = materials.iron
 
 
 class CraftingTable(BlockCube):
     number = 58
-    name = "Crafting Table"
     material = materials.wood
 
 
 class WheatCrops(BlockFlower):
     number = 59
-    name = "Wheat Crops"
+    inventory_avoid = True
 
 
 class Farmland(BlockCube):
     number = 60
-    name = "Farmland"
     material = materials.ground
     render_as_normal_block = False
     is_opaque_cube = False
+    inventory_avoid = True
 
 
 class Furnace(BlockCube):
     number = 61
-    name = "Furnace"
     material = materials.rock
 
 
 class BurningFurnace(BlockCube):
     number = 62
-    name = "Burning Furnace"
     material = materials.rock
+    inventory_avoid = True
 
 
 class SignPost(BlockSign):
+    inventory_avoid = True
     number = 63
-    name = "Sign Post"
 
 
 class WoodenDoor(BlockDoor):
+    inventory_avoid = True
     number = 64
-    name = "Wooden Door"
     material = materials.wood
 
 
 class Ladders(BlockSolid):
     number = 65
-    name = "Ladders"
     material = materials.circuits
     render_as_normal_block = False
     is_opaque_cube = False
@@ -1137,80 +1127,74 @@ class Ladders(BlockSolid):
 
 class Rail(BlockNonSolid):
     number = 66
-    name = "Rail"
     material = materials.circuits
 
 
 class CobblestoneStairs(BlockStairs):
     number = 67
-    name = "Cobblestone Stairs"
     material = Cobblestone.material
 
 
 class WallSign(BlockSign):
     number = 68
-    name = "Wall Sign"
+    inventory_avoid = True
 
 
 class Lever(BlockNonSolid):
     number = 69
-    name = "Lever"
     material = materials.circuits
 
 
 class StonePressurePlate(BlockNonSolid):
     number = 70
-    name = "Stone Pressure Plate"
     material = materials.rock
 
 
 class IronDoor(BlockDoor):
+    inventory_avoid = True
     number = 71
-    name = "Iron Door"
     material = materials.iron
 
 
 class WoodenPressurePlate(BlockNonSolid):
     number = 72
-    name = "Wooden Pressure Plate"
     material = materials.wood
 
 
 class RedstoneOre(BlockOre):
     number = 73
-    name = "Redstone Ore"
+    inventory_avoid = True
 
 
 class GlowingRedstoneOre(BlockOre):
     number = 74
-    name = "Glowing Redstone Ore"
+    inventory_avoid = True
 
 
 class RedstoneTorchOffState(BlockTorch):
     number = 75
-    name = "Redstone Torch off state"
     material = materials.circuits
+    inventory_avoid = True
 
 
 class RedstoneTorchOnState(BlockTorch):
     number = 76
-    name = "Redstone Torch on state"
     material = materials.circuits
+    name = "Redstone Torch"
 
 
 class StoneButton(BlockNonSolid):
     number = 77
-    name = "Stone Button"
     material = materials.circuits
 
 
 class Snow(BlockBiCollidable):
     number = 78
-    name = "Snow"
     material = materials.snow
     render_as_normal_block = False
     is_opaque_cube = False
     bounding_box = None
+    inventory_avoid = True
 
     @property
     def is_collidable(self):
@@ -1239,21 +1223,19 @@ class Snow(BlockBiCollidable):
 
 class Ice(BlockCube):
     number = 79
-    name = "Ice"
     slipperiness = 0.98
     material = materials.ice
     is_opaque_cube = False
+    inventory_avoid = True
 
 
 class SnowBlock(BlockCube):
     number = 80
-    name = "Snow Block"
     material = materials.crafted_snow
 
 
 class Cactus(BlockSolid):
     number = 81
-    name = "Cactus"
     material = materials.cactus
     render_as_normal_block = False
     is_opaque_cube = False
@@ -1262,43 +1244,37 @@ class Cactus(BlockSolid):
 
 class ClayBlock(BlockCube):
     number = 82
-    name = "Clay Block"
     material = materials.clay
 
 
 class SugarCane(BlockNonSolid):
+    inventory_avoid = True
     number = 83
-    name = "Sugar Cane"
     material = materials.plants
 
 
 class Jukebox(BlockCube):
     number = 84
-    name = "Jukebox"
     material = materials.wood
 
 
 class Fence(BlockFence):
     number = 85
-    name = "Fence"
     material = materials.wood
 
 
 class Pumpkin(BlockCube):
     number = 86
-    name = "Pumpkin"
     material = materials.pumpkin
 
 
 class Netherrack(BlockCube):
     number = 87
-    name = "Netherrack"
     material = materials.rock
 
 
 class SoulSand(BlockSolid):
     number = 88
-    name = "Soul Sand"
     material = materials.sand
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 1.0 - 0.125, 1.0)
 
@@ -1313,14 +1289,13 @@ class SoulSand(BlockSolid):
 
 class GlowstoneBlock(BlockCube):
     number = 89
-    name = "Glowstone Block"
     material = materials.glass
 
 
 class NetherPortal(BlockNonSolid):
     number = 90
-    name = "Nether Portal"
     material = materials.portal
+    inventory_avoid = True
 
 
 class JackOLantern(BlockCube):
@@ -1330,8 +1305,8 @@ class JackOLantern(BlockCube):
 
 
 class Cake(BlockSolid):
+    inventory_avoid = True
     number = 92
-    name = "Cake"
     material = materials.cake
     render_as_normal_block = False
     is_opaque_cube = False
@@ -1344,24 +1319,25 @@ class Cake(BlockSolid):
 
 
 class RedstoneRepeaterOff(BlockRedstoneRepeater):
+    inventory_avoid = True
     number = 93
-    name = "Redstone Repeater ('off' state)"
+    name = "Redstone Repeater (inactive)"
 
 
 class RedstoneRepeaterOn(BlockRedstoneRepeater):
+    inventory_avoid = True
     number = 94
-    name = "Redstone Repeater ('on' state)"
+    name = "Redstone Repeater (active)"
 
 
 class LockedChest(BlockCube):
     number = 95
-    name = "Locked Chest"
     material = materials.wood
+    inventory_avoid = True
 
 
 class Trapdoor(BlockSolid):
     number = 96
-    name = "Trapdoor"
     material = materials.wood
     bounding_box_closed = AABB(0.0, 0.0, 0.0, 1.0, 0.1875, 1.0)
     bounding_boxes = [AABB(0.0, 0.0, 0.8125, 1.0, 1.0, 1.0),
@@ -1393,59 +1369,57 @@ class Trapdoor(BlockSolid):
 
 class HiddenSilverfish(BlockCube):
     number = 97
-    name = "Hidden Silverfish"
     material = materials.clay
+    sub_names = ["Stone", "Cobblestone", "Stone Brick"]
+    inventory_avoid = True
 
 
 class StoneBrick(BlockCube):
     number = 98
-    name = "Stone Brick"
     material = materials.rock
+    sub_names = ["", "Mossy", "Cracked", "Chiseled"]
+    has_common_type = False
 
 
 class HugeBrownMushroom(BlockCube):
     number = 99
-    name = "Huge Brown Mushroom"
     material = materials.wood
+    inventory_avoid = True
 
 
 class HugeRedMushroom(BlockCube):
     number = 100
-    name = "Huge Red Mushroom"
     material = materials.wood
+    inventory_avoid = True
 
 
 class IronBars(BlockPane):
     number = 101
-    name = "Iron Bars"
     material = materials.iron
 
 
 class GlassPane(BlockPane):
     number = 102
-    name = "Glass Pane"
     material = materials.glass
 
 
 class MelonBlock(BlockCube):
     number = 103
-    name = "Melon Block"
     material = materials.pumpkin
 
 
 class PumpkinStem(BlockFlower):
     number = 104
-    name = "Pumpkin Stem"
+    inventory_avoid = True
 
 
 class MelonStem(BlockFlower):
     number = 105
-    name = "Melon Stem"
+    inventory_avoid = True
 
 
 class Vines(BlockNonSolid):
     number = 106
-    name = "Vines"
     material = materials.vine
 
     @property
@@ -1462,7 +1436,6 @@ class Vines(BlockNonSolid):
 
 class FenceGate(BlockBiCollidable):
     number = 107
-    name = "Fence Gate"
     material = materials.wood
     bounding_box_north_south = AABB(0.375, 0, 0, 0.625, 1.5, 1.0)
     bounding_box_east_west = AABB(0, 0, 0.375, 1.0, 1.5, 0.625)
@@ -1504,25 +1477,22 @@ class FenceGate(BlockBiCollidable):
 
 class BrickStairs(BlockStairs):
     number = 108
-    name = "Brick Stairs"
     material = Bricks.material
 
 
 class StoneBrickStairs(BlockStairs):
     number = 109
-    name = "Stone Brick Stairs"
     material = StoneBrick.material
 
 
 class Mycelium(BlockCube):
     number = 110
-    name = "Mycelium"
     material = materials.grass
+    inventory_avoid = True
 
 
 class LilyPad(BlockSolid):
     number = 111
-    name = "Lily Pad"
     material = materials.plants
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.015625, 1.0)
     is_opaque_cube = False
@@ -1533,32 +1503,28 @@ class LilyPad(BlockSolid):
         return True
 
 
-class NetherBrick(BlockCube):
+class NetherBricks(BlockCube):
     number = 112
-    name = "Nether Brick"
     material = materials.rock
 
 
 class NetherBrickFence(BlockFence):
     number = 113
-    name = "Nether Brick Fence"
-    material = materials.rock
+    material = NetherBricks.material
 
 
 class NetherBrickStairs(BlockStairs):
     number = 114
-    name = "Nether Brick Stairs"
-    material = NetherBrick.material
+    material = NetherBricks.material
 
 
 class NetherWart(BlockFlower):
+    inventory_avoid = True
     number = 115
-    name = "Nether Wart"
 
 
 class EnchantmentTable(BlockSolid):
     number = 116
-    name = "Enchantment Table"
     material = materials.rock
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.75, 1.0)
     render_as_normal_block = False
@@ -1570,8 +1536,8 @@ class EnchantmentTable(BlockSolid):
 
 
 class BrewingStand(BlockMultiBox):
+    inventory_avoid = True
     number = 117
-    name = "Brewing Stand"
     material = materials.iron
     bounding_box_stand = AABB(0.4375, 0.0, 0.4375, 0.5625, 0.875, 0.5625)
     bounding_box_base = AABB(0.0, 0.0, 0.0, 1.0, 0.125, 1.0)
@@ -1584,8 +1550,8 @@ class BrewingStand(BlockMultiBox):
 
 
 class Cauldron(BlockMultiBox):
+    inventory_avoid = True
     number = 118
-    name = "Cauldron"
     material = materials.iron
     render_as_normal_block = False
     is_opaque_cube = False
@@ -1603,17 +1569,17 @@ class Cauldron(BlockMultiBox):
 
 class EndPortal(BlockNonSolid):
     number = 119
-    name = "End Portal"
     material = materials.portal
+    inventory_avoid = True
 
 
 class EndPortalFrame(BlockMultiBox):
     number = 120
-    name = "End Portal Frame"
     material = materials.glass
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.8125, 1.0)
     bounding_box_eye_inserted = AABB(0.3125, 0.8125, 0.3125, 0.6875, 1.0, 0.6875)
     is_opaque_cube = False
+    inventory_avoid = True
 
     @property
     def eye_inserted(self):
@@ -1627,19 +1593,17 @@ class EndPortalFrame(BlockMultiBox):
 
 class EndStone(BlockCube):
     number = 121
-    name = "End Stone"
     material = materials.rock
 
 
 class DragonEgg(BlockNonSolid):
     number = 122
-    name = "Dragon Egg"
     material = materials.dragon_egg
 
 
 class RedstoneLampInactive(BlockCube):
     number = 123
-    name = "Redstone Lamp (inactive)"
+    name = "Redstone Lamp"
     material = materials.redstone_light
 
 
@@ -1647,23 +1611,26 @@ class RedstoneLampActive(BlockCube):
     number = 124
     name = "Redstone Lamp (active)"
     material = materials.redstone_light
+    inventory_avoid = True
 
 
 class WoodenDoubleSlab(BlockCube):
     number = 125
-    name = "Wooden Double Slab"
     material = materials.wood
+    sub_names = wood_names
+    inventory_avoid = True
 
 
 class WoodenSlab(BlockSingleSlab):
     number = 126
-    name = "Wooden Slab"
     material = materials.wood
+    sub_names = wood_names
 
 
-class CocoaPlant(BlockSolid):
+class CocoaPod(BlockSolid):
+    inventory_avoid = True
     number = 127
-    name = "Cocoa Plant"
+    material = materials.plants
     render_as_normal_block = False
     is_opaque_cube = False
 
@@ -1693,22 +1660,17 @@ class CocoaPlant(BlockSolid):
 
 class SandstoneStairs(BlockStairs):
     number = 128
-    name = "Sandstone Stairs"
     material = Sandstone.material
 
 
 class EmeraldOre(BlockOre):
     number = 129
-    name = "Emerald Ore"
+    inventory_avoid = True
 
 
-class EnderChest(BlockSolid):
+class EnderChest(BlockChest):
     number = 130
-    name = "Ender Chest"
     material = materials.rock
-    render_as_normal_block = False
-    is_opaque_cube = False
-    bounding_box = AABB(0.0625, 0.0, 0.0625, 0.9375, 0.875, 0.9375)
 
     @property
     def can_stand_in(self):
@@ -1717,51 +1679,45 @@ class EnderChest(BlockSolid):
 
 class TripwireHook(BlockNonSolid):
     number = 131
-    name = "Tripwire Hook"
     material = materials.circuits
     render_as_normal_block = False
 
 
 class Tripwire(BlockNonSolid):
+    inventory_avoid = True
     number = 132
-    name = "Tripwire"
     material = materials.circuits
     render_as_normal_block = False
 
 
 class BlockOfEmerald(BlockOfStorage):
     number = 133
-    name = "Block of Emerald"
     material = materials.iron
 
 
 class SpruceWoodStairs(BlockStairs):
     number = 134
-    name = "Spruce Wood Stairs"
     material = WoodenPlanks.material
 
 
 class BirchWoodStairs(BlockStairs):
     number = 135
-    name = "Birch Wood Stairs"
     material = WoodenPlanks.material
 
 
 class JungleWoodStairs(BlockStairs):
     number = 136
-    name = "Jungle Wood Stairs"
     material = WoodenPlanks.material
 
 
 class CommandBlock(BlockCube):
     number = 137
-    name = "Command Block"
     material = materials.iron
+    inventory_avoid = True
 
 
 class Beacon(BlockCube):
     number = 138
-    name = "Beacon"
     material = materials.glass
     render_as_normal_block = False
     is_opaque_cube = False
@@ -1769,13 +1725,14 @@ class Beacon(BlockCube):
 
 class CobblestoneWall(BlockFence):
     number = 139
-    name = "Cobblestone Wall"
     material = Cobblestone.material
+    sub_names = ["", "Mossy"]
+    has_common_type = False
 
 
 class FlowerPot(BlockSolid):
+    inventory_avoid = True
     number = 140
-    name = "Flower Pot"
     material = materials.circuits
     render_as_normal_block = False
     is_opaque_cube = False
@@ -1786,23 +1743,22 @@ class FlowerPot(BlockSolid):
 
 class Carrots(BlockFlower):
     number = 141
-    name = "Carrots"
+    inventory_avoid = True
 
 
 class Potatoes(BlockFlower):
     number = 142
-    name = "Potatoes"
+    inventory_avoid = True
 
 
 class WoodenButton(BlockNonSolid):
     number = 143
-    name = "Wooden Button"
     material = materials.circuits
 
 
 class Skull(BlockSolid):
+    inventory_avoid = True
     number = 144
-    name = "Skull"
     material = materials.circuits
     render_as_normal_block = False
     is_opaque_cube = False
@@ -1825,8 +1781,7 @@ class Skull(BlockSolid):
 
 class Anvil(BlockSolid):
     number = 145
-    name = "Anvil"
-    material = materials.iron
+    material = materials.anvil
     render_as_normal_block = False
     is_opaque_cube = False
 
@@ -1840,8 +1795,74 @@ class Anvil(BlockSolid):
         return gbb.offset(self.x, self.y, self.z)
 
 
-block_map = [None for _ in xrange(256)]
-selfmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
-for _, cl in selfmembers:
-    if issubclass(cl, Block) and hasattr(cl, 'number'):
-        block_map[cl.number] = cl
+class TrappedChest(BlockChest):
+    number = 146
+    material = materials.wood
+
+class WeightedPressurePlateLight(BlockSolid):
+    number = 147
+    material = materials.wood
+    name = "Weighted Pressure Plate (Light)"
+
+
+class WeightedPressurePlateHeavy(BlockSolid):
+    number = 148
+    material = materials.wood
+    name = "Weighted Pressure Plate (Heavy)"
+
+
+class RedstoneComparatorOffState(BlockSolid):
+    number = 149
+    material = materials.wood
+    name = "Redstone Comparator (inactive)"
+    inventory_avoid = True
+
+
+class RedstoneComparatorOnState(BlockSolid):
+    number = 150
+    material = materials.wood
+    name = "Redstone Comparator (active)"
+    inventory_avoid = True
+
+
+class DaylightSensor(BlockSolid):
+    number = 151
+    material = materials.wood
+
+
+class BlockOfRedstone(BlockCube):
+    number = 152
+    material = materials.wood
+
+
+class NetherQuartzOre(BlockOre):
+    number = 153
+    material = materials.wood
+
+
+class Hopper(BlockCube):
+    number = 154
+    material = materials.wood
+
+
+class BlockOfQuartz(BlockCube):
+    number = 155
+    material = materials.wood
+
+
+class QuartzStairs(BlockStairs):
+    number = 156
+    material = materials.wood
+
+
+class ActivatorRails(BlockNonSolid):
+    number = 157
+    material = materials.wood
+
+
+class Dropper(BlockCube):
+    number = 158
+    material = materials.wood
+
+
+log.msg("registered %d blocks" % len(block_map))

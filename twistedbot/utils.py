@@ -42,11 +42,11 @@ def grid_shift(v):
 
 
 def yaw_pitch_between(p1, p2):
-    x, y, z = p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]
-    return yaw_pitch_to_vector(x, y, z)
+    p = p1 - p2
+    return vector_to_yaw_pitch(p.x, p.y, p.z)
 
 
-def yaw_pitch_to_vector(x, y, z):
+def vector_to_yaw_pitch(x, y, z):
     d = math.hypot(x, z)
     if d == 0:
         pitch = 0
@@ -71,6 +71,28 @@ def yaw_pitch_to_vector(x, y, z):
     return yaw, -pitch
 
 
+def yaw_pitch_to_vector(yaw, pitch):
+    real_yaw = yaw * 2 * (math.pi / 256)
+    real_pitch = pitch * 2 * (math.pi / 256)
+    x = - math.cos(real_pitch) * math.sin(real_yaw)
+    y = - math.sin(real_pitch)
+    z = math.cos(real_pitch) * math.cos(real_yaw)
+    return Vector(x, y, z)
+
+
+def grid_sections_around(center, distance):
+    min_x = center.x - distance
+    max_x = center.x + distance + 1
+    min_y = min(0, center.y - distance)
+    max_y = min(16, center.y + distance) + 1
+    min_z = center.z - distance
+    max_z = center.z + distance + 1
+    for x in xrange(min_x, max_x):
+        for y in xrange(min_y, max_y):
+            for z in xrange(min_z, max_z):
+                yield Vector(x, y, z)
+
+
 ListItem = namedtuple('ListItem', ["order", "obj"])
 
 
@@ -82,7 +104,7 @@ class OrderedLinkedList(object):
     def __len__(self):
         return len(self.olist)
 
-    def __str__(self):
+    def __repr__(self):
         return "%s %s [%s]" % (self.name, len(self), ",".join([str((o.order, o.obj)) for o in self.olist]))
 
     def iter(self, forward_direction=True):
@@ -150,6 +172,9 @@ class Vector(object):
     def __eq__(self, o):
         return self.x == o.x and self.y == o.y and self.z == o.z
 
+    def __ne__(self, o):
+        return not self.__eq__(o)
+
     def __add__(self, v):
         return Vector(self.x + v.x, self.y + v.y, self.z + v.z)
 
@@ -159,11 +184,11 @@ class Vector(object):
     def __mul__(self, m):
         return Vector(self.x * m, self.y * m, self.z * m)
 
-    def __str__(self):
-        return "<%s %s %s>" % (self.x, self.y, self.z)
+    def __div__(self, d):
+        return Vector(self.x / d, self.y / d, self.z / d)
 
     def __repr__(self):
-        return self.__str__()
+        return "<%s %s %s>" % (self.x, self.y, self.z)
 
     @property
     def tuple(self):
@@ -172,6 +197,10 @@ class Vector(object):
     @property
     def size(self):
         return math.sqrt(pow(self.x, 2) + pow(self.y, 2) + pow(self.z, 2))
+
+    @property
+    def manhatan_size(self):
+        return abs(self.x) + abs(self.y) + abs(self.z)
 
     def normalize(self):
         d = self.size
@@ -205,14 +234,23 @@ class Vector(object):
             self.z *= -1
         return self
 
+    def grid_shift(self):
+        return Vector(grid_shift(self.x), grid_shift(self.y), grid_shift(self.z))
+
+    def distance(self, v):
+        return (self - v).size
+
 
 class Vector2D(object):
     def __init__(self, x, z):
         self.x = x
         self.z = z
 
-    def __str__(self):
+    def __repr__(self):
         return "<%s %s>" % (self.x, self.z)
+
+    def __sub__(self, v):
+        return Vector2D(self.x - v.x, self.z - v.z)
 
     @property
     def size(self):

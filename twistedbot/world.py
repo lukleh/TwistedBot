@@ -6,6 +6,7 @@ from datetime import datetime
 import logbot
 import utils
 import config
+import inventory
 from entities import Entities
 from grid import Grid
 from statistics import Statistics
@@ -32,18 +33,19 @@ class World(object):
         self.server_port = port
         self.commander = Commander(commander_name)
         self.chat = Chat(self)
-        self.bot = BotEntity(self, bot_name)
         self.stats = Statistics()
+        self.bot = BotEntity(self, bot_name)
         self.game_ticks = 0
         self.connected = False
         self.logged_in = False
         self.protocol = None
         self.factory = None
         self.entities = None
+        self.inventories = inventory.InvetoryContainer()
         self.grid = None
         self.sign_waypoints = None
         self.dimension = None
-        self.dimensions = [Dimension(self), Dimension(self), Dimension(self)]
+        self.dimensions = [Dimension(self), Dimension(self), Dimension(self)]       
         self.spawn_position = None
         self.game_mode = None
         self.difficulty = None
@@ -99,8 +101,9 @@ class World(object):
         d = self.dimensions[dim]
         self.dimension = d
         self.entities, self.grid, self.sign_waypoints = d.entities, d.grid, d.sign_waypoints
-        if not self.entities.has_entity(self.bot.eid):
+        if not self.entities.has_entity_eid(self.bot.eid):
             self.entities.new_bot(self.bot.eid)
+        #log.msg("NEW DIMENSION %d ents %s" % (dim, self.entities.entities))
 
     def on_login(self, bot_eid=None, game_mode=None, dimension=None, difficulty=None):
         self.bot.eid = bot_eid
@@ -108,6 +111,7 @@ class World(object):
         self.dimension_change(dimension)
         self.game_mode = game_mode
         self.difficulty = difficulty
+        self.bot.behavior_tree.blackboard.setup()
 
     def on_spawn_position(self, x, y, z):
         self.spawn_position = (x, y, z)
@@ -124,6 +128,10 @@ class World(object):
     def on_time_update(self, timestamp=None, daytime=None):
         self.timestamp = timestamp
         self.daytime = daytime
+
+    @property
+    def server_lag(self):
+        return self.players[config.USERNAME]
 
 
 class Commander(object):

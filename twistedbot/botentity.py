@@ -8,7 +8,7 @@ import packets
 import logbot
 import fops
 import blocks
-import behaviours
+import behavior_tree as bt
 from axisbox import AABB
 
 
@@ -57,11 +57,11 @@ class BotObject(object):
 
     @property
     def position_grid(self):
-        return (self.grid_x, self.grid_y, self.grid_z)
+        return utils.Vector(self.grid_x, self.grid_y, self.grid_z)
 
     @property
     def position_eyelevel(self):
-        return (self.x, self.y_eyelevel, self.z)
+        return utils.Vector(self.x, self.y_eyelevel, self.z)
 
     @property
     def y_eyelevel(self):
@@ -104,7 +104,7 @@ class BotEntity(object):
         self.location_received = False
         self.check_location_received = False
         self.spawn_point_received = False
-        self.behaviour_tree = behaviours.BehaviourTree(self.world, self)
+        self.behavior_tree = bt.BehaviorTree(self.world, self)
 
     def on_connection_lost(self):
         if self.location_received:
@@ -122,7 +122,7 @@ class BotEntity(object):
         if self.location_received is False:
             self.location_received = True
         if not self.in_complete_chunks(self.bot_object):
-            log.msg("Server send location into incomplete chunks")
+            log.msg("Server sent me into incomplete chunks, will wait until they load up.")
             self.ready = False
 
     def in_complete_chunks(self, b_obj):
@@ -141,7 +141,7 @@ class BotEntity(object):
         self.send_action(self.bot_object)
         self.stop_sneaking(self.bot_object)
         if not self.i_am_dead:
-            utils.do_now(self.behaviour_tree.tick)
+            utils.do_now(self.behavior_tree.tick)
 
     def send_location(self, b_obj):
         self.world.send_packet("player position&look", {
@@ -149,6 +149,7 @@ class BotEntity(object):
                                           stance=b_obj.stance),
             "orientation": packets.Container(yaw=b_obj.yaw, pitch=b_obj.pitch),
             "grounded": packets.Container(grounded=b_obj.on_ground)})
+        #print "send", packets.Container(yaw=b_obj.yaw, pitch=b_obj.pitch)
 
     def send_action(self, b_obj):
         """
@@ -159,7 +160,7 @@ class BotEntity(object):
             self.send_packet("entity action", {"eid": self.eid, "action": b_obj._action})
 
     def turn_to_point(self, b_obj, point):
-        if point[0] == b_obj.x and point[2] == b_obj.z:
+        if point.x == b_obj.x and point.z == b_obj.z:
             return
         yaw, pitch = utils.yaw_pitch_between(point, b_obj.position_eyelevel)
         if yaw is None or pitch is None:
@@ -167,12 +168,19 @@ class BotEntity(object):
         b_obj.yaw = yaw
         b_obj.pitch = pitch
 
-    def turn_to_direction(self, b_obj, x, z):
+    def turn_to_direction(self, b_obj, x, y, z):
         if x == 0 and z == 0:
             return
-        yaw, _ = utils.yaw_pitch_to_vector(x, 0, z)
+        yaw, pitch = utils.vector_to_yaw_pitch(x, y, z)
         b_obj.yaw = yaw
-        b_obj.pitch = 0
+        b_obj.pitch = pitch
+
+    def turn_to_vector(self, b_obj, vect):
+        if vect.x == 0 and vect.z == 0:
+            return
+        yaw, pitch = utils.vector_to_yaw_pitch(vect.x, vect.y, vect.z)
+        b_obj.yaw = yaw
+        b_obj.pitch = pitch
 
     def clip_abs_velocities(self, b_obj):
         if abs(b_obj.velocities.x) < 0.005:  # minecraft value
@@ -308,7 +316,7 @@ class BotEntity(object):
         elif is_in_lava:
             if b_obj.hold_position_flag:
                 b_obj.velocities.y = 0
-            orig_y = self.y
+            orig_y = b_obj.y
             self.update_directional_speed(b_obj, 0.02)
             self.move_collisions(b_obj, b_obj.velocities.x, b_obj.velocities.y, b_obj.velocities.z)
             b_obj.velocities.x *= 0.5
@@ -350,9 +358,9 @@ class BotEntity(object):
                 dot *= -1
                 perpedicular_dir = utils.Vector2D(direction.z, - direction.x)
             direction = utils.Vector2D(direction.x - perpedicular_dir.x * dot, direction.z - perpedicular_dir.z * dot)
-            self.turn_to_direction(b_obj, direction.x, direction.z)
+            self.turn_to_direction(b_obj, direction.x, 0, direction.z)
         if balance and b_obj.hold_position_flag:
-            self.turn_to_direction(b_obj, -b_obj.velocities.x, -b_obj.velocities.z)
+            self.turn_to_direction(b_obj, -b_obj.velocities.x, 0, -b_obj.velocities.z)
             b_obj.velocities.x = 0
             b_obj.velocities.z = 0
         b_obj.velocities.x += direction.x
@@ -430,7 +438,7 @@ class BotEntity(object):
         self.world.send_packet("client statuses", {"status": 1})
 
     def on_health_update(self, health, food, food_saturation):
-        log.msg("current health %s food %s saturation %s" % (health, food, food_saturation))
+        #log.msg("current health %s food %s saturation %s" % (health, food, food_saturation))
         if health <= 0:
             self.on_death()
 
@@ -446,4 +454,5 @@ class BotEntity(object):
         return self.standing_on_block(b_obj) is not None
 
     def on_update_experience(self, experience_bar=None, level=None, total_experience=None):
+        #log.msg("XP bar:%s level:%s total:%s" % (experience_bar, level, total_experience))
         pass

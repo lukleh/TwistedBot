@@ -5,6 +5,7 @@ import math
 import config
 import fops
 import utils
+from utils import Vector
 
 
 class AABB(object):
@@ -20,18 +21,15 @@ class AABB(object):
         self.maxs = [max_x, max_y, max_z]
 
     def __add__(self, o):
-        return self.offset(o[0], o[1], o[2])
+        return self.offset(o.x, o.y, o.z)
 
     def __sub__(self, o):
-        return self.offset(-o[0], -o[1], -o[2])
+        return self.offset(-o.x, -o.y, -o.z)
 
-    def __str__(self):
+    def __repr__(self):
         return "AABB [%s, %s, %s : %s, %s, %s]" % \
             (self.min_x, self.min_y, self.min_z,
              self.max_x, self.max_y, self.max_z)
-
-    def __repr__(self):
-        return self.__str__()
 
     def __eq__(self, o):
         return self.min_x == o.min_x and \
@@ -119,13 +117,18 @@ class AABB(object):
     def from_two_points(cls, p1, p2):
         return cls(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z)
 
+    @classmethod
+    def from_point_and_dimensions(cls, center, width, height):
+        w2 = width / 2.0
+        return cls(center.x - w2, center.y, center.z - w2, center.x + w2, center.y + height, center.z + w2)
+
     @property
     def bottom_center(self):
-        return (self.posx, self.posy, self.posz)
+        return Vector(self.posx, self.posy, self.posz)
 
     @property
     def grid_bottom_center(self):
-        return (self.gridpos_x, self.gridpos_y, self.gridpos_z)
+        return Vector(self.gridpos_x, self.gridpos_y, self.gridpos_z)
 
     def collides(self, bb):
         for i in xrange(3):
@@ -221,10 +224,10 @@ class AABB(object):
 
     @property
     def grid_area(self):
-        gbb = self.grid_box
-        for x in xrange(gbb[0], gbb[3] + 1):
-            for y in xrange(gbb[1], gbb[4] + 1):
-                for z in xrange(gbb[2], gbb[5] + 1):
+        min_x, min_y, min_z, max_x, max_y, max_z = int(math.floor(self.min_x)), int(math.floor(self.min_y)), int(math.floor(self.min_z)), int(math.floor(self.max_x)) + 1, int(math.floor(self.max_y)) + 1, int(math.floor(self.max_z)) + 1
+        for x in xrange(min_x, max_x):
+            for y in xrange(min_y, max_y):
+                for z in xrange(min_z, max_z):
                     yield x, y, z
 
     def sweep_collision(self, collidee, v, debug=False):

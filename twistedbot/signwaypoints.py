@@ -42,11 +42,8 @@ class Sign(object):
             return False
         return self.coords == sgn.coords
 
-    def __str__(self):
-        return "$coords:%s group:%s value:%s name:%s$" % (str(self.coords), self.group, self.value, self.name)
-
     def __repr__(self):
-        return self.__str__()
+        return "$coords:%s group:%s value:%s name:%s$" % (str(self.coords), self.group, self.value, self.name)
 
 
 class SignWayPoints(object):
@@ -78,6 +75,16 @@ class SignWayPoints(object):
     def has_name_point(self, name):
         return name in self.sign_points
 
+    def log_new_sign(self, sign):
+        msg = "adding sign at %s" % str(sign.coords)
+        if sign.group:
+            msg += " group '%s'" % sign.group
+        if sign.value:
+            msg += " value '%s'" % sign.value
+        if sign.name:
+            msg += " name '%s'" % sign.name
+        log.msg(msg)
+
     def new(self, sign):
         if self.has_sign_at(sign.coords):
             self.remove(sign.coords)
@@ -88,14 +95,8 @@ class SignWayPoints(object):
         if sign.name:
             self.sign_points[sign.name] = sign
         if sign.coords not in self.crd_to_sign:
-            msg = "Adding sign at %s" % str(sign.coords)
-            if sign.group:
-                msg += " group '%s'" % sign.group
-            if sign.value:
-                msg += " value '%s'" % sign.value
-            if sign.name:
-                msg += " name '%s'" % sign.name
-            log.msg(msg)
+            # self.log_new_sign(sign)
+            pass
         self.crd_to_sign[sign.coords] = sign
 
     def remove(self, crd):

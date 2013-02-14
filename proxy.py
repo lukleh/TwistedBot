@@ -7,11 +7,11 @@ import argparse
 
 from twisted.internet import reactor
 from twisted.internet.protocol import Protocol, Factory
-from twisted.internet.endpoints import TCP4ServerEndpoint, TCP4ClientEndpoint
 
 from twistedbot.packets import make_packet, parse_packets, packets
 from twistedbot import encryption
 from twistedbot import logbot
+from twistedbot import config
 
 
 log = logbot.getlogger("PROXY")
@@ -159,10 +159,7 @@ class ProxyClientProtocol(ProxyProtocol):
 
     def connectionMade(self):
         self.log.msg("Received connection from client")
-        endpoint = TCP4ClientEndpoint(
-            reactor, self.factory.host, self.factory.port)
-        d = endpoint.connect(self.proxyserver)
-        d.addErrback(logbot.exit_on_error, "Server network error")
+        reactor.connectTCP(self.factory.host, self.factory.port, self.proxyserver)
 
     def connectionLost(self, reason):
         self.log.msg("Lost connection from client: %s" % reason.getErrorMessage())
@@ -238,12 +235,12 @@ if __name__ == '__main__':
                         help='MC server host')
     parser.add_argument('--serverport',
                         type=int,
-                        default=25565,
+                        default=config.SERVER_PORT,
                         dest='serverport',
                         help='MC server port')
     parser.add_argument('--proxyport',
                         type=int,
-                        default=25566,
+                        default=config.PROXY_PORT,
                         dest='proxyport',
                         help='proxy port')
     parser.add_argument('--processor',
@@ -289,8 +286,6 @@ if __name__ == '__main__':
         logbot.exit_on_error(_why="Cannot open log file for writing")
         exit()
 
-    endpoint = TCP4ServerEndpoint(reactor, args.proxyport)
-    d = endpoint.listen(ProxyClientFactory(args.serverhost, args.serverport))
-    d.addErrback(logbot.exit_on_error, "Client network error")
+    reactor.listenTCP(args.proxyport, ProxyClientFactory(args.serverhost, args.serverport))
     reactor.addSystemEventTrigger('after', 'shutdown', processor.finish)
     reactor.run()

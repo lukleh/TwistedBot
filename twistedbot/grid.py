@@ -1,7 +1,8 @@
 
 import StringIO
 import array
-
+import math
+import sys
 
 import utils
 import blocks
@@ -16,6 +17,7 @@ log = logbot.getlogger("GRID")
 
 class Chunk(object):
     levels = config.WORLD_HEIGHT / 16
+    biomes = [None for _ in xrange(config.CHUNK_SIDE_LEN * config.CHUNK_SIDE_LEN)]
 
     def __init__(self, coords):
         self.coords = coords
@@ -27,7 +29,7 @@ class Chunk(object):
         self.meta = [None for _ in xrange(self.levels)]
         self.block_light = []  # ignore block light
         self.sky_light = []  # ifnore sky light
-        self.biome = [None for _ in xrange(config.CHUNK_SIDE_LEN * config.CHUNK_SIDE_LEN)]
+        self.biome = self.biomes[:]
         self.complete = False
 
     def set_meta(self, level, pos, meta):
@@ -44,7 +46,7 @@ class Chunk(object):
         else:
             return self.meta[level][pos / 2] >> 4
 
-    def __str__(self):
+    def __repr__(self):
         return "%s %s %s" % (str(self.coords), self.complete, [i if i is None else 1 for i in self.blocks])
 
 
@@ -62,7 +64,7 @@ class Grid(object):
         return self.chunks.get(coords, None)
 
     def make_block(self, x, y, z, block_type, meta):
-        return blocks.block_map[block_type](self, x, y, z, meta)
+        return blocks.block_list[block_type](self, x, y, z, meta)
 
     def get_block_coords(self, crds):
         return self.get_block(crds.x, crds.y, crds.z)
@@ -291,3 +293,73 @@ class Grid(object):
             return eye_y < (ey + 1 - wh)
         else:
             return False
+
+    def raycast_to_block(self, position, direction, max_distance=40):
+        g_position = position.grid_shift()
+        gx = g_position.x
+        gy = g_position.y
+        gz = g_position.z
+        if fops.eq(0, direction.x):
+            stepx = 0
+            tdx = sys.float_info.max
+        else:
+            stepx = int(math.copysign(1, direction.x))
+            tdx = abs(1 / direction.x)
+
+        if fops.eq(0, direction.y):
+            stepy = 0
+            tdy = sys.float_info.max
+        else:
+            stepy = int(math.copysign(1, direction.y))
+            tdy = abs(1 / direction.y)
+
+        if fops.eq(0, direction.z):
+            stepz = 0
+            tdz = sys.float_info.max
+        else:
+            stepz = int(math.copysign(1, direction.z))
+            tdz = abs(1 / direction.z)
+
+        if stepx == 0:
+            tmaxx = tdx
+        elif stepx > 0:
+            tmaxx = (math.floor(position.x) + 1 - position.x) * tdx
+        else:
+            tmaxx = (position.x - math.floor(position.x)) * tdx
+
+        if stepy == 0:
+            tmaxy = tdy
+        elif stepy > 0:
+            tmaxy = (math.floor(position.y) + 1 - position.y) * tdy
+        else:
+            tmaxy = (position.y - math.floor(position.y)) * tdy
+
+        if stepz == 0:
+            tmaxz = tdz
+        elif stepz > 0:
+            tmaxz = (math.floor(position.z) + 1 - position.z) * tdz
+        else:
+            tmaxz = (position.z - math.floor(position.z)) * tdz
+
+        sqr_max_distance = max_distance * max_distance
+        while True:
+            if tmaxx < tmaxy:
+                if tmaxx < tmaxz:
+                    gx = gx + stepx
+                    tmaxx = tmaxx + tdx
+                else:
+                    gz = gz + stepz
+                    tmaxz = tmaxz + tdz
+
+            else:
+                if tmaxy < tmaxz:
+                    gy = gy + stepy
+                    tmaxy = tmaxy + tdy
+                else:
+                    gz = gz + stepz
+                    tmaxz = tmaxz + tdz
+            blk = self.get_block(gx, gy, gz)
+            if blk.number != blocks.Air.number:
+                return blk
+            if (g_position.x - gx) ** 2 + (g_position.y - gy) ** 2 + (g_position.z - gz) ** 2 > sqr_max_distance:
+                return blocks.Air(self, 0, 0, 0, 0)
