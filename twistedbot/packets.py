@@ -131,24 +131,25 @@ slotdata = Struct("slotdata",
                      )
                   )
 
+
 def itemstack_as_slotdata(itemstack):
-  if itemstack is None:
-    data = {'id':-1}
-  else:
-    data = {'id': itemstack.number,
-            'count': itemstack.count,
-            'damage': itemstack.meta}
-    if itemstack.nbt is None:
-      data['size'] = -1
-      data['data'] = None
+    if itemstack is None:
+        data = {'id': -1}
     else:
-      nbt = itemstack.nbt
-      f = StringIO()
-      nbt.save(f)
-      nbt_data = f.getvalue()
-      data['size'] = len(nbt_data)
-      data['data'] = nbt_data
-  return Container(**data)
+        data = {'id': itemstack.number,
+                'count': itemstack.count,
+                'damage': itemstack.meta}
+        if itemstack.nbt is None:
+            data['size'] = -1
+            data['data'] = None
+        else:
+            nbt = itemstack.nbt
+            f = StringIO()
+            nbt.save(f)
+            nbt_data = f.getvalue()
+            data['size'] = len(nbt_data)
+            data['data'] = nbt_data
+    return Container(**data)
 
 
 Metadata = namedtuple("Metadata", "type value")

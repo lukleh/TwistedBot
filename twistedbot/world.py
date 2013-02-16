@@ -45,7 +45,7 @@ class World(object):
         self.grid = None
         self.sign_waypoints = None
         self.dimension = None
-        self.dimensions = [Dimension(self), Dimension(self), Dimension(self)]       
+        self.dimensions = [Dimension(self), Dimension(self), Dimension(self)]
         self.spawn_position = None
         self.game_mode = None
         self.difficulty = None
@@ -103,7 +103,7 @@ class World(object):
         self.entities, self.grid, self.sign_waypoints = d.entities, d.grid, d.sign_waypoints
         if not self.entities.has_entity_eid(self.bot.eid):
             self.entities.new_bot(self.bot.eid)
-        #log.msg("NEW DIMENSION %d ents %s" % (dim, self.entities.entities))
+        log.msg("NEW DIMENSION %d" % dim)
 
     def on_login(self, bot_eid=None, game_mode=None, dimension=None, difficulty=None):
         self.bot.eid = bot_eid

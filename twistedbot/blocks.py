@@ -1799,6 +1799,7 @@ class TrappedChest(BlockChest):
     number = 146
     material = materials.wood
 
+
 class WeightedPressurePlateLight(BlockSolid):
     number = 147
     material = materials.wood

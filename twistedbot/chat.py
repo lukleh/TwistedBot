@@ -157,7 +157,6 @@ class Chat(object):
                 elif what == "inventory":
                     for slot_id, item in self.world.inventories.player_inventory.slot_items():
                         self.send_chat_message("slot %d %s" % (slot_id, item))
-                        #log.msg("slot %d %s" % (slot_id, item))
                 elif what == "cursor":
                     self.world.bot.behavior_tree.new_command(bt.ShowPlayerCursor)
                 else:

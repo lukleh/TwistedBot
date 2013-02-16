@@ -111,7 +111,6 @@ class AStarCoords(object):
             raise StopIteration()
         except PathFound:
             log.msg('found path %d steps long' % len(self.astar.path))
-            #log.msg('path nodes %s' % self.astar.path)
             log.msg('time consumed %s sec, made %d iterations' % (self.time_sice_start(), self.astar.iter_count))
             self.path = self.astar.path
             raise StopIteration()

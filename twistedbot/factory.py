@@ -79,7 +79,7 @@ class MineCraftProtocol(Protocol):
             106: self.p_confirm_transaction,
             130: self.p_sign,
             131: self.p_item_data,
-            132: self.p_update_tile,
+            132: self.p_entity_update_tile,
             200: self.p_stats,
             201: self.p_players,
             202: self.p_abilities,
@@ -357,8 +357,8 @@ class MineCraftProtocol(Protocol):
         """ data for map item """
         pass
 
-    def p_update_tile(self, c):
-        #log.msg('Tile entity %s' % str(c))
+    def p_entity_update_tile(self, c):
+        #TODO figure out for what entities this applies
         pass
 
     def p_stats(self, c):
@@ -367,7 +367,6 @@ class MineCraftProtocol(Protocol):
     def p_players(self, c):
         if c.online:
             self.world.players[c.name] = c.ping
-            #log.msg('%s ping %d' % (c.name, c.ping))
         else:
             try:
                 del self.world.players[c.name]

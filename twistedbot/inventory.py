@@ -11,7 +11,6 @@ import utils
 log = logbot.getlogger("INVENTORY")
 
 
-
 class InvetoryBase(object):
     def __init__(self):
         self.slots = [None for _ in xrange(self.extra_slots + 36)]
@@ -119,7 +118,6 @@ class InvetoryContainer(object):
         pass
 
     def set_slot(self, window_id=None, slot_id=None, slotdata=None):
-        #log.msg("set slot %d %s" % (slot_id, slotdata))
         itemstack = items.ItemStack.from_slotdata(slotdata)
         if window_id == -1 and slot_id == -1:
             self.holding_item = itemstack
@@ -129,7 +127,6 @@ class InvetoryContainer(object):
     def set_slots(self, window_id=None, slotdata_list=None):
         inv = self.container[window_id]
         for slot_id, slotdata in enumerate(slotdata_list):
-            #log.msg("set slots %d %s" % (slot_id, slotdata))
             itemstack = items.ItemStack.from_slotdata(slotdata)
             inv.set_slot(slot_id, itemstack)
 

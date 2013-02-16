@@ -179,7 +179,6 @@ class Entities(object):
             del self.entities[eid]
             return True
         else:
-            #log.msg("deleting %d :(" % eid)
             return False
 
     def position_updated(self, entity, remove=False):
@@ -188,7 +187,6 @@ class Entities(object):
         if old_sec_pos != sec_pos:
             self.snap_entity2grid[entity] = entity.section_position
             self.snap_grid2entity[old_sec_pos].remove(entity)
-            #log.msg("E2G change %s %s %s" % (old_sec_pos, sec_pos, entity))
             if not self.snap_grid2entity[old_sec_pos]:
                 del self.snap_grid2entity[old_sec_pos]
             self.snap_grid2entity[sec_pos].add(entity)
@@ -223,9 +221,7 @@ class Entities(object):
     def entitynew(fn):
         def f(self, **kwargs):
             entity = fn(self, **kwargs)
-            #log.msg("NEW %s" % entity)
             if entity.eid in self.entities:
-                #log.msg("DEL FIRST BEFORE NEW ENTITY %s" % entity)
                 self.delete_entity(entity.eid)
             self.entities[entity.eid] = entity
             self.snap_entity2grid[entity] = entity.section_position
@@ -264,9 +260,8 @@ class Entities(object):
 
     def on_destroy(self, eids):
         for eid in eids:
-            #log.msg("DESTROY eid %d" % eid)
             if not self.delete_entity(eid):
-                #log.msg('Cannot destroy entity id %d because it is not registered' % eid)
+                log.msg('Cannot destroy entity id %d because it is not registered' % eid)
                 pass
 
     @entityupdate
@@ -317,4 +312,3 @@ class Entities(object):
             slotdata = metadata[10].value
             istack = items.ItemStack.from_slotdata(slotdata)
             entity.itemstack = istack
-            #log.msg("META %s itemstack %s" % (entity, istack))

@@ -1151,7 +1151,6 @@ class ItemStack(object):
 
     @classmethod
     def from_slotdata(cls, slotdata):
-        #log.msg(slotdata)
         if slotdata.id >= 0:
             return cls(slotdata.id, slotdata.damage, count=slotdata.count, nbt=slotdata.data)
         else:
@@ -1203,7 +1202,6 @@ class ItemDB(object):
         if name in self.item_names_map:
             raise Exception("%s already binded" % name)
         self.item_names_map[name] = istack
-        #log.msg("%s %s %s" % (istack.number, istack.meta, istack.name))
 
     def register(self, item):
         self.item_count += 1

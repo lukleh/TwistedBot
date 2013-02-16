@@ -438,7 +438,6 @@ class BotEntity(object):
         self.world.send_packet("client statuses", {"status": 1})
 
     def on_health_update(self, health, food, food_saturation):
-        #log.msg("current health %s food %s saturation %s" % (health, food, food_saturation))
         if health <= 0:
             self.on_death()
 
@@ -454,5 +453,5 @@ class BotEntity(object):
         return self.standing_on_block(b_obj) is not None
 
     def on_update_experience(self, experience_bar=None, level=None, total_experience=None):
-        #log.msg("XP bar:%s level:%s total:%s" % (experience_bar, level, total_experience))
+        #TODO relevant when we can enchant or use anvil
         pass

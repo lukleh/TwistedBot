@@ -163,7 +163,6 @@ class BehaviorTree(object):
                 self.check_new_command()
                 b = self.current_behavior
                 self.bot.bot_object.hold_position_flag = b.hold_position_flag
-                #log.msg("%d %s" % (self.world.game_ticks, b))
                 if b.status == Status.running:
                     yield b.tick()
                 if b.cancelled:
@@ -212,7 +211,6 @@ class BehaviorTree(object):
         self.user_command = (behavior, kwargs)
 
     def announce_behavior(self, bh):
-        #log.msg("new goal behavior '%s'" % bh.name)
         self.world.chat.send_chat_message("new goal behavior is %s" % bh.name)
 
 
@@ -461,8 +459,6 @@ class LookAtPlayer(BTGoal):
         return False
 
     def is_valid(self):
-        #log.msg("%d LAP self.blackboard.commander_in_game %s" % (self.blackboard.world_current_tick, self.blackboard.commander_in_game))
-        #traceback.print_stack()
         return self.blackboard.commander_in_game
 
     def choices(self):
@@ -659,12 +655,12 @@ class CollectMine(BTSequencer):
 
     def is_valid(self):
         #TODO blackboard.has_tool_for go through inventory and check if any tool applies
-        return self.blackboard.inventory_has_tool_for(self.recipe.block) and self.blocks_around
+        return self.blackboard.inventory_tool_for(self.recipe.block) and self.blocks_around
 
     def setup(self):
         #TODO blackboard.blocks_around  - find first X blocks, no max distance
         self.blocks_around = self.blackboard.blocks_around(self.blackboard.bot_object.position, self.recipe.block, self.recipe.block_filter)
-        self.mine_tool = self.blackboard.inventory_has_tool_for(self.recipe.block)
+        self.mine_tool = self.blackboard.inventory_tool_for(self.recipe.block)
 
     def choices(self):
         #TODO blackboard.tool_for_block - choose minimal tool for block
@@ -783,7 +779,6 @@ class MoveTo(BTAction):
         self.was_at_target = False
         self.hold_position_flag = False
         self.name = 'move to %s' % str(self.target_coords)
-        #log.msg(self.name)
 
     def _check_status(self, b_obj):
         gs = GridSpace(self.blackboard.grid)
@@ -847,7 +842,6 @@ class PeekAtPlayer(BTAction):
         super(PeekAtPlayer, self).__init__(**kwargs)
         self.player = player
         self.name = 'peek at player %s' % player.username
-        #log.msg(self.name)
 
     def on_start(self):
         self.blackboard.bot_turn_to_point(self.blackboard.bot_object, self.player.position_eyelevel)
@@ -917,10 +911,8 @@ class InventorySelect(BTAction):
                         "action_number": self.blackboard.inventory_transaction_counter_inc,
                         "hold_shift": False,
                         "slotdata": self.blackboard.itemstack_as_slotdata(itemstack=self.itemstack)}
-                #log.msg("pass 1 %s" % str(data))
                 self.blackboard.send_packet("click window", data)
                 confirmed = yield self.blackboard.inventory_get_confirmation(self.blackboard.inventory_transaction_counter)
-                #log.msg("got confirmation %s" % confirmed)
                 if not confirmed:
                     log.msg("bad news, inventory transaction not confirmed by the server on pass 1")
                     self.status = Status.failure
@@ -932,7 +924,6 @@ class InventorySelect(BTAction):
                 data["action_number"] = self.blackboard.inventory_transaction_counter_inc
                 dest_item = self.blackboard.inventory_item_at_slot(desc_slotnumber)
                 data["slotdata"] = self.blackboard.itemstack_as_slotdata(itemstack=dest_item)
-                #log.msg("pass 2 %s" % str(data))
                 self.blackboard.send_packet("click window", data)
                 confirmed = yield self.blackboard.inventory_get_confirmation(self.blackboard.inventory_transaction_counter)
                 if not confirmed:
@@ -946,7 +937,6 @@ class InventorySelect(BTAction):
                     fin_item = self.blackboard.inventory_item_at_slot(slot_position)
                     # if fin_item is not None, we picked up something, and it will be dropped on inventory close
                     data["slotdata"] = self.blackboard.itemstack_as_slotdata(itemstack=fin_item)
-                    #log.msg("pass 3 %s" % str(data))
                     self.blackboard.send_packet("click window", data)
                     confirmed = yield self.blackboard.inventory_get_confirmation(self.blackboard.inventory_transaction_counter)
                     if not confirmed:
