@@ -317,4 +317,4 @@ class Entities(object):
             slotdata = metadata[10].value
             istack = items.ItemStack.from_slotdata(slotdata)
             entity.itemstack = istack
-            log.msg("META %s itemstack %s" % (entity, istack))
+            #log.msg("META %s itemstack %s" % (entity, istack))

@@ -123,8 +123,7 @@ class MineCraftProtocol(Protocol):
         parsed_packets, self.leftover = parse_packets(
             self.leftover + bytestream)
         if config.DEBUG:
-            packet_printout(
-                "SERVER", parsed_packets, self.encryption_on, self.leftover)
+            packet_printout("SERVER", parsed_packets, self.encryption_on, self.leftover)
         self.packets.extend(parsed_packets)
         self.packet_iter(self.packets)
 
@@ -349,8 +348,7 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_confirm_transaction(self, c):
-        #TODO for inventory
-        pass
+        self.world.inventories.confirm_transaction(window_id=c.window_id, action_number=c.action_number, acknowledged=c.acknowledged)
 
     def p_sign(self, c):
         self.world.sign_waypoints.on_new_sign(c.x, c.y, c.z, c.line1, c.line2, c.line3, c.line4)
@@ -369,7 +367,7 @@ class MineCraftProtocol(Protocol):
     def p_players(self, c):
         if c.online:
             self.world.players[c.name] = c.ping
-            log.msg('%s ping %d' % (c.name, c.ping))
+            #log.msg('%s ping %d' % (c.name, c.ping))
         else:
             try:
                 del self.world.players[c.name]

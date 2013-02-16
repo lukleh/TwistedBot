@@ -157,6 +157,7 @@ class Chat(object):
                 elif what == "inventory":
                     for slot_id, item in self.world.inventories.player_inventory.slot_items():
                         self.send_chat_message("slot %d %s" % (slot_id, item))
+                        #log.msg("slot %d %s" % (slot_id, item))
                 elif what == "cursor":
                     self.world.bot.behavior_tree.new_command(bt.ShowPlayerCursor)
                 else:
@@ -166,11 +167,16 @@ class Chat(object):
         elif verb == "debug":
             if subject:
                 what = subject[0]
-                if what == "InventorySelect":
-                    sign_name = " ".join(subject[1:])
-                    if not sign_name:
+                if what == "inventoryselect":
+                    item_name = " ".join(subject[1:])
+                    if not item_name:
                         self.send_chat_message("specify item")
                         return
+                    itemstack = bt.InventorySelect.parse_parameters(item_name)
+                    if itemstack is not None:
+                        self.world.bot.behavior_tree.new_command(bt.InventorySelect, itemstack=itemstack)
+                    else:
+                        self.send_chat_message("unknown item %s" % item_name)
                 else:
                     self.send_chat_message("I can show only signs now")
             else:

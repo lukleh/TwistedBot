@@ -1147,9 +1147,11 @@ class ItemStack(object):
         self.meta = meta
         self.count = count
         self.common = common
+        self.nbt = nbt
 
     @classmethod
     def from_slotdata(cls, slotdata):
+        #log.msg(slotdata)
         if slotdata.id >= 0:
             return cls(slotdata.id, slotdata.damage, count=slotdata.count, nbt=slotdata.data)
         else:
@@ -1162,13 +1164,12 @@ class ItemStack(object):
     def __eq__(self, istack):
         return self.is_same(istack) and istack.is_same(self)
 
-    def __str__(self):
-        return self.__repr__()
-
     def __repr__(self):
         return "%s:%d:%d:%d%s" % (self.name, self.number, self.meta, self.count, ":C" if self.common else "")
 
     def is_same(self, istack):
+        if istack is None:
+            return False
         if self.common:
             return self.number == istack.number
         if self.item.has_subtypes:

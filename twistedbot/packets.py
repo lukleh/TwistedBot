@@ -131,6 +131,25 @@ slotdata = Struct("slotdata",
                      )
                   )
 
+def itemstack_as_slotdata(itemstack):
+  if itemstack is None:
+    data = {'id':-1}
+  else:
+    data = {'id': itemstack.number,
+            'count': itemstack.count,
+            'damage': itemstack.meta}
+    if itemstack.nbt is None:
+      data['size'] = -1
+      data['data'] = None
+    else:
+      nbt = itemstack.nbt
+      f = StringIO()
+      nbt.save(f)
+      nbt_data = f.getvalue()
+      data['size'] = len(nbt_data)
+      data['data'] = nbt_data
+  return Container(**data)
+
 
 Metadata = namedtuple("Metadata", "type value")
 metadata_types = ["byte", "short", "int", "float", "string16", "slotdata",
@@ -538,7 +557,7 @@ packets = {
                 SBInt8("window_id"),
                 SBInt16("slot"),
                 SBInt8("mouse_button"),
-                SBInt16("token"),
+                SBInt16("action_number"),
                 Bool("hold_shift"),
                 slotdata,
                 ),
@@ -559,7 +578,7 @@ packets = {
                 ),
     106: Struct("confirm transaction",
                 SBInt8("window_id"),
-                SBInt16("token"),
+                SBInt16("action_number"),
                 Bool("acknowledged"),
                 ),
     107: Struct("creative inventory action ",

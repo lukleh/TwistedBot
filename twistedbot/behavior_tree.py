@@ -9,6 +9,7 @@ import logbot
 import utils
 import fops
 import dig
+import packets
 from pathfinding import AStarBBCol, AStarCoords
 from gridspace import GridSpace
 
@@ -35,6 +36,7 @@ class BlackBoard(object):
         self._bot = manager.bot
 
     def setup(self):
+        self._inventory_transaction_counter = 1
         self.last_look_at_block = None
         self.recipes_for_item = recipes.recipes_db.recipes_for_item
         self.get_entity = self._world.entities.get_entity
@@ -56,9 +58,30 @@ class BlackBoard(object):
         self.bot_turn_to_point = self._bot.turn_to_point
         self.bot_turn_to_vector = self._bot.turn_to_vector
         self.bot_turn_to_direction = self._bot.turn_to_direction
+        self.inventory_has_item = self._world.inventories.player_inventory.has_item
+        self.inventory_is_holding_item = self._world.inventories.player_inventory.is_holding_item
+        self.inventory_item_holding_position = self._world.inventories.player_inventory.item_holding_position
+        self.inventory_set_holding_position = self._world.inventories.player_inventory.holding_position
+        self.inventory_slot_at_item = self._world.inventories.player_inventory.slot_at_item
+        self.inventory_item_at_slot = self._world.inventories.player_inventory.item_at_slot
+        self.inventory_get_confirmation = self._world.inventories.get_confirmation
+        self.inventory_choose_holding_slot = self._world.inventories.choose_holding_slot
+        self.inventory_set_slot = self._world.inventories.player_inventory.set_slot
+        self.inventory_active_position = self._world.inventories.player_inventory.active_slot
+        self.itemstack_as_slotdata = packets.itemstack_as_slotdata
+        self.send_packet = self._world.send_packet
 
     def add_subbehavior(self, behavior):
         self._manager.bqueue.append(behavior)
+
+    @property
+    def inventory_transaction_counter_inc(self):
+        self._inventory_transaction_counter += 1
+        return self._inventory_transaction_counter
+
+    @property
+    def inventory_transaction_counter(self):
+        return self._inventory_transaction_counter
 
     @property
     def world_current_tick(self):
@@ -303,14 +326,14 @@ class BTAction(BTbase):
     def on_end(self):
         pass
 
-    #@inlineCallbacks
+    @inlineCallbacks
     def tick(self):
         if not self.action_started:
             self.on_start()
             self.action_started = True
             if self.status != Status.running:
                 return
-        self.action()
+        yield self.action()
         if self.status != Status.running:
             self.on_end()
         self.duration_ticks += 1
@@ -636,12 +659,12 @@ class CollectMine(BTSequencer):
 
     def is_valid(self):
         #TODO blackboard.has_tool_for go through inventory and check if any tool applies
-        return self.blackboard.has_tool_for(self.recipe.block) and self.blocks_around
+        return self.blackboard.inventory_has_tool_for(self.recipe.block) and self.blocks_around
 
     def setup(self):
         #TODO blackboard.blocks_around  - find first X blocks, no max distance
         self.blocks_around = self.blackboard.blocks_around(self.blackboard.bot_object.position, self.recipe.block, self.recipe.block_filter)
-        self.mine_tool = self.blackboard.has_tool_for(self.recipe.block)
+        self.mine_tool = self.blackboard.inventory_has_tool_for(self.recipe.block)
 
     def choices(self):
         #TODO blackboard.tool_for_block - choose minimal tool for block
@@ -823,7 +846,6 @@ class PeekAtPlayer(BTAction):
     def __init__(self, player=None, **kwargs):
         super(PeekAtPlayer, self).__init__(**kwargs)
         self.player = player
-        self.duration_ticks = 1
         self.name = 'peek at player %s' % player.username
         #log.msg(self.name)
 
@@ -860,41 +882,89 @@ class ShowCursor(BTAction):
 
 class InventorySelect(BTAction):
     def __init__(self, itemstack=None, **kwargs):
-        super(DigBlock, self).__init__(**kwargs)
+        super(InventorySelect, self).__init__(**kwargs)
         self.itemstack = itemstack
         self.name = "hold item %s" % self.itemstack
 
+    @classmethod
+    def parse_parameters(cls, itemname):
+        try:
+            istack = items.item_db.item_by_name(itemname)
+        except KeyError:
+            istack = None
+        return istack
+
+    @inlineCallbacks
     def action(self):
-        if self.blackboard.holding_item(self.itemstack):
+        if not self.blackboard.inventory_has_item(self.itemstack):
+            self.status = Status.failure
+            self.blackboard.send_chat_message("don't have %s in my inventory" % self.itemstack.name)
+            return
+        if self.blackboard.inventory_is_holding_item(self.itemstack):
             self.status = Status.success
         else:
-            held_position = self.blackboard.holding_position(self.itemstack)
+            held_position = self.blackboard.inventory_item_holding_position(self.itemstack)
             if held_position is not None:
                 self.blackboard.send_packet("held item change", {"active_slot": held_position})
-                self.blackboard.set_holding_position(held_position)
+                self.blackboard.inventory_set_holding_position(held_position)
                 self.status = Status.success
             else:
-                slot_position = self.blackboard.slot_position(self.itemstack)
+                slot_position = self.blackboard.inventory_slot_at_item(self.itemstack)
+                self.itemstack = self.blackboard.inventory_item_at_slot(slot_position)
                 data = {"window_id": 0,
                         "slot": slot_position,
                         "mouse_button": 0,
-                        "action_number": self.blackboard.inventory_transaction_counter,
+                        "action_number": self.blackboard.inventory_transaction_counter_inc,
                         "hold_shift": False,
-                        "slotdata": packets.itemstack_as_slotdata(self.itemstack)}
+                        "slotdata": self.blackboard.itemstack_as_slotdata(itemstack=self.itemstack)}
+                #log.msg("pass 1 %s" % str(data))
                 self.blackboard.send_packet("click window", data)
-                # receive 'confirm transaction(106)' ?
-                # wait for 'set slot(103)'
-                data["slot"] = self.blackboard.holding_position_as_slot(8)
-                data["action_number"] = self.blackboard.inventory_transaction_counter
+                confirmed = yield self.blackboard.inventory_get_confirmation(self.blackboard.inventory_transaction_counter)
+                #log.msg("got confirmation %s" % confirmed)
+                if not confirmed:
+                    log.msg("bad news, inventory transaction not confirmed by the server on pass 1")
+                    self.status = Status.failure
+                    return
+                #TODO check when item is picked up, it can fill the slot
+                self.blackboard.inventory_set_slot(slot_position, None)
+                desc_slotnumber = self.blackboard.inventory_choose_holding_slot()
+                data["slot"] = desc_slotnumber
+                data["action_number"] = self.blackboard.inventory_transaction_counter_inc
+                dest_item = self.blackboard.inventory_item_at_slot(desc_slotnumber)
+                data["slotdata"] = self.blackboard.itemstack_as_slotdata(itemstack=dest_item)
+                #log.msg("pass 2 %s" % str(data))
                 self.blackboard.send_packet("click window", data)
-                # receive 'confirm transaction(106)' ?
-                # wait for 'set slot(103)'
-                data["slot"] = slot_position
-                data["action_number"] = self.blackboard.inventory_transaction_counter
-                self.blackboard.send_packet("click window", data)
-                # receive 'confirm transaction(106)' ?
-                self.blackboard.send_packet("close window", {"window_id": 0})
+                confirmed = yield self.blackboard.inventory_get_confirmation(self.blackboard.inventory_transaction_counter)
+                if not confirmed:
+                    log.msg("bad news, inventory transaction not confirmed by the server on pass 2")
+                    self.status = Status.failure
+                    return
+                self.blackboard.inventory_set_slot(desc_slotnumber, self.itemstack)
+                if dest_item is not None:
+                    data["slot"] = slot_position
+                    data["action_number"] = self.blackboard.inventory_transaction_counter_inc
+                    fin_item = self.blackboard.inventory_item_at_slot(slot_position)
+                    # if fin_item is not None, we picked up something, and it will be dropped on inventory close
+                    data["slotdata"] = self.blackboard.itemstack_as_slotdata(itemstack=fin_item)
+                    #log.msg("pass 3 %s" % str(data))
+                    self.blackboard.send_packet("click window", data)
+                    confirmed = yield self.blackboard.inventory_get_confirmation(self.blackboard.inventory_transaction_counter)
+                    if not confirmed:
+                        log.msg("bad news, inventory transaction not confirmed by the server on pass 3")
+                        self.status = Status.failure
+                        return
+                    self.blackboard.inventory_set_slot(slot_position, dest_item)
                 self.status = Status.success
+
+    def on_end(self):
+        """ make sure the item is on active slot and close the inventory """
+        if self.status == Status.success:
+            held_position = self.blackboard.inventory_item_holding_position(self.itemstack)
+            if self.blackboard.inventory_active_position != held_position:
+                self.blackboard.send_packet("held item change", {"active_slot": held_position})
+                self.blackboard.inventory_set_holding_position(held_position)
+            self.blackboard.send_chat_message("holding %s" % self.itemstack.name)
+        self.blackboard.send_packet("close window", {"window_id": 0})
 
 
 class WaitForDrop(BTAction):
