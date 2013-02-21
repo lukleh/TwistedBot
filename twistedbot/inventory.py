@@ -1,5 +1,6 @@
 
 import random
+from collections import defaultdict
 
 from twisted.internet.defer import Deferred
 
@@ -12,16 +13,42 @@ log = logbot.getlogger("INVENTORY")
 
 
 class InvetoryBase(object):
-    def __init__(self):
-        self.slots = [None for _ in xrange(self.extra_slots + 36)]
+    base_slots = 36
+
+    def __init__(self, extra_slots, window_id, inventory_container):
+        self.extra_slots = extra_slots + 1
+        self.window_id = window_id
+        self.inventory_container = inventory_container
+        self.slots = [None for _ in xrange(self.extra_slots + self.base_slots)]
+
+    def __repr__(self):
+        return self.__class__.__name__
+
+    def close_window(self):
+        self.inventory_container.close_window()
 
     def set_slot(self, position, itemstack):
         self.slots[position] = itemstack
 
+    def store_slots(self):
+        for i in xrange(self.extra_slots, len(self.slots)):
+            slot = i + self.extra_slots
+            yield slot, self.slots[slot]
+
+    def slot_for(self, itemstack):
+        for position, slot_itemstack in self.store_slots():
+            if slot_itemstack is None:
+                return position
+            if itemstack.is_same(slot_itemstack, ignore_common=True):
+                if slot_itemstack.stacksize > itemstack.count:
+                    return position
+        else:
+            return None
+
     def slot_items(self):
-        for i in xrange(self.extra_slots):
-            if self.slots[i] is not None:
-                yield i, self.slots[i]
+        for i, itemstack in enumerate(self.slots):
+            if itemstack is not None:
+                yield i, itemstack
 
     def has_item(self, itemstack):
         for slot in self.slots:
@@ -40,95 +67,133 @@ class InvetoryBase(object):
     def item_at_slot(self, slot):
         return self.slots[slot]
 
+    def has_item_count(self, itemstack):
+        count = itemstack.count
+        for _, slot_itemstack in self.slot_items():
+            if itemstack.is_same(slot_itemstack):
+                count -= slot_itemstack.count
+                if count <= 0:
+                    return True
+        else:
+            return False
+
+    def has_space_for(self, itemstack):
+        count = itemstack.count
+        for i, slot_itemstack in self.store_slots():
+            if slot_itemstack is None:
+                return True
+            if itemstack.common:
+                continue
+            if itemstack.is_same(slot_itemstack):
+                count = count - (itemstack.stacksize - slot_itemstack.count)
+                if count <= 0:
+                    return True
+        else:
+            return False
+
 
 class PlayerInventory(InvetoryBase):
-    extra_slots = 9
+    extra_slots = 8
+    crafted_slot = 0
 
-    def __init__(self):
-        super(PlayerInventory, self).__init__()
+    def __init__(self, **kwargs):
+        super(PlayerInventory, self).__init__(extra_slots=self.extra_slots, window_id=0, **kwargs)
         self.active_slot = None
 
-    def holding_possition_as_slot(self, i):
-        return 36 + i
+    def active_possition_as_slot(self, i):
+        return self.base_slots + i
 
-    def slot_items(self):
-        for i, itemstack in enumerate(self.slots):
-            if itemstack is not None:
-                yield i, itemstack
-
-    def is_holding_item(self, item):
-        slot_number = self.holding_possition_as_slot(self.active_slot)
+    def is_item_active(self, item):
+        slot_number = self.active_possition_as_slot(self.active_slot)
         return item.is_same(self.slots[slot_number])
 
-    def item_holding_position(self, item):
+    def active_item(self):
+        return self.slots[self.active_possition_as_slot(self.active_slot)]
+
+    def item_at_active_slot(self, item):
         for i in xrange(9):
-            slot = self.holding_possition_as_slot(i)
+            slot = self.active_possition_as_slot(i)
             if item.is_same(self.slots[slot]):
                 return i
         else:
             return None
 
-    def holding_position(self, i):
+    def active_position(self, i):
         self.active_slot = i
+
+    def choose_active_slot(self):
+        return random.randint(0, 8)
+
+    def crafting_offset_as_slot(self, offset):
+        return 1 + offset
 
 
 class CraftingTable(InvetoryBase):
-    extra_slots = 10
+    crafted_slot = 0
+
+    def crafting_offset_as_slot(self, offset):
+        return 1 + offset
 
 
 class Chest(InvetoryBase):
-    extra_slots = 27
-
-
-class LargeChest(InvetoryBase):
-    extra_slots = 54
+    """
+    small chest 27 extra slots
+    large chest 54 extra slots
+    """
+    def __init__(self, **kwargs):
+        super(Chest, self).__init__(**kwargs)
 
 
 class Furnace(InvetoryBase):
-    extra_slots = 3
+    pass
 
 
 class Dispenser(InvetoryBase):
-    extra_slots = 9
+    pass
 
 
 class EnchantmentTable(InvetoryBase):
-    extra_slots = 1
+    pass
 
 
 class InvetoryContainer(object):
-    inventory_types = [LargeChest, CraftingTable, Furnace, Dispenser, EnchantmentTable]
+    inventory_types = [Chest, CraftingTable, Furnace, Dispenser, EnchantmentTable]
 
-    def __init__(self):
-        self.player_inventory = PlayerInventory()
-        self.container = {0: self.player_inventory}
-        self.holding_item = None
+    def __init__(self, world):
+        self.world = world
+        self.player_inventory = PlayerInventory(inventory_container=self)
+        self.cursor_item = None
         self.opened_window = None
         self.on_confirmation = None
+        self.on_openwindow = None
+        self.item_collected_count = defaultdict(int)
 
     def open_window(self, window_id=None, window_type=None, extra_slots=None):
-        if window_id not in self.container:
-            self.container[window_id] = self.inventory_types[window_type]()
-        self.opened_window = self.container[window_id]
+        log.msg("open window %d %d %d" % (window_id, window_type, extra_slots))
+        self.opened_window = self.inventory_types[window_type](extra_slots=extra_slots, window_id=window_id, inventory_container=self)
 
     def close_window(self, window_id=None):
         self.opened_window = None
 
-    def click_window(self, window_id=None, slot_id=None, mouse_button=None, token=None, hold_shift=None, slotdata=None):
-        pass
-
     def set_slot(self, window_id=None, slot_id=None, slotdata=None):
         itemstack = items.ItemStack.from_slotdata(slotdata)
+        log.msg('set slot %d with %s' % (slot_id, itemstack))
         if window_id == -1 and slot_id == -1:
-            self.holding_item = itemstack
+            self.cursor_item = itemstack
+        elif window_id == 0:
+            self.player_inventory.set_slot(slot_id, itemstack)
         else:
-            self.container[window_id].set_slot(slot_id, itemstack)
+            self.opened_window.set_slot(slot_id, itemstack)
 
     def set_slots(self, window_id=None, slotdata_list=None):
-        inv = self.container[window_id]
+        log.msg('received %d items for window_id %d %s' % (len(slotdata_list), window_id, str(["%d-%s" % (i, items.ItemStack.from_slotdata(slotdata)) for i, slotdata in enumerate(slotdata_list)])))
+        inv = self.player_inventory if window_id == 0 else self.opened_window
         for slot_id, slotdata in enumerate(slotdata_list):
             itemstack = items.ItemStack.from_slotdata(slotdata)
             inv.set_slot(slot_id, itemstack)
+        if self.on_openwindow is not None:
+            utils.do_now(self.on_openwindow.d.callback, self.opened_window)
+            self.on_openwindow = None
 
     def active_slot_change(self, sid):
         log.msg("active slot changed to %d" % sid)
@@ -140,19 +205,35 @@ class InvetoryContainer(object):
             utils.do_now(self.on_confirmation.d.callback, self.on_confirmation.confirmed)
             self.on_confirmation = None
 
+    def collect_action(self, collected_eid=None, collector_eid=None):
+        if self.world.bot.eid == collector_eid:  # it's me picking up item
+            ent = self.world.entities.get_entity(collected_eid)
+            itemstack = ent.itemstack
+            self.item_collected_count[itemstack.name] += itemstack.count
+            log.msg("collected %s" % itemstack)
+
     def get_confirmation(self, action_number=None, window_id=0):
         con = Confirmation(action_number=action_number, window_id=window_id)
-        con.d = Deferred()
         self.on_confirmation = con
         return con.d
 
-    def choose_holding_slot(self):
-        return self.player_inventory.holding_possition_as_slot(random.randint(0, 8))
+    def get_open_window(self):
+        ow = OpenWindow()
+        self.on_openwindow = ow
+        return ow.d
+
+    def get_item_collected_count(self, itemstack):
+        return self.item_collected_count[itemstack.name]
+
+
+class OpenWindow(object):
+    def __init__(self):
+        self.d = Deferred()
 
 
 class Confirmation(object):
     def __init__(self, window_id=0, action_number=None):
-        self.d = None
+        self.d = Deferred()
         self.window_id = window_id
         self.action_number = action_number
         self.confirmed = False

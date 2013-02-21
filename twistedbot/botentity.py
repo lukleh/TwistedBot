@@ -149,7 +149,6 @@ class BotEntity(object):
                                           stance=b_obj.stance),
             "orientation": packets.Container(yaw=b_obj.yaw, pitch=b_obj.pitch),
             "grounded": packets.Container(grounded=b_obj.on_ground)})
-        #print "send", packets.Container(yaw=b_obj.yaw, pitch=b_obj.pitch)
 
     def send_action(self, b_obj):
         """

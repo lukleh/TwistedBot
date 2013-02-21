@@ -72,7 +72,6 @@ class MineCraftProtocol(Protocol):
             71: self.p_thunderbolt,
             100: self.p_open_window,
             101: self.p_close_window,
-            102: self.p_click_window,
             103: self.p_window_slot,
             104: self.p_inventory,
             105: self.p_update_window_property,
@@ -216,13 +215,7 @@ class MineCraftProtocol(Protocol):
                                           pitch=c.pitch, x=c.x, y=c.y, z=c.z)
 
     def p_collect(self, c):
-        """
-        this could be used to to check (among other signals),
-        if we are picking up itemstack we want
-        c.collected_eid
-        c.collector_eid
-        """
-        pass
+        self.world.inventories.collect_action(collected_eid=c.collected_eid, collector_eid=c.collector_eid)
 
     def p_spawn_objectvehicle(self, c):
         vel = {"x": c.velocity.x,
@@ -333,9 +326,6 @@ class MineCraftProtocol(Protocol):
 
     def p_close_window(self, c):
         self.world.inventories.close_window(window_id=c.window_id)
-
-    def p_click_window(self, c):
-        self.world.inventories.click_window(window_id=c.window_id, slot_id=c.slot, mouse_button=c.mouse_button, token=c.token, hold_shift=c.hold_shift, slotdata=c.slotdata)
 
     def p_window_slot(self, c):
         self.world.inventories.set_slot(window_id=c.window_id, slot_id=c.slot, slotdata=c.slotdata)

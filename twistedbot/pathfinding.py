@@ -122,6 +122,19 @@ class AStarCoords(object):
             raise
 
 
+class AStarMultiCoords(AStarCoords):
+    def __init__(self, multiple_goals=None, **kwargs):
+        self.multiple_goals = [PathNode(g) for g in multiple_goals]
+        super(AStarMultiCoords, self).__init__(**kwargs)
+
+    def is_goal(self, current):
+        for g in self.multiple_goals:
+            if current == g:
+                return True
+        else:
+            return False
+
+
 class AStarBBCol(AStarCoords):
     def __init__(self, bb=None, **kwargs):
         self.bb = bb

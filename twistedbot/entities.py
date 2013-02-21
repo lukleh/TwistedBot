@@ -152,7 +152,7 @@ class Entities(object):
         self.snap_entity2grid = {}
         self.snap_grid2entity = collections.defaultdict(set)
 
-    def in_distance(self, coords, distance=159):
+    def entities_in_distance(self, coords, distance=159):
         center_section = (coords / 16.0).grid_shift()
         for crd in utils.grid_sections_around(center_section, distance=distance / 16 + 1):
             if crd in self.snap_grid2entity:
@@ -214,7 +214,7 @@ class Entities(object):
             if entity.is_bot:
                 # server is trying to change my parameters, like velocity, and I can ignore it :)
                 pass
-            fn(self, entity, **kwargs)
+            fn(self, entity, eid=eid, **kwargs)
             self.maybe_commander(entity)
         return f
 

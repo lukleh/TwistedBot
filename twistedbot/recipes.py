@@ -16,7 +16,7 @@ class RecipeMetaClass(type):
         cls = super(RecipeMetaClass, meta).__new__(meta, name, bases, dct)
         if hasattr(cls, 'name'):
             cls.resources = []
-            cls.itemstack = items.item_db.item_by_name(cls.name)
+            cls.itemstack = items.item_db.item_by_name(cls.name, count=cls.count)
             if issubclass(cls, MineBluePrint):
                 cls.block = blocks.block_map[cls.block]
                 recipes_count["mine"] += 1
@@ -32,11 +32,21 @@ class RecipeMetaClass(type):
                         raise Exception("Bad blueprint plan %s %s" % (cls.name, cls))
                     if len(cls.plan[0]) == 1:
                         raise Exception("Bad blueprint plan %s %s" % (cls.name, cls))
-                    cls.plan = map(lambda mark: items.item_db.item_by_name(cls.parts[mark]) if mark in cls.parts else None, "".join(cls.plan))
+                    cls.plan = map(lambda mark: items.item_db.item_by_name(cls.parts[mark]) if mark != " " else None, "".join(cls.plan))
                 elif cls.parts is not None:
                     cls.need_bench = len(cls.parts) > 4
                     cls.plan = [items.item_db.item_by_name(name) for name in cls.parts]
-                cls.resources = [istack for istack in cls.plan if istack is not None]
+                else:
+                    raise Exception("Bad blueprint no plan or parts %s %s" % (cls.name, cls))
+                for istack in cls.plan:
+                    if istack is None:
+                        continue
+                    for rstack in cls.resources:
+                        if rstack.is_same(istack):
+                            rstack.inc_count(1)
+                            break
+                    else:
+                        cls.resources.append(istack)
             cls.is_obtainable = cls.mine_recipe or cls.craft_recipe or cls.smelt_recipe or cls.brew_recipe or cls.mobkill_recipe
             if cls.name not in recipe_map:
                 recipe_map[cls.name] = [cls]
@@ -55,6 +65,7 @@ class BluePrint(object):
     craft_recipe = False
     brew_recipe = False
     mobkill_recipe = False
+    count = 1
 
 
 class MineBluePrint(BluePrint):
@@ -74,7 +85,6 @@ class CraftBluePrint(BluePrint):
     need_bench = False
     plan = None
     parts = None
-    count = 1
 
 
 class Cobblestone_stone(MineBluePrint):

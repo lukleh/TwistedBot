@@ -25,7 +25,7 @@ class Chunk(object):
         self.z = coords[1]
         self.grid_x = self.x << 4
         self.grid_z = self.z << 4
-        self.blocks = [None for _ in xrange(self.levels)]
+        self.block_types = [None for _ in xrange(self.levels)]
         self.meta = [None for _ in xrange(self.levels)]
         self.block_light = []  # ignore block light
         self.sky_light = []  # ifnore sky light
@@ -47,7 +47,7 @@ class Chunk(object):
             return self.meta[level][pos / 2] >> 4
 
     def __repr__(self):
-        return "%s %s %s" % (str(self.coords), self.complete, [i if i is None else 1 for i in self.blocks])
+        return "%s %s %s" % (str(self.coords), self.complete, [i if i is None else 1 for i in self.block_types])
 
 
 class Grid(object):
@@ -78,7 +78,7 @@ class Grid(object):
         if chunk is None:
             return self.make_block(x, y, z, 0, 0)
         y_level = y >> 4
-        block_types = chunk.blocks[y_level]
+        block_types = chunk.block_types[y_level]
         if block_types is None:
             return self.make_block(x, y, z, 0, 0)
         cx = x & 15
@@ -115,7 +115,7 @@ class Grid(object):
             if primary_bit & (1 << i):
                 data_str = data.read(4096)
                 ndata = array.array('B', data_str)  # y, z, x
-                chunk.blocks[i] = ndata
+                chunk.block_types[i] = ndata
         for i in xrange(chunk.levels):
             if primary_bit & (1 << i):
                 data_str = data.read(2048)
@@ -163,7 +163,7 @@ class Grid(object):
         else:
             chunk = self.get_chunk((chunk_x, chunk_z))
         y_level = y >> 4
-        if chunk.blocks[y_level] is None:
+        if chunk.block_types[y_level] is None:
             return None, None
         current_block = self.get_block(x, y, z)
         if current_block is None:
@@ -173,7 +173,7 @@ class Grid(object):
         cy = y & 15
         cz = z & 15
         pos = self.chunk_array_position(cx, cy, cz)
-        chunk.blocks[y_level][pos] = block_type
+        chunk.block_types[y_level][pos] = block_type
         chunk.set_meta(y_level, pos, meta)
         new_block = self.make_block(x, y, z, block_type, meta)
         return current_block, new_block
@@ -293,6 +293,38 @@ class Grid(object):
             return eye_y < (ey + 1 - wh)
         else:
             return False
+
+    def grid_column_around(self, center, distance):
+        min_x = center.x - distance
+        max_x = center.x + distance + 1
+        min_z = center.z - distance
+        max_z = center.z + distance + 1
+        for x in xrange(min_x, max_x):
+            for z in xrange(min_z, max_z):
+                yield (x, z)
+
+    def blocks_in_distance(self, coords, block_number=None, block_filter=None, distance=160):
+        center_section = (coords / 16.0).grid_shift()
+        for chunk_crd in self.grid_column_around(center_section, distance=distance / 16 + 1):
+            chunk = self.get_chunk(chunk_crd)
+            if chunk is None:
+                continue
+            for level, block_types in enumerate(chunk.block_types):
+                if block_types is None:
+                    continue
+                if block_types.count(block_number) > 0:
+                    for pos, block_id in enumerate(block_types):
+                        if block_id == block_number:
+                            meta = chunk.get_meta(level, pos)
+                            if block_filter is not None and not block_filter(meta):
+                                continue
+                            cx = pos & 15
+                            cz = (pos >> 4) & 15
+                            cy = pos / 256
+                            x = cx + chunk_crd[0] * 16
+                            y = cy + level * 16
+                            z = cz + chunk_crd[1] * 16
+                            yield self.make_block(x, y, z, block_number, meta)
 
     def raycast_to_block(self, position, direction, max_distance=40):
         g_position = position.grid_shift()

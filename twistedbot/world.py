@@ -41,7 +41,7 @@ class World(object):
         self.protocol = None
         self.factory = None
         self.entities = None
-        self.inventories = inventory.InvetoryContainer()
+        self.inventories = inventory.InvetoryContainer(self)
         self.grid = None
         self.sign_waypoints = None
         self.dimension = None

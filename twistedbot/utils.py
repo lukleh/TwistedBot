@@ -88,8 +88,8 @@ def grid_sections_around(center, distance):
     min_z = center.z - distance
     max_z = center.z + distance + 1
     for x in xrange(min_x, max_x):
-        for y in xrange(min_y, max_y):
-            for z in xrange(min_z, max_z):
+        for z in xrange(min_z, max_z):
+            for y in xrange(min_y, max_y):
                 yield Vector(x, y, z)
 
 

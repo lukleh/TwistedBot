@@ -69,6 +69,18 @@ class GridSpace(object):
             self.cache[t_coords] = state
             return state
 
+    def positions_to_dig(self, coords):
+        center = utils.Vector(coords.x, coords.y - 1, coords.z)
+        for x in xrange(-5, 6):
+            for y in xrange(-5, 6):
+                for z in xrange(-5, 6):
+                    spow = x ** 2 + y ** 2 + z ** 2
+                    if spow > 25:
+                        continue
+                    state = self.get_state(center.x + x, center.y + y, center.z + z)
+                    if state.can_stand:
+                        yield utils.Vector(center.x + x, center.y + y, center.z + z)
+
     def neighbours_of(self, coords, go_fire=False):
         x = coords.x
         y = coords.y

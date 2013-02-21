@@ -1143,11 +1143,45 @@ class ItemStack(object):
 
     def __init__(self, item_id, meta=0, count=1, common=False, nbt=None):
         self.item = self.item_list[item_id]
-        self.number = item_id
-        self.meta = meta
-        self.count = count
-        self.common = common
-        self.nbt = nbt
+        self._number = item_id
+        self._meta = meta
+        self._count = count
+        self._common = common
+        self._nbt = nbt
+
+    @property
+    def number(self):
+        return self._number
+
+    @property
+    def meta(self):
+        return self._meta
+
+    @property
+    def count(self):
+        return self._count
+
+    @property
+    def common(self):
+        return self._common
+
+    @property
+    def nbt(self):
+        return self._nbt
+
+    def inc_count(self, i):
+        self._count += i
+
+    def copy(self, count=None):
+        if count is None:
+            count = self.count
+        elif count < 1:
+            return None
+        return ItemStack(item_id=self.number, meta=self.meta, count=count, common=self.common, nbt=self.nbt)
+
+    @property
+    def stacksize(self):
+        return self.item.stacksize
 
     @classmethod
     def from_slotdata(cls, slotdata):
@@ -1166,10 +1200,10 @@ class ItemStack(object):
     def __repr__(self):
         return "%s:%d:%d:%d%s" % (self.name, self.number, self.meta, self.count, ":C" if self.common else "")
 
-    def is_same(self, istack):
+    def is_same(self, istack, ignore_common=False):
         if istack is None:
             return False
-        if self.common:
+        if not ignore_common and self.common:
             return self.number == istack.number
         if self.item.has_subtypes:
             return self.number == istack.number and self.meta == istack.meta
@@ -1214,8 +1248,8 @@ class ItemDB(object):
     def slot_empty(self, number):
         return self.item_list[number] is None
 
-    def item_by_name(self, name):
-        return self.item_names_map[name]
+    def item_by_name(self, name, count=None):
+        return self.item_names_map[name].copy(count=count)
 
     def needs_tool_for(self, block_cls):
         """ dummy for now """

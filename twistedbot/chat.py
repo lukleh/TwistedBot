@@ -125,7 +125,6 @@ class Chat(object):
                 if count < 1:
                     self.send_chat_message("amount has to be bigger that zero" % itemstack.name)
                     return
-                itemstack.count = count
                 self.world.bot.behavior_tree.new_command(bt.CollectResources, itemstack=itemstack)
             else:
                 self.send_chat_message("collect what?")
@@ -155,14 +154,27 @@ class Chat(object):
                     for sign in self.world.sign_waypoints.ordered_sign_groups[sign_name].iter():
                         self.send_chat_message(str(sign))
                 elif what == "inventory":
-                    for slot_id, item in self.world.inventories.player_inventory.slot_items():
-                        self.send_chat_message("slot %d %s" % (slot_id, item))
+                    content = [i for i in self.world.inventories.player_inventory.slot_items()]
+                    if content:
+                        for slot_id, item in content:
+                            self.send_chat_message("slot %d %s" % (slot_id, item))
+                    else:
+                        self.send_chat_message("inventory is empty")
                 elif what == "cursor":
                     self.world.bot.behavior_tree.new_command(bt.ShowPlayerCursor)
                 else:
-                    self.send_chat_message("I can show only signs now")
+                    self.send_chat_message("I can show sign, inventory and cursor")
             else:
                 self.send_chat_message("show what?")
+        elif verb == "drop":
+            if subject:
+                what = subject[0]
+                if what == "inventory":
+                    self.world.bot.behavior_tree.new_command(bt.DropInventory)
+                else:
+                    self.send_chat_message("unknown subject")
+            else:
+                self.send_chat_message("drop what?")
         elif verb == "debug":
             if subject:
                 what = subject[0]
@@ -177,7 +189,7 @@ class Chat(object):
                     else:
                         self.send_chat_message("unknown item %s" % item_name)
                 else:
-                    self.send_chat_message("I can show only signs now")
+                    self.send_chat_message("unknown subject")
             else:
                 self.send_chat_message("debug what?")
         else:
