@@ -40,7 +40,7 @@ class InvetoryBase(object):
             if slot_itemstack is None:
                 return position
             if itemstack.is_same(slot_itemstack, ignore_common=True):
-                if slot_itemstack.stacksize > itemstack.count:
+                if slot_itemstack.stacksize > slot_itemstack.count:
                     return position
         else:
             return None
@@ -127,12 +127,20 @@ class PlayerInventory(InvetoryBase):
     def crafting_offset_as_slot(self, offset):
         return 1 + offset
 
+    def crafting_slots(self):
+        for i in xrange(4):
+            yield self.crafting_offset_as_slot(i)
+
 
 class CraftingTable(InvetoryBase):
     crafted_slot = 0
 
     def crafting_offset_as_slot(self, offset):
         return 1 + offset
+
+    def crafting_slots(self):
+        for i in xrange(9):
+            yield self.crafting_offset_as_slot(i)
 
 
 class Chest(InvetoryBase):
@@ -186,7 +194,7 @@ class InvetoryContainer(object):
             self.opened_window.set_slot(slot_id, itemstack)
 
     def set_slots(self, window_id=None, slotdata_list=None):
-        log.msg('received %d items for window_id %d %s' % (len(slotdata_list), window_id, str(["%d-%s" % (i, items.ItemStack.from_slotdata(slotdata)) for i, slotdata in enumerate(slotdata_list)])))
+        log.msg('received %d items for window_id %d %s' % (len(slotdata_list), window_id, str(["%d-%s" % (i, items.ItemStack.from_slotdata(slotdata)) for i, slotdata in enumerate(slotdata_list) if slotdata.id > 0])))
         inv = self.player_inventory if window_id == 0 else self.opened_window
         for slot_id, slotdata in enumerate(slotdata_list):
             itemstack = items.ItemStack.from_slotdata(slotdata)

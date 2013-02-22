@@ -679,7 +679,7 @@ class CollectMine(BTSequencer):
 
     def is_valid(self):
         #TODO blackboard.has_tool_for go through inventory and check if any tool applies
-        return self.blackboard.inventory_tool_for(self.recipe.block) and self.blocks_around
+        return self.mine_tool and self.blocks_around
 
     def setup(self):
         #TODO blackboard.blocks_around  - find first X blocks, no max distance
@@ -719,7 +719,7 @@ class CollectCraft(BTSelector):
 
     def setup(self):
         if self.recipe.need_bench:
-            self.crafting_tables_around = list(self.blackboard.blocks_around(self.blackboard.bot_object.position, block_number=blocks.CraftingTable.number, distance=32))
+            self.crafting_tables_around = list(self.blackboard.blocks_around(self.blackboard.bot_object.position, block_number=blocks.CraftingTable.number, distance=80))
             log.msg("There are %d crafting table around" % len(self.crafting_tables_around))
 
     @property
@@ -977,9 +977,11 @@ class CraftItemBase(BTAction):
                 continue
             yield self.inventory_man.cursor_hold(itemstack)
             yield self.put_craftoffset_slot(crafting_offset)
+        self.inventory_man.set_crafted_item(self.recipe.itemstack)
         while not self.inventory_man.is_cursor_empty:
             yield self.inventory_man.empty_cursor()
         yield self.get_crafted_item()
+        self.inventory_man.erase_craft_slots()
         while not self.inventory_man.is_cursor_empty:
             yield self.inventory_man.empty_cursor()
         self.inventory_man.increment_collected(self.recipe.itemstack)
@@ -989,7 +991,7 @@ class CraftItemBase(BTAction):
         return self.inventory_man.right_click_slot(slot)
 
     def get_crafted_item(self):
-        return self.inventory_man.click_slot(self.inventory.crafted_slot, made_itemstack=self.recipe.itemstack)
+        return self.inventory_man.click_slot(self.inventory.crafted_slot)
 
 
 class CraftItemInventory(CraftItemBase):
@@ -1040,6 +1042,13 @@ class InventoryManipulation(object):
         self.blackboard.send_packet("close window", {"window_id": self.inventory.window_id})
         self.inventory.close_window()
 
+    def erase_craft_slots(self):
+        for slot in self.inventory.crafting_slots():
+            self.inventory.set_slot(slot, None)
+
+    def set_crafted_item(self, itemstack):
+        self.inventory.set_slot(self.inventory.crafted_slot, itemstack)
+
     def cursor_hold(self, itemstack):
         if itemstack.is_same(self.cursor_item):
             return True
@@ -1055,10 +1064,7 @@ class InventoryManipulation(object):
             if slot is None:
                 raise Exception("could not choose inventory slot")
             slotstack = self.inventory.item_at_slot(slot)
-            if slotstack is None:
-                return self.click_slot(slot)
-            else:
-                return self.right_click_slot(slot)
+            return self.click_slot(slot)
 
     def click_active_slot(self, active_position):
         return self.click_slot(self.inventory.active_possition_as_slot(active_position))
@@ -1084,17 +1090,10 @@ class InventoryManipulation(object):
             self.inventory.set_slot(self.clicked_slot, None)
         return confirmed
 
-    def click_slot(self, slot, right_mouse_button=False, made_itemstack=None):
+    def click_slot(self, slot, right_mouse_button=False):
         if slot is None:
             raise Exception("click slot is None, inventory full?")
-        if right_mouse_button:
-            itemstack = None
-        elif made_itemstack is not None:
-            itemstack = made_itemstack
-            self.cursor_item = None
-            self.inventory.set_slot(slot, made_itemstack)
-        else:
-            itemstack = self.inventory.item_at_slot(slot)
+        itemstack = self.inventory.item_at_slot(slot)
         self.clicked_slot = slot
         self.clicked_right_mouse_button = right_mouse_button
         data = {"window_id": self.inventory.window_id,
@@ -1109,25 +1108,37 @@ class InventoryManipulation(object):
         return d
 
     def transaction_confirmed(self, confirmed):
-        if confirmed:
-            if self.clicked_right_mouse_button:
-                if self.cursor_item is not None:
-                    next_cursor_item = self.cursor_item.copy(count=self.cursor_item.count - 1)
-                    under_cursor = self.inventory.item_at_slot(self.clicked_slot)
-                    if under_cursor is None:
-                        self.inventory.set_slot(self.clicked_slot, self.cursor_item.copy(count=1))
-                    else:
-                        if not self.cursor_item.is_same(under_cursor):
-                            raise Exception("This could not be planned, cursor item %s diff from slot item %s during right click" % (self.cursor_item, under_cursor))
-                        if under_cursor.count == under_cursor.stacksize:
-                            raise Exception("right click on full itemstack, no no...")
-                        self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=self.cursor_item.count + 1))
-                    self.cursor_item = next_cursor_item
-            elif self.cursor_item is None:
-                self.cursor_item = self.inventory.item_at_slot(self.clicked_slot)
-                self.inventory.set_slot(self.clicked_slot, None)
-            else:
+        if not confirmed:
+            return confirmed
+        if self.clicked_right_mouse_button:
+            if self.cursor_item is not None:
+                next_cursor_item = self.cursor_item.copy(count=self.cursor_item.count - 1)
                 under_cursor = self.inventory.item_at_slot(self.clicked_slot)
+                if under_cursor is None:
+                    self.inventory.set_slot(self.clicked_slot, self.cursor_item.copy(count=1))
+                else:
+                    if not self.cursor_item.is_same(under_cursor):
+                        raise Exception("This could not be planned, cursor item %s diff from slot item %s during right click" % (self.cursor_item, under_cursor))
+                    if under_cursor.count == under_cursor.stacksize:
+                        raise Exception("right click on full itemstack, no no...")
+                    self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=under_cursor.count + 1))
+                self.cursor_item = next_cursor_item
+            else:
+                raise Exception('right click with empty cursor? maybe later')
+        else:
+            under_cursor = self.inventory.item_at_slot(self.clicked_slot)
+            if under_cursor is not None and self.cursor_item is not None and under_cursor.is_same(self.cursor_item):
+                slotspace = under_cursor.stacksize - under_cursor.count
+                if slotspace > 0:
+                    if slotspace >= self.cursor_item.count:
+                        self.cursor_item = None
+                        self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=under_cursor.count + self.cursor_item.count))
+                    else:
+                        self.cursor_item = self.cursor_item.copy(count=self.cursor_item.count - slotspace)
+                        self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=under_cursor.stacksize))
+                else:
+                    raise Exception("left click on full itemstack, no no...")
+            else:
                 self.inventory.set_slot(self.clicked_slot, self.cursor_item)
                 self.cursor_item = under_cursor
         return confirmed
