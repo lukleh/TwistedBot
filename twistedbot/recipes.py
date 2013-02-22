@@ -17,14 +17,19 @@ class RecipeMetaClass(type):
         if hasattr(cls, 'name'):
             cls.resources = []
             cls.itemstack = items.item_db.item_by_name(cls.name, count=cls.count)
+            #if cls.itemstack.common:
+            #    print 'recipes check', cls
             if issubclass(cls, MineBluePrint):
+                cls.type = 'mine'
                 cls.block = blocks.block_map[cls.block]
                 recipes_count["mine"] += 1
             elif issubclass(cls, SmeltBluePrint):
+                cls.type = 'smelt'
                 cls.smelt_item = items.item_db.item_by_name(cls.smelt_item)
                 cls.resources = [cls.smelt_item]
                 recipes_count["smelt"] += 1
             elif issubclass(cls, CraftBluePrint):
+                cls.type = 'craft'
                 recipes_count["craft"] += 1
                 if cls.plan is not None:
                     cls.need_bench = len(cls.plan[0]) == 3
@@ -55,7 +60,7 @@ class RecipeMetaClass(type):
         return cls
 
     def __repr__(cls):
-        return cls.name
+        return "%s %s" % (cls.type, cls.name)
 
 
 class BluePrint(object):
@@ -86,6 +91,10 @@ class CraftBluePrint(BluePrint):
     plan = None
     parts = None
 
+    @classmethod
+    def crafted_item(cls, recources):
+        return cls.itemstack
+
 
 class Cobblestone_stone(MineBluePrint):
     name = "cobblestone"
@@ -115,6 +124,42 @@ class GoldOre(MineBluePrint):
 class Wood(MineBluePrint):
     name = "wood"
     block = "wood"
+
+
+class OakWood(MineBluePrint):
+    name = "oak wood"
+    block = "wood"
+
+    @classmethod
+    def block_filter(cls, meta):
+        return (meta & 0x2) == 0
+
+
+class SpruceWood(MineBluePrint):
+    name = "spruce wood"
+    block = "wood"
+
+    @classmethod
+    def block_filter(cls, meta):
+        return (meta & 0x2) == 1
+
+
+class BirchWood(MineBluePrint):
+    name = "birch wood"
+    block = "wood"
+
+    @classmethod
+    def block_filter(cls, meta):
+        return (meta & 0x2) == 2
+
+
+class JungleWood(MineBluePrint):
+    name = "jungle wood"
+    block = "wood"
+
+    @classmethod
+    def block_filter(cls, meta):
+        return (meta & 0x2) == 3
 
 
 class SugarCanes(MineBluePrint):
@@ -196,6 +241,36 @@ class Furnace(CraftBluePrint):
 class WoodenPlanks(CraftBluePrint):
     name = "wooden planks"
     parts = ["wood"]
+    count = 4
+
+    @classmethod
+    def crafted_item(cls, recources):
+        """ wooden planks depend on the wood type """
+        wood = recources[0]
+        return cls.itemstack.copy(meta=wood.meta, common=False)
+
+
+class OakWoodenPlanks(CraftBluePrint):
+    name = "oak wooden planks"
+    parts = ["oak wood"]
+    count = 4
+
+
+class SpruceWoodenPlanks(CraftBluePrint):
+    name = "spruce wooden planks"
+    parts = ["spruce wood"]
+    count = 4
+
+
+class BirchWoodenPlanks(CraftBluePrint):
+    name = "birch wooden planks"
+    parts = ["birch wood"]
+    count = 4
+
+
+class JungleWoodenPlanks(CraftBluePrint):
+    name = "jungle wooden planks"
+    parts = ["jungle wood"]
     count = 4
 
 

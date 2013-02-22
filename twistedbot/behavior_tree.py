@@ -13,6 +13,7 @@ import packets
 import blocks
 from pathfinding import AStarBBCol, AStarCoords, AStarMultiCoords
 from gridspace import GridSpace
+from inventory import InventoryManipulation
 
 
 log = logbot.getlogger("BEHAVIOUR_TREE")
@@ -701,9 +702,64 @@ class CollectMine(BTSequencer):
             break
 
 
-class CollectCraft(BTSelector):
+class CollectCraft(BTSequencer):
     def __init__(self, itemstack=None, recipe=None, **kwargs):
         super(CollectCraft, self).__init__(**kwargs)
+        self.itemstack = itemstack
+        self.recipe = recipe
+
+    def is_valid(self):
+        return True
+
+    @property
+    def missing_ingredient(self):
+        for itemstack in self.recipe.resources:
+            if not self.blackboard.inventory_player.has_item_count(itemstack):
+                log.msg("missing ingredient %s for crafting" % itemstack)
+                return itemstack
+
+    def choices(self):
+        while self.missing_ingredient is not None:
+            yield self.make_behavior(Collect, itemstack=self.missing_ingredient)
+        yield self.make_behavior(CraftItem, itemstack=self.itemstack, recipe=self.recipe)
+
+
+class CollectSmelt(BTSelector):
+    def __init__(self, itemstack=None, recipe=None, **kwargs):
+        super(CollectSmelt, self).__init__(**kwargs)
+        self.itemstack = itemstack
+        self.name = 'smelt %s' % self.itemstack
+
+    def is_valid(self):
+        """ smelting later today """
+        return False
+
+
+class CollectBrew(BTSelector):
+    def __init__(self, itemstack=None, recipe=None, **kwargs):
+        super(CollectBrew, self).__init__(**kwargs)
+        self.itemstack = itemstack
+        self.name = 'brew %s' % self.itemstack
+
+    def is_valid(self):
+        """ brewing not today """
+        return False
+
+
+class CollectMobKill(BTSelector):
+    def __init__(self, itemstack=None, recipe=None, **kwargs):
+        super(CollectMobKill, self).__init__(**kwargs)
+        self.itemstack = itemstack
+        self.name = 'kill for %s' % self.itemstack
+
+    def is_valid(self):
+        """ it will take time before the bot will kill mobs """
+        return False
+
+
+class CraftItem(BTSelector):
+    def __init__(self, itemstack=None, recipe=None, **kwargs):
+        super(CraftItem, self).__init__(**kwargs)
         self.itemstack = itemstack
         self.recipe = recipe
         self.name = 'craft %s' % self.itemstack
@@ -756,39 +812,6 @@ class CraftItemAtTable(BTSequencer):
     def choices(self):
         yield self.make_behavior(TravelTo, coords=self.craftingtable.coords, multiple_goals=self.dig_positions)
         yield self.make_behavior(CraftItemTable, recipe=self.recipe, craftingtable=self.craftingtable)
-
-
-class CollectSmelt(BTSelector):
-    def __init__(self, itemstack=None, recipe=None, **kwargs):
-        super(CollectSmelt, self).__init__(**kwargs)
-        self.itemstack = itemstack
-        self.name = 'smelt %s' % self.itemstack
-
-    def is_valid(self):
-        """ smelting later today """
-        return False
-
-
-class CollectBrew(BTSelector):
-    def __init__(self, itemstack=None, recipe=None, **kwargs):
-        super(CollectBrew, self).__init__(**kwargs)
-        self.itemstack = itemstack
-        self.name = 'brew %s' % self.itemstack
-
-    def is_valid(self):
-        """ brewing not today """
-        return False
-
-
-class CollectMobKill(BTSelector):
-    def __init__(self, itemstack=None, recipe=None, **kwargs):
-        super(CollectMobKill, self).__init__(**kwargs)
-        self.itemstack = itemstack
-        self.name = 'kill for %s' % self.itemstack
-
-    def is_valid(self):
-        """ it will take time before the bot will kill mobs """
-        return False
 
 
 class TravelTo(BTSequencer):
@@ -977,7 +1000,7 @@ class CraftItemBase(BTAction):
                 continue
             yield self.inventory_man.cursor_hold(itemstack)
             yield self.put_craftoffset_slot(crafting_offset)
-        self.inventory_man.set_crafted_item(self.recipe.itemstack)
+        self.inventory_man.set_crafted_item(self.recipe)
         while not self.inventory_man.is_cursor_empty:
             yield self.inventory_man.empty_cursor()
         yield self.get_crafted_item()
@@ -997,7 +1020,7 @@ class CraftItemBase(BTAction):
 class CraftItemInventory(CraftItemBase):
     def __init__(self, **kwargs):
         super(CraftItemInventory, self).__init__(**kwargs)
-        self.name = "craft %s in inventory" % self.recipe
+        self.name = "%s in inventory" % self.recipe
         log.msg(self.name)
 
     def on_start(self):
@@ -1009,7 +1032,7 @@ class CraftItemTable(CraftItemBase):
     def __init__(self, craftingtable=None, **kwargs):
         super(CraftItemTable, self).__init__(**kwargs)
         self.craftingtable = craftingtable
-        self.name = "craft %s on %s" % (self.recipe, self.craftingtable)
+        self.name = "%s on %s" % (self.recipe, self.craftingtable)
         log.msg(self.name)
 
     @inlineCallbacks
@@ -1025,146 +1048,6 @@ class CraftItemTable(CraftItemBase):
         self.blackboard.send_packet("player block placement", data)
         self.inventory = yield self.blackboard.receive_inventory()
         self.inventory_man = InventoryManipulation(inventory=self.inventory, blackboard=self.blackboard)
-
-
-class InventoryManipulation(object):
-    def __init__(self, inventory=None, blackboard=None):
-        self.inventory = inventory
-        self.blackboard = blackboard
-        self.clicked_slot = None
-        self.cursor_item = None
-
-    @property
-    def is_cursor_empty(self):
-        return self.cursor_item is None
-
-    def close(self):
-        self.blackboard.send_packet("close window", {"window_id": self.inventory.window_id})
-        self.inventory.close_window()
-
-    def erase_craft_slots(self):
-        for slot in self.inventory.crafting_slots():
-            self.inventory.set_slot(slot, None)
-
-    def set_crafted_item(self, itemstack):
-        self.inventory.set_slot(self.inventory.crafted_slot, itemstack)
-
-    def cursor_hold(self, itemstack):
-        if itemstack.is_same(self.cursor_item):
-            return True
-        else:
-            slot = self.slot_at_item(itemstack)
-            return self.click_slot(slot)
-
-    def empty_cursor(self):
-        if self.is_cursor_empty:
-            return True
-        else:
-            slot = self.inventory.slot_for(self.cursor_item)
-            if slot is None:
-                raise Exception("could not choose inventory slot")
-            slotstack = self.inventory.item_at_slot(slot)
-            return self.click_slot(slot)
-
-    def click_active_slot(self, active_position):
-        return self.click_slot(self.inventory.active_possition_as_slot(active_position))
-
-    def right_click_slot(self, slot):
-        return self.click_slot(slot, right_mouse_button=True)
-
-    def click_drop(self):
-        data = {"window_id": self.inventory.window_id,
-                "slot": -999,
-                "mouse_button": 0,
-                "action_number": self.blackboard.inventory_transaction_counter_inc,
-                "hold_shift": False,
-                "slotdata": self.blackboard.itemstack_as_slotdata(itemstack=None)}
-        self.blackboard.send_packet("click window", data)
-        d = self.blackboard.inventory_get_confirmation(action_number=self.blackboard.inventory_transaction_counter, window_id=self.inventory.window_id)
-        d.addCallback(self.transaction_confirmed_drop)
-        return d
-
-    def transaction_confirmed_drop(self, confirmed):
-        if confirmed:
-            self.cursor_item = None
-            self.inventory.set_slot(self.clicked_slot, None)
-        return confirmed
-
-    def click_slot(self, slot, right_mouse_button=False):
-        if slot is None:
-            raise Exception("click slot is None, inventory full?")
-        itemstack = self.inventory.item_at_slot(slot)
-        self.clicked_slot = slot
-        self.clicked_right_mouse_button = right_mouse_button
-        data = {"window_id": self.inventory.window_id,
-                "slot": slot,
-                "mouse_button": 1 if right_mouse_button else 0,
-                "action_number": self.blackboard.inventory_transaction_counter_inc,
-                "hold_shift": False,
-                "slotdata": self.blackboard.itemstack_as_slotdata(itemstack=itemstack)}
-        self.blackboard.send_packet("click window", data)
-        d = self.blackboard.inventory_get_confirmation(action_number=self.blackboard.inventory_transaction_counter, window_id=self.inventory.window_id)
-        d.addCallback(self.transaction_confirmed)
-        return d
-
-    def transaction_confirmed(self, confirmed):
-        if not confirmed:
-            return confirmed
-        if self.clicked_right_mouse_button:
-            if self.cursor_item is not None:
-                next_cursor_item = self.cursor_item.copy(count=self.cursor_item.count - 1)
-                under_cursor = self.inventory.item_at_slot(self.clicked_slot)
-                if under_cursor is None:
-                    self.inventory.set_slot(self.clicked_slot, self.cursor_item.copy(count=1))
-                else:
-                    if not self.cursor_item.is_same(under_cursor):
-                        raise Exception("This could not be planned, cursor item %s diff from slot item %s during right click" % (self.cursor_item, under_cursor))
-                    if under_cursor.count == under_cursor.stacksize:
-                        raise Exception("right click on full itemstack, no no...")
-                    self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=under_cursor.count + 1))
-                self.cursor_item = next_cursor_item
-            else:
-                raise Exception('right click with empty cursor? maybe later')
-        else:
-            under_cursor = self.inventory.item_at_slot(self.clicked_slot)
-            if under_cursor is not None and self.cursor_item is not None and under_cursor.is_same(self.cursor_item):
-                slotspace = under_cursor.stacksize - under_cursor.count
-                if slotspace > 0:
-                    if slotspace >= self.cursor_item.count:
-                        self.cursor_item = None
-                        self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=under_cursor.count + self.cursor_item.count))
-                    else:
-                        self.cursor_item = self.cursor_item.copy(count=self.cursor_item.count - slotspace)
-                        self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=under_cursor.stacksize))
-                else:
-                    raise Exception("left click on full itemstack, no no...")
-            else:
-                self.inventory.set_slot(self.clicked_slot, self.cursor_item)
-                self.cursor_item = under_cursor
-        return confirmed
-
-    def set_active_slot(self, active_slot):
-        if active_slot != self.blackboard.inventory_player.active_slot:
-            self.blackboard.send_packet("held item change", {"active_slot": active_slot})
-            self.blackboard.inventory_player.active_slot = active_slot
-
-    def has_item(self, itemstack):
-        return self.inventory.has_item(itemstack)
-
-    def item_active(self, itemstack):
-        return self.inventory.is_item_active(itemstack)
-
-    def item_at_active_slot(self, itemstack):
-        return self.inventory.item_at_active_slot(itemstack)
-
-    def slot_at_item(self, itemstack):
-        return self.inventory.slot_at_item(itemstack)
-
-    def choose_active_slot(self):
-        return self.blackboard.inventory_player.choose_active_slot()
-
-    def increment_collected(self, itemstack):
-        self.inventory.inventory_container.item_collected_count[itemstack.name] += itemstack.count
 
 
 class DropInventory(BTAction):

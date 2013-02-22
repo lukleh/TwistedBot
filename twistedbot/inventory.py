@@ -70,6 +70,7 @@ class InvetoryBase(object):
     def has_item_count(self, itemstack):
         count = itemstack.count
         for _, slot_itemstack in self.slot_items():
+            #print 'has_item_count', itemstack, slot_itemstack, itemstack.is_same(slot_itemstack)
             if itemstack.is_same(slot_itemstack):
                 count -= slot_itemstack.count
                 if count <= 0:
@@ -181,11 +182,13 @@ class InvetoryContainer(object):
         self.opened_window = self.inventory_types[window_type](extra_slots=extra_slots, window_id=window_id, inventory_container=self)
 
     def close_window(self, window_id=None):
+        if window_id is not None:
+            log.msg('server closed window %d' % window_id)
         self.opened_window = None
 
     def set_slot(self, window_id=None, slot_id=None, slotdata=None):
         itemstack = items.ItemStack.from_slotdata(slotdata)
-        log.msg('set slot %d with %s' % (slot_id, itemstack))
+        log.msg('server set slot %d with %s' % (slot_id, itemstack))
         if window_id == -1 and slot_id == -1:
             self.cursor_item = itemstack
         elif window_id == 0:
@@ -252,3 +255,150 @@ class Confirmation(object):
         if self.action_number != action_number:
             return
         self.confirmed = acknowledged
+
+
+class InventoryManipulation(object):
+    def __init__(self, inventory=None, blackboard=None):
+        self.inventory = inventory
+        self.blackboard = blackboard
+        self.clicked_slot = None
+        self.cursor_item = None
+
+    @property
+    def is_cursor_empty(self):
+        return self.cursor_item is None
+
+    def close(self):
+        self.blackboard.send_packet("close window", {"window_id": self.inventory.window_id})
+        self.inventory.close_window()
+
+    def erase_craft_slots(self):
+        for slot in self.inventory.crafting_slots():
+            self.inventory.set_slot(slot, None)
+
+    def set_crafted_item(self, recipe):
+        resources = []
+        for slot in self.inventory.crafting_slots():
+            res = self.inventory.item_at_slot(slot)
+            if res is not None:
+                resources.append(res)
+        itemstack = recipe.crafted_item(resources)
+        #log.msg('crafted item is %s from %s' % (itemstack, resources))
+        self.inventory.set_slot(self.inventory.crafted_slot, itemstack)
+
+    def cursor_hold(self, itemstack):
+        if itemstack.is_same(self.cursor_item):
+            return True
+        else:
+            slot = self.slot_at_item(itemstack)
+            return self.click_slot(slot)
+
+    def empty_cursor(self):
+        if self.is_cursor_empty:
+            return True
+        else:
+            slot = self.inventory.slot_for(self.cursor_item)
+            if slot is None:
+                raise Exception("could not choose inventory slot")
+            return self.click_slot(slot)
+
+    def click_active_slot(self, active_position):
+        return self.click_slot(self.inventory.active_possition_as_slot(active_position))
+
+    def right_click_slot(self, slot):
+        return self.click_slot(slot, right_mouse_button=True)
+
+    def click_drop(self):
+        data = {"window_id": self.inventory.window_id,
+                "slot": -999,
+                "mouse_button": 0,
+                "action_number": self.blackboard.inventory_transaction_counter_inc,
+                "hold_shift": False,
+                "slotdata": self.blackboard.itemstack_as_slotdata(itemstack=None)}
+        self.blackboard.send_packet("click window", data)
+        d = self.blackboard.inventory_get_confirmation(action_number=self.blackboard.inventory_transaction_counter, window_id=self.inventory.window_id)
+        d.addCallback(self.transaction_confirmed_drop)
+        return d
+
+    def transaction_confirmed_drop(self, confirmed):
+        if confirmed:
+            self.cursor_item = None
+            self.inventory.set_slot(self.clicked_slot, None)
+        return confirmed
+
+    def click_slot(self, slot, right_mouse_button=False):
+        if slot is None:
+            raise Exception("click slot is None, inventory full?")
+        itemstack = self.inventory.item_at_slot(slot)
+        self.clicked_slot = slot
+        self.clicked_right_mouse_button = right_mouse_button
+        data = {"window_id": self.inventory.window_id,
+                "slot": slot,
+                "mouse_button": 1 if right_mouse_button else 0,
+                "action_number": self.blackboard.inventory_transaction_counter_inc,
+                "hold_shift": False,
+                "slotdata": self.blackboard.itemstack_as_slotdata(itemstack=itemstack)}
+        #log.msg('click inventory %s' % str(data))
+        self.blackboard.send_packet("click window", data)
+        d = self.blackboard.inventory_get_confirmation(action_number=self.blackboard.inventory_transaction_counter, window_id=self.inventory.window_id)
+        d.addCallback(self.transaction_confirmed)
+        return d
+
+    def transaction_confirmed(self, confirmed):
+        if not confirmed:
+            return confirmed
+        if self.clicked_right_mouse_button:
+            if self.cursor_item is not None:
+                next_cursor_item = self.cursor_item.copy(count=self.cursor_item.count - 1)
+                under_cursor = self.inventory.item_at_slot(self.clicked_slot)
+                if under_cursor is None:
+                    self.inventory.set_slot(self.clicked_slot, self.cursor_item.copy(count=1))
+                else:
+                    if not self.cursor_item.is_same(under_cursor):
+                        raise Exception("This could not be planned, cursor item %s diff from slot item %s during right click" % (self.cursor_item, under_cursor))
+                    if under_cursor.count == under_cursor.stacksize:
+                        raise Exception("right click on full itemstack, no no...")
+                    self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=under_cursor.count + 1))
+                self.cursor_item = next_cursor_item
+            else:
+                raise Exception('right click with empty cursor? maybe later')
+        else:
+            under_cursor = self.inventory.item_at_slot(self.clicked_slot)
+            if under_cursor is not None and self.cursor_item is not None and under_cursor.is_same(self.cursor_item):
+                slotspace = under_cursor.stacksize - under_cursor.count
+                if slotspace > 0:
+                    if slotspace >= self.cursor_item.count:
+                        self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=under_cursor.count + self.cursor_item.count))
+                        self.cursor_item = None
+                    else:
+                        self.inventory.set_slot(self.clicked_slot, under_cursor.copy(count=under_cursor.stacksize))
+                        self.cursor_item = self.cursor_item.copy(count=self.cursor_item.count - slotspace)
+                else:
+                    raise Exception("left click on full itemstack, no no...")
+            else:
+                self.inventory.set_slot(self.clicked_slot, self.cursor_item)
+                self.cursor_item = under_cursor
+        return confirmed
+
+    def set_active_slot(self, active_slot):
+        if active_slot != self.blackboard.inventory_player.active_slot:
+            self.blackboard.send_packet("held item change", {"active_slot": active_slot})
+            self.blackboard.inventory_player.active_slot = active_slot
+
+    def has_item(self, itemstack):
+        return self.inventory.has_item(itemstack)
+
+    def item_active(self, itemstack):
+        return self.inventory.is_item_active(itemstack)
+
+    def item_at_active_slot(self, itemstack):
+        return self.inventory.item_at_active_slot(itemstack)
+
+    def slot_at_item(self, itemstack):
+        return self.inventory.slot_at_item(itemstack)
+
+    def choose_active_slot(self):
+        return self.blackboard.inventory_player.choose_active_slot()
+
+    def increment_collected(self, itemstack):
+        self.inventory.inventory_container.item_collected_count[itemstack.name] += itemstack.count

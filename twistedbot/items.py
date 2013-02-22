@@ -1172,12 +1172,16 @@ class ItemStack(object):
     def inc_count(self, i):
         self._count += i
 
-    def copy(self, count=None):
+    def copy(self, count=None, meta=None, common=None):
         if count is None:
             count = self.count
         elif count < 1:
             return None
-        return ItemStack(item_id=self.number, meta=self.meta, count=count, common=self.common, nbt=self.nbt)
+        if meta is None:
+            meta = self.meta
+        if common is None:
+            common = self.common
+        return ItemStack(item_id=self.number, meta=meta, count=count, common=common, nbt=self.nbt)
 
     @property
     def stacksize(self):
