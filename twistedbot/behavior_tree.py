@@ -696,7 +696,7 @@ class CollectMine(BTSequencer):
             if not dig_positions:
                 continue
             yield self.make_behavior(TravelTo, multiple_goals=dig_positions)
-            yield self.make_behavior(InventorySelect, itemstack=self.mine_tool)
+            yield self.make_behavior(InventorySelectActive, itemstack=self.mine_tool)
             yield self.make_behavior(DigBlock, block)
             yield self.make_behavior(WaitForDrop, block=block, itemstack=self.recipe.itemstack, drop_everytime=self.recipe.drop_everytime)
             break
@@ -1058,21 +1058,20 @@ class DropInventory(BTAction):
     def on_start(self):
         self.inventory_man = InventoryManipulation(inventory=self.blackboard.inventory_player, blackboard=self.blackboard)
 
+    def dropsteps(self):
+        for slot, itemstack in self.inventory_man.inventory.slot_items():
+            yield self.inventory_man.click_slot(slot)
+            yield self.inventory_man.click_drop()
+            log.msg('dropped %s' % itemstack)
+
     @inlineCallbacks
     def action(self):
-        for slot, _ in self.inventory_man.inventory.slot_items():
-            confirmed = yield self.inventory_man.click_slot(slot)
+        for drop in self.dropsteps():
+            confirmed = yield drop
             if not confirmed:
                 log.err("bad news, inventory transaction not confirmed by the server, click slot")
                 self.status = Status.failure
                 return
-            itemstack = self.inventory_man.cursor_item
-            confirmed = yield self.inventory_man.click_drop()
-            if not confirmed:
-                log.err("bad news, inventory transaction not confirmed by the server, click drop")
-                self.status = Status.failure
-                return
-            log.msg('dropped %s' % itemstack)
         self.status = Status.success
 
     def on_end(self):
@@ -1080,9 +1079,9 @@ class DropInventory(BTAction):
             self.inventory_man.close()
 
 
-class InventorySelect(BTAction):
+class InventorySelectActive(BTAction):
     def __init__(self, itemstack=None, **kwargs):
-        super(InventorySelect, self).__init__(**kwargs)
+        super(InventorySelectActive, self).__init__(**kwargs)
         self.itemstack = itemstack
         self.name = "hold item %s" % self.itemstack
 
@@ -1105,39 +1104,38 @@ class InventorySelect(BTAction):
             return
         if self.inventory_man.item_active(self.itemstack):
             self.status = Status.success
-        else:
-            active_slot = self.inventory_man.item_at_active_slot(self.itemstack)
-            if active_slot is not None:
-                self.inventory_man.set_active_slot(active_slot)
-                self.status = Status.success
-            else:
-                slot_position = self.inventory_man.slot_at_item(self.itemstack)
-                confirmed = yield self.inventory_man.click_slot(slot_position)
-                if not confirmed:
-                    log.msg("bad news, inventory transaction not confirmed by the server on pass 1")
-                    self.status = Status.failure
-                    return
-                active_slot = self.inventory_man.choose_active_slot()
-                confirmed = yield self.inventory_man.click_active_slot(active_slot)
-                if not confirmed:
-                    log.msg("bad news, inventory transaction not confirmed by the server on pass 2")
-                    self.status = Status.failure
-                    return
-                if not self.inventory_man.is_cursor_empty:
-                    confirmed = yield self.inventory_man.click_slot(slot_position)
-                    if not confirmed:
-                        log.msg("bad news, inventory transaction not confirmed by the server on pass 3")
-                        self.status = Status.failure
-                        return
-                self.inventory_man.set_active_slot(active_slot)
-                self.status = Status.success
+            return
+        active_slot = self.inventory_man.item_at_active_slot(self.itemstack)
+        if active_slot is not None:
+            self.inventory_man.set_active_slot(active_slot)
+            self.status = Status.success
+            return
+        slot_position = self.inventory_man.slot_at_item(self.itemstack)
+        confirmed = yield self.inventory_man.click_slot(slot_position)
+        if not confirmed:
+            log.msg("bad news, inventory transaction not confirmed by the server")
+            self.status = Status.failure
+            return
+        active_slot = self.inventory_man.choose_active_slot()
+        confirmed = yield self.inventory_man.click_active_slot(active_slot)
+        if not confirmed:
+            log.msg("bad news, inventory transaction not confirmed by the server")
+            self.status = Status.failure
+            return
+        if not self.inventory_man.is_cursor_empty:
+            confirmed = yield self.inventory_man.click_slot(slot_position)
+            if not confirmed:
+                log.msg("bad news, inventory transaction not confirmed by the server")
+                self.status = Status.failure
+                return
+        self.inventory_man.set_active_slot(active_slot)
+        self.status = Status.success
 
     def on_end(self):
         """ make sure the item is on active slot and close the inventory """
         if self.status == Status.success:
             self.blackboard.send_chat_message("holding %s" % self.itemstack.name)
-        if self.status == Status.success:
-            self.inventory_man.close()
+        self.inventory_man.close()
 
 
 class WaitForDrop(BTAction):
