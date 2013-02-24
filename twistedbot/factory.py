@@ -6,11 +6,15 @@ from twisted.internet.protocol import ReconnectingClientFactory, Protocol
 from twisted.internet import reactor
 
 import config
+import hashlib
+import urllib
+import time
 import logbot
 import proxy_processors.default
 import utils
 from packets import parse_packets, make_packet, packets_by_name, Container
 from proxy_processors.default import process_packets as packet_printout
+from Crypto.Random import _UserFriendlyRNG
 
 
 proxy_processors.default.ignore_packets = []
@@ -18,6 +22,27 @@ proxy_processors.default.filter_packets = []
 
 log = logbot.getlogger("PROTOCOL")
 
+def javaHexDigest(digest):
+    d = long(digest.hexdigest(), 16)
+    if d >> 39 * 4 & 0x8:
+        d = "-%x" % ((-d) & (2 ** (40 * 4) - 1))
+    else:
+        d = "%x" % d
+    return d
+
+def auth(id, secret, key):
+    shaobj = hashlib.sha1()
+    shaobj.update(id)
+    shaobj.update(secret) 
+    shaobj.update(key)
+    hash = javaHexDigest(shaobj)		
+ 	
+    url = urllib.urlopen("http://login.minecraft.net?user=" + config.EMAIL + "&password=" + config.PASSWORD + "&version=1337")
+    response = url.readline()
+    log.msg(response)
+    responses = response.split(':')
+    derp = urllib.urlopen("http://session.minecraft.net/game/joinserver.jsp?user=" + responses[2] + "&serverId=" + hash + "&sessionId=" + responses[3])
+    log.msg(derp.readline())
 
 class MineCraftProtocol(Protocol):
     def __init__(self, world):
@@ -409,6 +434,9 @@ class MineCraftProtocol(Protocol):
                 public_key = encryption.load_pubkey(c.public_key)
                 enc_shared_sercet = encryption.encrypt(key16, public_key)
                 enc_4bytes = encryption.encrypt(c.verify_token, public_key)
+                
+                auth(c.server_id, key16, c.public_key)
+                
                 self.send_packet(
                     "encryption key response",
                     {"shared_length": len(enc_shared_sercet),

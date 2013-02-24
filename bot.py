@@ -43,6 +43,12 @@ def start():
     parser.add_argument('--botname', default=config.USERNAME,
                         dest='botname',
                         help='username that will be used by the bot')
+    parser.add_argument('--botpass', default=config.PASSWORD,
+                        dest='botpass',
+                        help='password that will be used by the bot')
+    parser.add_argument('--botemail', default=config.EMAIL,
+                        dest='botemail',
+                        help='email address that will be used by the bot')
     parser.add_argument('--commandername', default=config.COMMANDER,
                         dest='commandername',
                         help='your username that you use in Minecraft')
@@ -53,6 +59,8 @@ def start():
     if args.log2file:
         logbot.start_bot_filelog()
     config.USERNAME = args.botname
+    config.PASSWORD = args.botpass
+    config.EMAIL = args.botemail
     config.COMMANDER = args.commandername.lower()
     host = args.serverhost
     port = args.serverport

@@ -9,6 +9,11 @@ COMMANDER = "lukleh"
 COMMANDER = COMMANDER.lower()
 
 USERNAME = "twistedbot"
+PASSWORD = "yourpassword"
+
+#This is the email address accoisated with your mojang account. If you have not migrated your minecraft account to a mojang account, set this to you minecraft username
+EMAIL = "the email associated with your mojang account"
+
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 25565
 PROXY_PORT = 25566
