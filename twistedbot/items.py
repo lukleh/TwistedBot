@@ -169,7 +169,7 @@ class ItemPickaxe(ItemTool):
                                 blocks.LapisLazuliBlock,
                                 blocks.RedstoneOre,
                                 blocks.GlowingRedstoneOre,
-                                blocks.Rail,
+                                blocks.Rails,
                                 blocks.DetectorRail,
                                 blocks.PoweredRail]
 
@@ -356,12 +356,12 @@ class StoneAxe(ItemAxe):
     material = EnumToolMaterial.STONE
 
 
-class DiamiondSword(ItemSword):
+class DiamondSword(ItemSword):
     number = 20
     material = EnumToolMaterial.DIAMOND
 
 
-class DiamiondShovel(ItemSpade):
+class DiamondShovel(ItemSpade):
     number = 21
     material = EnumToolMaterial.DIAMOND
 
@@ -380,11 +380,11 @@ class Sticks(Item):
     number = 24
 
 
-class EmptyBowl(Item):
+class Bowl(Item):
     number = 25
 
 
-class SoupBowl(ItemFood):
+class MushroomStew(ItemFood):
     number = 26
     stacksize = 1
     heal_amount = 6
@@ -419,7 +419,7 @@ class Feather(Item):
     number = 32
 
 
-class GunPowder(Item):
+class Gunpowder(Item):
     number = 33
 
 
@@ -437,7 +437,7 @@ class StoneHoe(ItemHoe):
     material = EnumToolMaterial.STONE
 
 
-class SteelHoe(ItemHoe):
+class IronHoe(ItemHoe):
     number = 36
     material = EnumToolMaterial.IRON
 
@@ -484,7 +484,7 @@ class ItemHelmet(ItemArmor):
     armor_type = EnumArmorPart.HELMET
 
 
-class ItemChestPlate(ItemArmor):
+class ItemChestplate(ItemArmor):
     armor_type = EnumArmorPart.CHESTPLATE
 
 
@@ -501,7 +501,7 @@ class LeatherHelmet(ItemHelmet):
     material = EnumArmorMaterial.LEATHER
 
 
-class LeatherChestPlate(ItemChestPlate):
+class LeatherChestplate(ItemChestplate):
     number = 43
     material = EnumArmorMaterial.LEATHER
 
@@ -521,7 +521,7 @@ class ChainHelmet(ItemHelmet):
     material = EnumArmorMaterial.CHAIN
 
 
-class ChainChestPlate(ItemChestPlate):
+class ChainChestplate(ItemChestplate):
     number = 47
     material = EnumArmorMaterial.CHAIN
 
@@ -541,7 +541,7 @@ class IronHelmet(ItemHelmet):
     material = EnumArmorMaterial.IRON
 
 
-class IronChestPlate(ItemChestPlate):
+class IronChestplate(ItemChestplate):
     number = 51
     material = EnumArmorMaterial.IRON
 
@@ -561,7 +561,7 @@ class DiamondHelmet(ItemHelmet):
     material = EnumArmorMaterial.DIAMOND
 
 
-class DiamondChestPlate(ItemChestPlate):
+class DiamondChestplate(ItemChestplate):
     number = 55
     material = EnumArmorMaterial.DIAMOND
 
@@ -581,7 +581,7 @@ class GoldenHelmet(ItemHelmet):
     material = EnumArmorMaterial.GOLD
 
 
-class GoldenChestPlate(ItemChestPlate):
+class GoldenChestplate(ItemChestplate):
     number = 59
     material = EnumArmorMaterial.GOLD
 
@@ -600,13 +600,13 @@ class Flint(Item):
     number = 62
 
 
-class RawPork(ItemFood):
+class RawPorkchop(ItemFood):
     number = 63
     heal_amount = 3
     saturation_modifier = 0.3
 
 
-class CookedPork(ItemFood):
+class CookedPorkchop(ItemFood):
     number = 64
     heal_amount = 8
     saturation_modifier = 0.8
@@ -620,10 +620,16 @@ class GoldenApple(ItemFood):
     number = 66
     heal_amount = 4
     saturation_modifier = 1.2
+    has_subtypes = True
+    sub_names = ['golden apple', 'enchanted golden apple']
 
-    def __init__(self, **kwargs):
-        super(GoldenApple, self).__init__(**kwargs)
-        self.has_subtypes = True
+    def get_types(self):
+        for i, _ in enumerate(self.sub_names):
+            yield ItemStack(self.number, i)
+
+    def get_name(self, meta):
+        return self.sub_names[meta]
+
 
 
 class Sign(Item):
@@ -639,7 +645,7 @@ class ItemBucket(Item):
     stacksize = 1
 
 
-class EmptyBucket(ItemBucket):
+class Bucket(ItemBucket):
     number = 69
     stacksize = 16
 
@@ -656,7 +662,7 @@ class ItemMinecart(Item):
     pass
 
 
-class EmptyMinecart(ItemMinecart):
+class Minecart(ItemMinecart):
     number = 72
 
 
@@ -672,7 +678,7 @@ class Redstone(Item):
     number = 75
 
 
-class SnowBall(Item):
+class Snowball(Item):
     number = 76
 
 
@@ -709,7 +715,7 @@ class Book(Item):
     number = 84
 
 
-class SlimeBall(Item):
+class Slimeball(Item):
     number = 85
 
 
@@ -783,7 +789,7 @@ class RedstoneRepeater(Item):
     number = 100
 
 
-class Coookie(ItemFood):
+class Cookie(ItemFood):
     number = 101
     heal_amount = 2
     saturation_modifier = 0.1
@@ -811,7 +817,7 @@ class Shears(Item):
             return 15.0
 
 
-class Melon(ItemFood):
+class MelonSlice(ItemFood):
     number = 104
     heal_amount = 2
     saturation_modifier = 0.3
@@ -871,7 +877,7 @@ class GhastTear(Item):
     number = 114
 
 
-class GoldenNugget(Item):
+class GoldNugget(Item):
     number = 115
 
 
@@ -1277,7 +1283,7 @@ def init_list():
             item = obj()
             item_db.register(item)
 
-    for block_name in ["wool", "wood", "wooden planks", "stone brick", "sandstone", "slab", "wooden slab", "saplings", "leaves", "grass", "cobblestone wall"]:
+    for block_name in ["wool", "wood", "wooden planks", "stone bricks", "sandstone", "slab", "wooden slab", "saplings", "leaves", "grass", "cobblestone wall"]:
         block = blocks.block_map[block_name]
         item_db.register(ItemBlockMulti(block=block))
 

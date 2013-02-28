@@ -984,7 +984,6 @@ class TNT(BlockCube):
     number = 46
     name = "TNT"
     material = materials.tnt
-    inventory_avoid = True
 
 
 class Bookshelf(BlockCube):
@@ -1020,7 +1019,7 @@ class MonsterSpawner(BlockCube):
     inventory_avoid = True
 
 
-class WoodenStairs(BlockStairs):
+class OakWoodStairs(BlockStairs):
     number = 53
     material = WoodenPlanks.material
 
@@ -1125,7 +1124,7 @@ class Ladders(BlockSolid):
         return True
 
 
-class Rail(BlockNonSolid):
+class Rails(BlockNonSolid):
     number = 66
     material = materials.circuits
 
@@ -1374,7 +1373,7 @@ class HiddenSilverfish(BlockCube):
     inventory_avoid = True
 
 
-class StoneBrick(BlockCube):
+class StoneBricks(BlockCube):
     number = 98
     material = materials.rock
     sub_names = ["", "Mossy", "Cracked", "Chiseled"]
@@ -1482,7 +1481,7 @@ class BrickStairs(BlockStairs):
 
 class StoneBrickStairs(BlockStairs):
     number = 109
-    material = StoneBrick.material
+    material = StoneBricks.material
 
 
 class Mycelium(BlockCube):
@@ -1803,13 +1802,13 @@ class TrappedChest(BlockChest):
 class WeightedPressurePlateLight(BlockSolid):
     number = 147
     material = materials.wood
-    name = "Weighted Pressure Plate (Light)"
+    name = "Weighted Pressure Plate Light"
 
 
 class WeightedPressurePlateHeavy(BlockSolid):
     number = 148
     material = materials.wood
-    name = "Weighted Pressure Plate (Heavy)"
+    name = "Weighted Pressure Plate Heavy"
 
 
 class RedstoneComparatorOffState(BlockSolid):
@@ -1856,7 +1855,7 @@ class QuartzStairs(BlockStairs):
     material = materials.wood
 
 
-class ActivatorRails(BlockNonSolid):
+class ActivatorRail(BlockNonSolid):
     number = 157
     material = materials.wood
 

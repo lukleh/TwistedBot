@@ -666,7 +666,7 @@ packets = {
                 AlphaString("team_display_name"),
                 AlphaString("team_prefix"),
                 AlphaString("team_suffix"),
-                Bool("friendly_fire"),
+                SBInt8("friendly_fire"),
                 SBInt16("player_count"),
                 AlphaString("players"),
                 ),

@@ -667,7 +667,19 @@ class CollectLayingAround(BTSelector):
             ent = self.get_closest_entity()
             if not self.blackboard.entities_has_entity_eid(ent.eid):
                 continue
-            yield self.make_behavior(TravelTo, bb=ent.aabb)
+            yield self.make_behavior(TravelTo, entity=ent.aabb)
+
+
+class CollectEntity(BTSequencer):
+    def __init__(self, itemstack=None, recipe=None, **kwargs):
+        super(CollectEntity, self).__init__(**kwargs)
+
+    def is_valid(self):
+        return self.blackboard.entities_has_entity_eid(ent.eid)
+
+    def choices(self):
+        yield self.make_behavior(TravelTo, bb=ent.aabb)
+        yield self.make_behavior(PickUp)
 
 
 class CollectMine(BTSequencer):
