@@ -66,6 +66,7 @@ class BlackBoard(object):
         self.inventory_player = self._world.inventories.player_inventory
         self.inventory_get_confirmation = self._world.inventories.get_confirmation
         self.inventory_item_collected_count = self._world.inventories.get_item_collected_count
+        self.inventory_tool_for_block = self._world.inventories.tool_for_block
         self.receive_inventory = self._world.inventories.get_open_window
         self.blocks_around = self._world.grid.blocks_in_distance
 
@@ -692,25 +693,19 @@ class CollectMine(BTSequencer):
         self.blocks_around = []
 
     def is_valid(self):
-        #TODO blackboard.has_tool_for go through inventory and check if any tool applies
-        return self.mine_tool and self.blocks_around
+        return self.blocks_around
 
     def setup(self):
-        #TODO blackboard.blocks_around  - find first X blocks, no max distance
+        _, self.have_tool, self.mine_tool = self.blackboard.inventory_tool_for_block(self.recipe.block)
         self.blocks_around = self.blackboard.blocks_around(self.blackboard.bot_object.position, block_number=self.recipe.block.number, block_filter=self.recipe.block_filter)
-        self.mine_tool = self.blackboard.inventory_tool_for(self.recipe.block)
-
+        
     def choices(self):
-        #TODO blackboard.tool_for_block - choose minimal tool for block
-        if self.mine_tool is None:
-            yield self.make_behavior(Collect, itemstack=self.blackboard.tool_for_block(self.recipe.block))
+        if not self.have_tool:
+            yield self.make_behavior(Collect, itemstack=self.blackboard.min_tool_for_block(self.recipe.block))
         for block in self.blocks_around:
-            dig_positions = self.blackboard.positions_to_dig(block.coords)
-            if not dig_positions:
-                continue
-            yield self.make_behavior(TravelTo, multiple_goals=dig_positions)
+            yield self.make_behavior(GetTo, digtarget=block.coords)
             yield self.make_behavior(InventorySelectActive, itemstack=self.mine_tool)
-            yield self.make_behavior(DigBlock, block)
+            yield self.make_behavior(DigBlock, block=block)
             yield self.make_behavior(WaitForDrop, block=block, itemstack=self.recipe.itemstack, drop_everytime=self.recipe.drop_everytime)
             break
 

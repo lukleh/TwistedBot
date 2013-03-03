@@ -50,14 +50,32 @@ def strength_vs_block(holding_item, block):
     return strength
 
 
-def debug_printout(itemstack, block_obj):
-    rbh = relative_block_hardness(itemstack, block_obj)
+def dig_ticks(itemstack, block):
+    rbh = relative_block_hardness(itemstack, block)
+    ticks = int(math.ceil(1.0 / rbh))
+    return ticks
+
+
+def is_diggable(block_cls):
+    return not block_cls.is_fluid and not block_cls.hardness < 0
+
+
+def is_instant(block_cls):
+    return block_cls.hardness == 0
+
+
+def needs_tool(block_cls):
+    return not block_cls.material.is_tool_not_required
+
+
+def debug_printout(itemstack, block):
+    rbh = relative_block_hardness(itemstack, block)
     ticks = int(math.ceil(1.0 / rbh))
     print 'TICKS %s RBH %.3f' % (ticks, rbh),
     if itemstack is not None:
-        print itemstack.name, '-', block_obj.name
+        print itemstack.name, '-', block.name
     else:
-        print itemstack, '-', block_obj.name
+        print itemstack, '-', block.name
 
 
 def debug_dig_ticks():
@@ -82,11 +100,10 @@ def debug_dig_ticks():
         if block.material.is_tool_not_required:
             print block.name, 'BARE HANDS'
             continue
-        block_obj = block(None, 0, 0, 0, 0)
         for itemstack in items.item_db.all_items():
-            debug_printout(itemstack, block_obj)
+            debug_printout(itemstack, block)
         else:
-            debug_printout(None, block_obj)
+            debug_printout(None, block)
 
 
 if __name__ == '__main__':

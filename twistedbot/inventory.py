@@ -236,6 +236,23 @@ class InvetoryContainer(object):
     def get_item_collected_count(self, itemstack):
         return self.item_collected_count[itemstack.name]
 
+    def tool_for_block(self, block_cls):
+        if not dig.is_digable(block_cls):
+            return False, False, None
+        if dig.is_instant(block_cls):
+            return True, True, None
+        hand_ticks = dig.dig_ticks(None, block_cls)
+        tool = None
+        lowest_ticks = hand_ticks
+        for _, istack in self.player_inventory.store_slots:
+            tool_ticks = dig.dig_ticks(istack, block_cls)
+            if tool_ticks < lowest_ticks:
+                lowest_ticks = tool_ticks
+                tool = istack
+        if dig.needs_tool(block_cls) and tool is None:
+            return True, False, None
+        return True, True, tool
+
 
 class OpenWindow(object):
     def __init__(self):
