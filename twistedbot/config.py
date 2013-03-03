@@ -4,15 +4,17 @@ import math
 DEBUG = False
 USE_ENCRYPTION = False
 WHISPER = False
+#To use online login you must also enable encryption
+ONLINE_LOGIN = False
 
 COMMANDER = "lukleh"
 COMMANDER = COMMANDER.lower()
 
 USERNAME = "twistedbot"
-PASSWORD = "yourpassword"
+PASSWORD = ""
 
-#This is the email address accoisated with your mojang account. If you have not migrated your minecraft account to a mojang account, set this to you minecraft username
-EMAIL = "the email associated with your mojang account"
+#This is the email address associated with your Mojang account. If you have not migrated your minecraft account to a Mojang account, set this to you minecraft username
+EMAIL = ""
 
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 25565

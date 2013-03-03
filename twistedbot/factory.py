@@ -22,6 +22,7 @@ proxy_processors.default.filter_packets = []
 
 log = logbot.getlogger("PROTOCOL")
 
+# This function courtesy of barneygale (taken from pyCraft)
 def javaHexDigest(digest):
     d = long(digest.hexdigest(), 16)
     if d >> 39 * 4 & 0x8:
@@ -435,7 +436,8 @@ class MineCraftProtocol(Protocol):
                 enc_shared_sercet = encryption.encrypt(key16, public_key)
                 enc_4bytes = encryption.encrypt(c.verify_token, public_key)
                 
-                auth(c.server_id, key16, c.public_key)
+                if config.ONLINE_LOGIN:
+                    auth(c.server_id, key16, c.public_key)
                 
                 self.send_packet(
                     "encryption key response",
