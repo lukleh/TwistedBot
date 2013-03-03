@@ -631,7 +631,6 @@ class GoldenApple(ItemFood):
         return self.sub_names[meta]
 
 
-
 class Sign(Item):
     number = 67
     stacksize = 16

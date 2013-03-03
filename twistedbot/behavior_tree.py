@@ -671,6 +671,7 @@ class CollectLayingAround(BTSelector):
 
 
 class CollectEntity(BTSequencer):
+    """ future work, unconnected"""
     def __init__(self, itemstack=None, recipe=None, **kwargs):
         super(CollectEntity, self).__init__(**kwargs)
 

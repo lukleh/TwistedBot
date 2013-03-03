@@ -282,7 +282,7 @@ class BlockOfStorage(BlockCube):
     material = materials.iron
 
 
-class BlockRedstoneRepeater(BlockSolid):
+class BlockRedstoneCircuit(BlockSolid):
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.125, 1.0)
     material = materials.circuits
     render_as_normal_block = False
@@ -584,29 +584,39 @@ class BlockPane(BlockMultiBox):
             out.append(AABB(0.4375, 0.0, 0.0, 0.5625, 1.0, 1.0).offset(self.x, self.y, self.z))
 
 
-class BlockFence(BlockSolid):
+class BlockFence(BlockMultiBox):
     is_opaque_cube = False
     render_as_normal_block = False
 
     @property
-    def grid_bounding_box(self):
-        if self.can_connect_to(self.x, self.y, self.z - 1):
+    def add_grid_bounding_boxes_to(self, out):
+        cmz = self.can_connect_to(self.x, self.y, self.z - 1)
+        cpz = self.can_connect_to(self.x, self.y, self.z + 1)
+        cmx = self.can_connect_to(self.x - 1, self.y, self.z)
+        cpx = self.can_connect_to(self.x + 1, self.y, self.z)
+        minx = 0.375
+        maxx = 0.625
+        minz = 0.375
+        maxz = 0.625
+        if cmz:
             minz = 0.0
-        else:
-            minz = 0.375
-        if self.can_connect_to(self.x, self.y, self.z + 1):
+        if cpz:
             maxz = 1.0
-        else:
-            maxz = 0.625
-        if self.can_connect_to(self.x - 1, self.y, self.z):
+        if cmz or cpz:
+            out.append(AABB(minx, 0, minz, maxx, 1.5, maxz).offset(self.x, self.y, self.z))
+        minz = 0.375
+        maxz = 0.625
+        if cmx:
             minx = 0.0
-        else:
-            minx = 0.375
-        if self.can_connect_to(self.x + 1, self.y, self.z):
+        if cpx:
             maxx = 1.0
-        else:
-            maxx = 0.625
-        return AABB(minx, 0, minz, maxx, 1.5, maxz).offset(self.x, self.y, self.z)
+        if cmx or cpx or not cmz and not cpz:
+            out.append(AABB(minx, 0, minz, maxx, 1.5, maxz).offset(self.x, self.y, self.z))
+        if cmz:
+            minz = 0.0
+        if cpz:
+            maxz = 1.0
+        out.append(AABB(minx, 0, minz, maxx, 1.0, maxz).offset(self.x, self.y, self.z))
 
     def can_connect_to(self, x, y, z):
         blk = self.grid.get_block(x, y, z)
@@ -1193,19 +1203,15 @@ class Snow(BlockBiCollidable):
     render_as_normal_block = False
     is_opaque_cube = False
     bounding_box = None
-    inventory_avoid = True
 
     @property
     def is_collidable(self):
-        return (self.meta & 7) >= 3
+        return (self.meta & 7) > 0
 
     @property
     def grid_bounding_box(self):
         m = self.meta & 7
-        if m >= 3:
-            return AABB(0.0, 0.0, 0.0, 1.0, 0.5, 1.0).offset(self.x, self.y, self.z)
-        else:
-            return None
+        return AABB(0.0, 0.0, 0.0, 1.0, m * 0.125, 1.0).offset(self.x, self.y, self.z)
 
     @property
     def can_stand_in(self):
@@ -1317,13 +1323,13 @@ class Cake(BlockSolid):
         return AABB(f1, 0.0, f, 1.0 - f, 0.5 - f, 1.0 - f).offset(self.x, self.y, self.z)
 
 
-class RedstoneRepeaterOff(BlockRedstoneRepeater):
+class RedstoneRepeaterOff(BlockRedstoneCircuit):
     inventory_avoid = True
     number = 93
     name = "Redstone Repeater (inactive)"
 
 
-class RedstoneRepeaterOn(BlockRedstoneRepeater):
+class RedstoneRepeaterOn(BlockRedstoneCircuit):
     inventory_avoid = True
     number = 94
     name = "Redstone Repeater (active)"
@@ -1799,28 +1805,26 @@ class TrappedChest(BlockChest):
     material = materials.wood
 
 
-class WeightedPressurePlateLight(BlockSolid):
+class WeightedPressurePlateLight(BlockNonSolid):
     number = 147
-    material = materials.wood
+    material = materials.iron
     name = "Weighted Pressure Plate Light"
 
 
-class WeightedPressurePlateHeavy(BlockSolid):
+class WeightedPressurePlateHeavy(BlockNonSolid):
     number = 148
-    material = materials.wood
+    material = materials.iron
     name = "Weighted Pressure Plate Heavy"
 
 
-class RedstoneComparatorOffState(BlockSolid):
+class RedstoneComparatorOffState(BlockRedstoneCircuit):
     number = 149
-    material = materials.wood
     name = "Redstone Comparator (inactive)"
     inventory_avoid = True
 
 
-class RedstoneComparatorOnState(BlockSolid):
+class RedstoneComparatorOnState(BlockRedstoneCircuit):
     number = 150
-    material = materials.wood
     name = "Redstone Comparator (active)"
     inventory_avoid = True
 
@@ -1828,41 +1832,50 @@ class RedstoneComparatorOnState(BlockSolid):
 class DaylightSensor(BlockSolid):
     number = 151
     material = materials.wood
+    bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.375, 1.0)
 
 
 class BlockOfRedstone(BlockCube):
     number = 152
-    material = materials.wood
+    material = materials.iron
 
 
 class NetherQuartzOre(BlockOre):
     number = 153
-    material = materials.wood
+    material = materials.rock
 
 
-class Hopper(BlockCube):
+class Hopper(BlockMultiBox):
     number = 154
-    material = materials.wood
+    material = materials.iron
+
+    def add_grid_bounding_boxes_to(self, out):
+        out.append(AABB(0.0, 0.0, 0.0, 1.0, 0.625, 1.0).offset(self.x, self.y, self.z))
+        side = 0.125
+        out.append(AABB(0.0, 0.0, 0.0, side, 1.0, 1.0).offset(self.x, self.y, self.z))
+        out.append(AABB(0.0, 0.0, 0.0, 1.0, 1.0, side).offset(self.x, self.y, self.z))
+        out.append(AABB(1.0 - side, 0.0, 0.0, 1.0, 1.0, 1.0).offset(self.x, self.y, self.z))
+        out.append(AABB(0.0, 0.0, 1.0 - side, 1.0, 1.0, 1.0).offset(self.x, self.y, self.z))
 
 
 class BlockOfQuartz(BlockCube):
     number = 155
-    material = materials.wood
+    material = materials.rock
 
 
 class QuartzStairs(BlockStairs):
     number = 156
-    material = materials.wood
+    material = BlockOfQuartz.material
 
 
 class ActivatorRail(BlockNonSolid):
     number = 157
-    material = materials.wood
+    material = materials.circuits
 
 
 class Dropper(BlockCube):
     number = 158
-    material = materials.wood
+    material = materials.rock
 
 
 log.msg("registered %d blocks" % len(block_map))

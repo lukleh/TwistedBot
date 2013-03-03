@@ -1,7 +1,7 @@
 # Bot/Proxy for Minecraft
 Twitter [@lukleh](https://twitter.com/lukleh "@lukleh")
 #### Technical info
-- Support for Minecraft 1.5, protocol version 58
+- Support for Minecraft 1.5, protocol version 60
 - Code is for Python 2.7
 - Running under [PyPy](http://pypy.org/ "PyPy")
 - Clean [flake8](http://pypi.python.org/pypi/flake8/ "flake8") with long lines

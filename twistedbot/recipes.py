@@ -404,7 +404,7 @@ class Redmushroom(MineBluePrint):
 class Blockofgold(CraftBluePrint):
     name = "block of gold"
     plan = ["GGG", "GGG", "GGG"]
-    parts = {"G": "gold ingot"}    
+    parts = {"G": "gold ingot"}
 
 
 class BlockOfIron(CraftBluePrint):
@@ -573,6 +573,13 @@ class Redstonetorch(CraftBluePrint):
 class Stonebutton(CraftBluePrint):
     name = "stone button"
     parts = ["stone"]
+
+
+class Snow(CraftBluePrint):
+    name = "snow"
+    plan = ["   ", "   ", "BBB"]
+    parts = {"B": "snow block"}
+    count = 6
 
 
 class Snowblock(CraftBluePrint):
@@ -1874,7 +1881,6 @@ class MinecartwithHopper(CraftBluePrint):
 
 class Discs(CustomBluePrint):
     pass
-
 
 
 class RecipesDB(object):
