@@ -2,10 +2,10 @@
 import math
 
 DEBUG = False
-USE_ENCRYPTION = False
 WHISPER = False
-#To use online login you must also enable encryption
+#To use online login, encryption must also be enabled
 ONLINE_LOGIN = False
+USE_ENCRYPTION = ONLINE_LOGIN
 
 COMMANDER = "lukleh"
 COMMANDER = COMMANDER.lower()
@@ -26,6 +26,7 @@ DIFFICULTY = 0  # 0-3 peaceful, easy, normal, hard
 PROTOCOL_VERSION = 60
 CONNECTION_MAX_DELAY = 5
 CONNECTION_INITIAL_DELAY = 0.1
+KEEP_ALIVE_PERIOD = 300  # that is 6000 ticks
 
 WORLD_HEIGHT = 256
 CHUNK_SIDE_LEN = 16

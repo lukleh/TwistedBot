@@ -8,11 +8,12 @@ syspath_fix.update_sys_path()
 
 from twisted.internet import reactor
 from twisted.protocols import basic
+from twisted.internet.defer import inlineCallbacks
 
-from twistedbot.factory import MineCraftFactory
-from twistedbot.world import World
+import twistedbot.factory as factory
 import twistedbot.config as config
 import twistedbot.logbot as logbot
+from twistedbot.world import World
 
 
 log = logbot.getlogger("MAIN")
@@ -49,6 +50,12 @@ def start():
     parser.add_argument('--botemail', default=config.EMAIL,
                         dest='botemail',
                         help='email address that will be used by the bot')
+    parser.add_argument('--onlinemode',
+                        action='store_true',
+                        help='Authenticate with Mojang')
+    parser.add_argument('--use_encryption',
+                        action='store_true',
+                        help='use encryption, turned true if onlinemode used')
     parser.add_argument('--commandername', default=config.COMMANDER,
                         dest='commandername',
                         help='your username that you use in Minecraft')
@@ -61,6 +68,10 @@ def start():
     config.USERNAME = args.botname
     config.PASSWORD = args.botpass
     config.EMAIL = args.botemail
+    config.USE_ENCRYPTION = args.use_encryption or args.onlinemode
+    config.ONLINE_LOGIN = args.onlinemode
+    if config.USE_ENCRYPTION:
+        factory.import_encryption()  
     config.COMMANDER = args.commandername.lower()
     host = args.serverhost
     port = args.serverport
@@ -70,17 +81,23 @@ def start():
         stdio.StandardIO(ConsoleChat(world))
     except ImportError:
         log.msg("no terminal chat available")
-
-    mc_factory = MineCraftFactory(world)
+    mc_factory = factory.MineCraftFactory(world)
 
     def customKeyboardInterruptHandler(signum, stackframe):
         log.msg("CTRL-C from user, exiting....")
         mc_factory.log_connection_lost = False
         reactor.callFromThread(reactor.stop)
 
+    @inlineCallbacks
+    def connect():
+        if config.ONLINE_LOGIN:
+            yield mc_factory.online_auth()
+        if mc_factory.clean_to_connect:
+            reactor.connectTCP(host, port, mc_factory)
+    connect()
+
     signal.signal(signal.SIGINT, customKeyboardInterruptHandler)
     reactor.addSystemEventTrigger("before", "shutdown", world.on_shutdown)
-    reactor.connectTCP(host, port, mc_factory)
     reactor.run()
 
 

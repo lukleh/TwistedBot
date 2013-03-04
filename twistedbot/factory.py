@@ -4,17 +4,26 @@ from collections import deque
 
 from twisted.internet.protocol import ReconnectingClientFactory, Protocol
 from twisted.internet import reactor
+from twisted.web.client import getPage
+from twisted.internet.defer import inlineCallbacks
 
 import config
 import hashlib
-import urllib
-import time
 import logbot
 import proxy_processors.default
 import utils
 from packets import parse_packets, make_packet, packets_by_name, Container
 from proxy_processors.default import process_packets as packet_printout
-from Crypto.Random import _UserFriendlyRNG
+
+encryption = None
+
+
+def import_encryption():
+    global encryption
+    try:
+        import encryption
+    except ImportError:
+        log.err('Encryption is demanded but PyCrypto not installed. This is not going to have a good end.')
 
 
 proxy_processors.default.ignore_packets = []
@@ -22,28 +31,6 @@ proxy_processors.default.filter_packets = []
 
 log = logbot.getlogger("PROTOCOL")
 
-# This function courtesy of barneygale (taken from pyCraft)
-def javaHexDigest(digest):
-    d = long(digest.hexdigest(), 16)
-    if d >> 39 * 4 & 0x8:
-        d = "-%x" % ((-d) & (2 ** (40 * 4) - 1))
-    else:
-        d = "%x" % d
-    return d
-
-def auth(id, secret, key):
-    shaobj = hashlib.sha1()
-    shaobj.update(id)
-    shaobj.update(secret) 
-    shaobj.update(key)
-    hash = javaHexDigest(shaobj)		
- 	
-    url = urllib.urlopen("http://login.minecraft.net?user=" + config.EMAIL + "&password=" + config.PASSWORD + "&version=1337")
-    response = url.readline()
-    log.msg(response)
-    responses = response.split(':')
-    derp = urllib.urlopen("http://session.minecraft.net/game/joinserver.jsp?user=" + responses[2] + "&serverId=" + hash + "&sessionId=" + responses[3])
-    log.msg(derp.readline())
 
 class MineCraftProtocol(Protocol):
     def __init__(self, world):
@@ -121,7 +108,6 @@ class MineCraftProtocol(Protocol):
 
     def connectionMade(self):
         self.world.connection_made()
-        log.msg("sending Handshake")
         self.send_packet("handshake", {"protocol": config.PROTOCOL_VERSION,
                                        "username": config.USERNAME,
                                        "server_host": config.SERVER_HOST,
@@ -145,8 +131,7 @@ class MineCraftProtocol(Protocol):
     def parse_stream(self, bytestream):
         if self.encryption_on:
             bytestream = self.decipher.decrypt(bytestream)
-        parsed_packets, self.leftover = parse_packets(
-            self.leftover + bytestream)
+        parsed_packets, self.leftover = parse_packets(self.leftover + bytestream)
         if config.DEBUG:
             packet_printout("SERVER", parsed_packets, self.encryption_on, self.leftover)
         self.packets.extend(parsed_packets)
@@ -425,26 +410,39 @@ class MineCraftProtocol(Protocol):
         self.encryption_on = True
         self.send_packet("client statuses", {"status": 0})
 
+    @inlineCallbacks
+    def do_auth(self, id, key):
+        log.msg('doing online authentication')
+        shaobj = hashlib.sha1()
+        shaobj.update(id)
+        shaobj.update(self.factory.client_key)
+        shaobj.update(key)
+        d = long(shaobj.hexdigest(), 16)
+        if d >> 39 * 4 & 0x8:
+            d = "-%x" % ((-d) & (2 ** (40 * 4) - 1))
+        else:
+            d = "%x" % d
+        hashstr = d
+        url = "http://session.minecraft.net/game/joinserver.jsp?user=%s&serverId=%s&sessionId=%s" % (self.factory.case_username, hashstr, self.factory.session_id)
+        response = yield getPage(url).addErrback(logbot.exit_on_error)
+        log.msg("responce from http://session.minecraft.net: %s" % response)
+
+    @inlineCallbacks
     def p_encryption_key_request(self, c):
         if config.USE_ENCRYPTION:
             try:
-                import encryption
-                key16 = encryption.get_random_bytes()
-                self.cipher = encryption.make_aes(key16, key16)
-                self.decipher = encryption.make_aes(key16, key16)
+                self.cipher = encryption.make_aes(self.factory.client_key, self.factory.client_key)
+                self.decipher = encryption.make_aes(self.factory.client_key, self.factory.client_key)
                 public_key = encryption.load_pubkey(c.public_key)
-                enc_shared_sercet = encryption.encrypt(key16, public_key)
+                enc_shared_sercet = encryption.encrypt(self.factory.client_key, public_key)
                 enc_4bytes = encryption.encrypt(c.verify_token, public_key)
-                
                 if config.ONLINE_LOGIN:
-                    auth(c.server_id, key16, c.public_key)
-                
-                self.send_packet(
-                    "encryption key response",
-                    {"shared_length": len(enc_shared_sercet),
-                     "shared_secret": enc_shared_sercet,
-                     "token_length": len(enc_4bytes),
-                     "token_secret": enc_4bytes})
+                    yield self.do_auth(c.server_id, c.public_key)
+                self.send_packet("encryption key response",
+                                 {"shared_length": len(enc_shared_sercet),
+                                 "shared_secret": enc_shared_sercet,
+                                 "token_length": len(enc_4bytes),
+                                 "token_secret": enc_4bytes})
             except ImportError:
                 log.msg('PyCrypto not installed, skipping encryption.')
                 self.send_packet("client statuses", {"status": 0})
@@ -465,12 +463,38 @@ class MineCraftFactory(ReconnectingClientFactory):
         self.initialDelay = config.CONNECTION_INITIAL_DELAY
         self.delay = self.initialDelay
         self.log_connection_lost = True
+        self.client_key = None
+        self.clean_to_connect = True
+
+    def startFactory(self):
+        if config.USE_ENCRYPTION:
+            self.client_key = encryption.get_random_bytes()
+
+    @inlineCallbacks
+    def online_auth(self):
+        if config.ONLINE_LOGIN:
+            log.msg('doing online login')
+            url = "http://login.minecraft.net/?user=%s&password=%s&version=1337" % (config.EMAIL, config.PASSWORD)
+            response = yield getPage(url).addErrback(logbot.exit_on_error)
+            log.msg("responce from http://login.minecraft.net: %s" % response)
+            if ":" not in response:  # TODO well this is blunt approach, should use code with http code check
+                self.clean_to_connect = False
+                reactor.stop()
+            else:
+                _, _, self.case_username, self.session_id, _ = response.split(':')
+                utils.do_later(10, self.keep_alive)
+
+    def keep_alive(self):
+        log.msg('keep alive to https://login.minecraft.net')
+        url = "https://login.minecraft.net/session?name=%s&session=%s" % (self.case_username, self.session_id)
+        getPage(url)
+        utils.do_later(config.KEEP_ALIVE_PERIOD, self.keep_alive)
 
     def startedConnecting(self, connector):
-        log.msg('Started connecting...')
+        log.msg('started connecting to %s:%d' % (connector.host, connector.port))
 
     def buildProtocol(self, addr):
-        log.msg('Connected!')
+        log.msg('connected to %s:%d' % (addr.host, addr.port))
         if self.delay > self.initialDelay:
             log.msg('Resetting reconnection delay')
             self.resetDelay()
