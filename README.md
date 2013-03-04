@@ -11,7 +11,7 @@ Twitter [@lukleh](https://twitter.com/lukleh "@lukleh")
 
 ## Bot
 #### Features
-- Client side artificial player for Minecraft that runs on vanilla server in offline mode. No modification on server/client side needed.
+- Client side artificial player for Minecraft that runs on vanilla server in online(needs encryption) and offline mode. No modification on server/client side needed.
 - Basic pathfinding
 - Solid block awareness
 - Avoiding lava, web and cactus
