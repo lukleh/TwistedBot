@@ -638,6 +638,7 @@ class UnloadInvetoryToChest(BTSelector):
         return True
 
     def choices(self):
+        """ for now just dump it """
         yield self.make_behavior(DropInventory)
 
 
@@ -698,12 +699,14 @@ class CollectMine(BTSequencer):
     def setup(self):
         _, self.have_tool, self.mine_tool = self.blackboard.inventory_tool_for_block(self.recipe.block)
         self.blocks_around = self.blackboard.blocks_around(self.blackboard.bot_object.position, block_number=self.recipe.block.number, block_filter=self.recipe.block_filter)
-        
+
     def choices(self):
         if not self.have_tool:
-            yield self.make_behavior(Collect, itemstack=self.blackboard.min_tool_for_block(self.recipe.block))
+            yield self.make_behavior(Collect, itemstack=self.blackboard.inventory_min_tool_for_block(self.recipe.block))
         for block in self.blocks_around:
             yield self.make_behavior(GetTo, digtarget=block.coords)
+            if not self.have_tool:
+                yield self.make_behavior(Collect, itemstack=self.blackboard.inventory_min_tool_for_block(self.recipe.block))
             yield self.make_behavior(InventorySelectActive, itemstack=self.mine_tool)
             yield self.make_behavior(DigBlock, block=block)
             yield self.make_behavior(WaitForDrop, block=block, itemstack=self.recipe.itemstack, drop_everytime=self.recipe.drop_everytime)

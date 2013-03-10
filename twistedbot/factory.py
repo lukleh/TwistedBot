@@ -81,6 +81,7 @@ class MineCraftProtocol(Protocol):
             60: self.p_explosion,
             61: self.p_sound,
             62: self.p_named_sound,
+            63: self.p_particle,
             70: self.p_state,
             71: self.p_thunderbolt,
             100: self.p_open_window,
@@ -324,6 +325,9 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_named_sound(self, c):
+        pass
+
+    def p_particle(self, c):
         pass
 
     def p_state(self, c):
