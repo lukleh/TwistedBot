@@ -241,7 +241,7 @@ class MineCraftProtocol(Protocol):
     def p_spawn_mob(self, c):
         self.world.entities.on_new_mob(eid=c.eid, etype=c.type, x=c.x, y=c.y,
                                        z=c.z, yaw=c.yaw, pitch=c.pitch,
-                                       head_pitch=c.head_pitch,
+                                       head_yaw=c.head_yaw,
                                        velocity_x=c.velocity_x,
                                        velocity_y=c.velocity_y,
                                        velocity_z=c.velocity_z,
