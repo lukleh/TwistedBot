@@ -659,7 +659,7 @@ packets = {
     206: Struct("create scoreboard",
                 AlphaString("name"),
                 AlphaString("display_text"),
-                Bool("create_remove"),
+                SBInt8("create_remove"),
                 ),
     207: Struct("update scoreboard",
                 AlphaString("item_name"),

@@ -73,10 +73,10 @@ class EntityLiving(Entity):
 
 
 class EntityMob(EntityLiving):
-    def __init__(self, etype=None, head_yaw=None, velocity_x=None, velocity_y=None, velocity_z=None, metadata=None, **kwargs):
+    def __init__(self, etype=None, head_pitch=None, velocity_x=None, velocity_y=None, velocity_z=None, metadata=None, **kwargs):
         super(EntityMob, self).__init__(**kwargs)
         self.etype = etype
-        self.head_yaw = head_yaw
+        self.head_pitch = head_pitch
         self.status = None
         self.is_mob = True
         #TODO assign mob type according to the etype and metadata

@@ -269,6 +269,10 @@ class BTGoal(BTbase):
     def choices(self):
         raise NotImplementedError()
 
+    @property
+    def goal_reached(self):
+        raise NotImplementedError()
+
     def sleep_ticks(self, tplus):
         self.sleep_until = self.blackboard.world_current_tick + tplus
 
