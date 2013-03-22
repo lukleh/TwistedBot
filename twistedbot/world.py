@@ -94,7 +94,7 @@ class World(object):
         if self.protocol is not None:
             self.protocol.send_packet(name, payload)
         else:
-            log.msg("Trying to send %s while disconnected" % name)
+            log.err("Trying to send %s while disconnected" % name)
 
     def dimension_change(self, dimension):
         dim = dimension + 1  # to index from 0

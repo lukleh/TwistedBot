@@ -673,19 +673,20 @@ class CollectLayingAround(BTSelector):
             ent = self.get_closest_entity()
             if not self.blackboard.entities_has_entity_eid(ent.eid):
                 continue
-            yield self.make_behavior(TravelTo, entity=ent.aabb)
+            yield self.make_behavior(CollectEntity, entity=ent)
 
 
 class CollectEntity(BTSequencer):
     """ future work, unconnected"""
-    def __init__(self, itemstack=None, recipe=None, **kwargs):
+    def __init__(self, entity=None, **kwargs):
         super(CollectEntity, self).__init__(**kwargs)
+        self.entity = entity
 
     def is_valid(self):
-        return self.blackboard.entities_has_entity_eid(ent.eid)
+        return self.blackboard.entities_has_entity_eid(self.entity.eid)
 
     def choices(self):
-        yield self.make_behavior(TravelTo, bb=ent.aabb)
+        yield self.make_behavior(GetTo, bb=self.entity.expand(1, 0.5, 1))
         yield self.make_behavior(PickUp)
 
 

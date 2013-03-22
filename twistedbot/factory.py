@@ -512,5 +512,6 @@ class MineCraftFactory(ReconnectingClientFactory):
         ReconnectingClientFactory.clientConnectionLost(self, connector, unused_reason)
 
     def clientConnectionFailed(self, connector, reason):
-        log.msg('Connection failed, reason:', reason.getErrorMessage())
+        if self.log_connection_lost:
+            log.msg('Connection failed, reason:', reason.getErrorMessage())
         ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
