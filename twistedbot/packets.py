@@ -664,8 +664,13 @@ packets = {
     207: Struct("update scoreboard",
                 AlphaString("item_name"),
                 SBInt8("update_remove"),
-                AlphaString("score_name"),
-                SBInt32("value"),
+                If(lambda context: context["update_remove"] != 1,
+                  Embed(Struct("namevalue",
+                    AlphaString("score_name"),
+                    SBInt32("value"),
+                    )
+                  )
+                  )
                 ),
     208: Struct("display scoreboard",
                 SBInt8("position"),
