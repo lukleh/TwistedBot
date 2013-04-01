@@ -207,12 +207,11 @@ class InvetoryContainer(object):
             self.on_openwindow = None
 
     def active_slot_change(self, sid):
-        log.msg("active slot changed to %d" % sid)
         self.player_inventory.active_slot = sid
 
-    def confirm_transaction(self, window_id=None, action_number=None, acknowledged=None):
+    def confirm_transaction(self, window_id, action_number, confirmed):
         if self.on_confirmation is not None:
-            self.on_confirmation.confirm(window_id=window_id, action_number=action_number, acknowledged=acknowledged)
+            self.on_confirmation.confirm(window_id=window_id, action_number=action_number, confirmed=confirmed)
             utils.do_now(self.on_confirmation.d.callback, self.on_confirmation.confirmed)
             self.on_confirmation = None
 
@@ -223,7 +222,7 @@ class InvetoryContainer(object):
             self.item_collected_count[itemstack.name] += itemstack.count
             log.msg("collected %s" % itemstack)
 
-    def get_confirmation(self, action_number=None, window_id=0):
+    def get_confirmation(self, action_number, window_id):
         con = Confirmation(action_number=action_number, window_id=window_id)
         self.on_confirmation = con
         return con.d
@@ -260,22 +259,22 @@ class OpenWindow(object):
 
 
 class Confirmation(object):
-    def __init__(self, window_id=0, action_number=None):
+    def __init__(self, window_id, action_number):
         self.d = Deferred()
         self.window_id = window_id
         self.action_number = action_number
         self.confirmed = False
 
-    def confirm(self, window_id=None, action_number=None, acknowledged=None):
+    def confirm(self, window_id, action_number, confirmed):
         if self.window_id != window_id:
             return
         if self.action_number != action_number:
             return
-        self.confirmed = acknowledged
+        self.confirmed = confirmed
 
 
 class InventoryManipulation(object):
-    def __init__(self, inventory=None, blackboard=None):
+    def __init__(self, inventory, blackboard):
         self.inventory = inventory
         self.blackboard = blackboard
         self.clicked_slot = None

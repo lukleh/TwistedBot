@@ -33,6 +33,10 @@ class Chat(object):
             self.send_chat_message(self.chat_spam_treshold_buffer.popleft())
 
     def send_chat_message(self, msg):
+        if isinstance(msg, list):
+            for line in msg:
+                self.send_chat_message(line)
+            return
         log.msg("out| %s" % msg)
         if self.world.commander.in_game:
             if self.chat_spam_treshold_count > 160:
@@ -45,6 +49,7 @@ class Chat(object):
                 return
             if config.WHISPER:
                 msg = "/tell %s %s" % (self.world.commander.name, msg)
+            #TODO split msg in a better way
             if len(msg) > 100:
                 self.chat_spam_treshold_buffer.appendleft(msg[:100])
                 self.chat_spam_treshold_buffer.appendleft(msg[100:])
@@ -60,7 +65,7 @@ class Chat(object):
         msg = msg.lower()
         return msg
 
-    def parse_full(self, msg):
+    def parse_message(self, msg):
         try:
             p = self.commander_message.parseString(msg)
         except ParseException:
@@ -68,7 +73,7 @@ class Chat(object):
         else:
             return p.commander, p.command
 
-    def parse_partial(self, msg):
+    def parse_command(self, msg):
         try:
             p = self.command_part.parseString(msg)
         except ParseException:
@@ -76,121 +81,30 @@ class Chat(object):
         else:
             return p.command
 
-    def on_chat_message(self, msg):
-        msg = self.clean(msg)
-        commander, command = self.parse_full(msg)
-        if commander == config.COMMANDER:
-            log.msg("in # %s" % msg)
-            self.process_command(command)
-
     def process_command_line(self, msg):
-        command = self.parse_partial(msg)
-        self.process_command(command)
-
-    def process_command(self, command):
+        command = self.parse_command(msg)
         if not command:
-            self.send_chat_message("your message does not appear to be a command")
+            log.msg("your message does not appear to be a command")
             return
+        self.process_command("operator", command)
+
+    def process_command(self, sender, command):
         cmd_msg = " ".join(command)
         log.msg("possible command >%s<" % cmd_msg)
         verb = command[0]
-        subject = command[1:] if len(command) > 1 else []
-        self.parse_command(verb, subject, cmd_msg)
+        subject = command[1:]
+        self.dispatch_command(sender, verb, subject, cmd_msg)
 
-    def parse_command(self, verb, subject, cmd_msg):
-        if verb == "rotate" or verb == "circulate":
-            if subject:
-                self.world.bot.behavior_tree.new_command(bt.WalkSigns, group=" ".join(subject), walk_type=verb)
-            else:
-                self.send_chat_message("which sign group to %s?" % verb)
-        elif verb == "go":
-            if subject:
-                self.world.bot.behavior_tree.new_command(bt.GoToSign, sign_name=" ".join(subject))
-            else:
-                self.send_chat_message("go where?")
-        elif verb == "look":
-            if subject == ["at", "me"]:
-                self.world.bot.behavior_tree.new_command(bt.LookAtPlayer)
-            else:
-                self.send_chat_message("look at what?")
-        elif verb == "collect":
-            if subject:
-                itemstack, count = bt.CollectResources.parse_parameters(subject)
-                if itemstack is None:
-                    self.send_chat_message("collect what item?")
-                    return
-                if count is None:
-                    self.send_chat_message("what amount of %s to collect?" % itemstack.name)
-                    return
-                if count < 1:
-                    self.send_chat_message("amount has to be bigger that zero" % itemstack.name)
-                    return
-                self.world.bot.behavior_tree.new_command(bt.CollectResources, itemstack=itemstack)
-            else:
-                self.send_chat_message("collect what?")
-        elif verb == "follow":
-            self.world.bot.behavior_tree.new_command(bt.FollowPlayer)
-        elif verb == "stop":
-            self.world.bot.behavior_tree.cancel_running()
-        elif verb == "show":
-            if subject:
-                what = subject[0]
-                if what == "sign":
-                    sign_name = " ".join(subject[1:])
-                    if not sign_name:
-                        self.send_chat_message("show which sign?")
-                        return
-                    sign = self.world.sign_waypoints.get_namepoint(sign_name)
-                    if sign is not None:
-                        self.send_chat_message(str(sign))
-                        return
-                    sign = self.world.sign_waypoints.get_name_from_group(sign_name)
-                    if sign is not None:
-                        self.send_chat_message(str(sign))
-                        return
-                    if not self.world.sign_waypoints.has_group(sign_name):
-                        self.send_chat_message("no group named %s" % sign_name)
-                        return
-                    for sign in self.world.sign_waypoints.ordered_sign_groups[sign_name].iter():
-                        self.send_chat_message(str(sign))
-                elif what == "inventory":
-                    content = [i for i in self.world.inventories.player_inventory.slot_items()]
-                    if content:
-                        for slot_id, item in content:
-                            self.send_chat_message("slot %d %s" % (slot_id, item))
-                    else:
-                        self.send_chat_message("inventory is empty")
-                elif what == "cursor":
-                    self.world.bot.behavior_tree.new_command(bt.ShowPlayerCursor)
-                else:
-                    self.send_chat_message("I can show sign, inventory and cursor")
-            else:
-                self.send_chat_message("show what?")
-        elif verb == "drop":
-            if subject:
-                what = subject[0]
-                if what == "inventory":
-                    self.world.bot.behavior_tree.new_command(bt.DropInventory)
-                else:
-                    self.send_chat_message("unknown subject")
-            else:
-                self.send_chat_message("drop what?")
-        elif verb == "debug":
-            if subject:
-                what = subject[0]
-                if what == "inventoryselect":
-                    item_name = " ".join(subject[1:])
-                    if not item_name:
-                        self.send_chat_message("specify item")
-                        return
-                    itemstack = bt.InventorySelect.parse_parameters(item_name)
-                    if itemstack is not None:
-                        self.world.bot.behavior_tree.new_command(bt.InventorySelect, itemstack=itemstack)
-                    else:
-                        self.send_chat_message("unknown item %s" % item_name)
-                else:
-                    self.send_chat_message("unknown subject")
-            else:
-                self.send_chat_message("debug what?")
+    @property
+    def verbs(self):
+        return self.world.eventregister.chat_commands
+
+    def dispatch_command(self, sender, verb, subject, cmd_msg):
+        if verb in self.verbs:
+            try:
+                self.verbs[verb].command(sender, verb, subject)
+            except Exception as e:
+                log.err(e, "error for command %s" % verb)
+                self.send_chat_message("code error in this command")
         else:
             self.send_chat_message("Unknown command: %s" % cmd_msg)

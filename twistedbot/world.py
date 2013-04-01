@@ -13,13 +13,13 @@ from statistics import Statistics
 from chat import Chat
 from botentity import BotEntity
 from signwaypoints import SignWayPoints
+from eventregister import EventRegister
 
 
 log = logbot.getlogger("WORLD")
 
 
 class Dimension(object):
-
     def __init__(self, world):
         self.world = world
         self.entities = Entities(self)
@@ -31,6 +31,9 @@ class World(object):
     def __init__(self, host=None, port=None, commander_name=None, bot_name=None):
         self.server_host = host
         self.server_port = port
+        self.config = config
+        self.eventregister = EventRegister(self)
+        self.eventregister.setup()
         self.commander = Commander(commander_name)
         self.chat = Chat(self)
         self.stats = Statistics()
@@ -77,15 +80,6 @@ class World(object):
     def every_n_ticks(self, n=100):
         self.game_ticks += 1
 
-    def on_connection_lost(self):
-        self.connected = False
-        self.logged_in = False
-        self.protocol = None
-        self.bot.on_connection_lost()
-
-    def connection_made(self):
-        self.connected = True
-
     def on_shutdown(self):
         log.msg("Shutdown")
         self.factory.log_connection_lost = False
@@ -104,30 +98,6 @@ class World(object):
         if not self.entities.has_entity_eid(self.bot.eid):
             self.entities.new_bot(self.bot.eid)
         log.msg("NEW DIMENSION %d" % dim)
-
-    def on_login(self, bot_eid=None, game_mode=None, dimension=None, difficulty=None):
-        self.bot.eid = bot_eid
-        self.logged_in = True
-        self.dimension_change(dimension)
-        self.game_mode = game_mode
-        self.difficulty = difficulty
-        self.bot.behavior_tree.blackboard.setup()
-
-    def on_spawn_position(self, x, y, z):
-        self.spawn_position = (x, y, z)
-        self.bot.spawn_point_received = True
-
-    def on_respawn(self, game_mode=None, dimension=None, difficulty=None):
-        self.dimension_change(dimension)
-        self.game_mode = game_mode
-        self.difficulty = difficulty
-        self.bot.location_received = False
-        self.bot.spawn_point_received = False
-        self.bot.i_am_dead = False
-
-    def on_time_update(self, timestamp=None, daytime=None):
-        self.timestamp = timestamp
-        self.daytime = daytime
 
     @property
     def server_lag(self):

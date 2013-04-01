@@ -6,31 +6,42 @@ import abc
 from functools import wraps
 
 
+class PluginMeta(abc.ABCMeta): 
+    def __new__(meta, name, bases, dct):
+        cls = super(PluginMeta, meta).__new__(meta, name, bases, dct)
+        cls.handlers = []
+        for name, obj in cls.__dict__.iteritems():
+            if hasattr(obj, "__call__") and  name.startswith("on_"):
+                cls.handlers.append(name)
+        return cls
+
+
 class PluginBase(object):
-    __metaclass__ = abc.ABCMeta
+    __metaclass__ = PluginMeta
 
     def __init__(self, world):
         self.world = world
-        self.world.eventregister.register_plugin(self)
-        
-    @classmethod
-    def register(cls, fn):
-        if not getattr(cls, "handlers", False):
-            cls.handlers = []
-        cls.handlers.append(fn.__name__)
-        @wraps
-        def f(self):
-            return fn(self, **kwargs)
-        return f
 
 
 class PluginChatBase(PluginBase):
+
+    def send_chat_message(self, msg):
+        self.world.chat.send_chat_message(msg)
+
     @abc.abstractproperty
     def command_verb(self):
         pass
 
+    @property
+    def aliases(self):
+        return []
+
+    @abc.abstractproperty
+    def help(self):
+        pass
+
     @abc.abstractmethod
-    def on_command(self, sender, command, args):
+    def command(self, sender, command, args):
         pass
 
 
@@ -50,19 +61,21 @@ def load(log, call_file, group):
             mpath = ".".join([__package__, group, name])
             module = loader.find_module(mpath).load_module(mpath)
             if not getattr(module, "plugin", False):
-                log.msg("module %s missing plugin attribute" % module.__name__)
+                log.msg("module %s does not include plugin" % module.__name__)
                 continue
-            if issubclass(module.plugin, PluginChatBase):
-                log.msg("loaded %s chat plugin" % module.plugin.__name__)
-                plugs.append(module.plugin)
-            elif issubclass(module.plugin, PluginProtocolBase):
-                log.msg("loaded %s protocol plugin" % module.plugin.__name__)
-                plugs.append(module.plugin)
-            elif issubclass(module.plugin, PluginPlannerBase):
-                log.msg("loaded %s planner plugin" % module.plugin.__name__)
-                plugs.append(module.plugin)
+            plugin_class = module.plugin
+            plugin_path = "%s.%s" % (module.__name__, plugin_class.__name__)
+            if issubclass(plugin_class, PluginChatBase):
+                log.msg("loaded chat plugin %s" % plugin_path)
+                plugs.append(plugin_class)
+            elif issubclass(plugin_class, PluginEventHandlerBase):
+                log.msg("loaded event plugin %s" % plugin_path)
+                plugs.append(plugin_class)
+            elif issubclass(plugin_class, PluginPlannerBase):
+                log.msg("loaded planner plugin %s" % plugin_path)
+                plugs.append(plugin_class)
             else:
-                log.msg("file %s is not plugin" % module.__file__)
+                log.msg("class %s is not plugin" % plugin_path)
         except Exception as e:
             log.err(_stuff=e, _why="could not load plugin %s.py" % os.path.join(path[0], name))
     return plugs

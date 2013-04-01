@@ -53,7 +53,7 @@ class SignWayPoints(object):
         self.crd_to_sign = {}
         self.ordered_sign_groups = {}
 
-    def on_new_sign(self, x, y, z, line1, line2, line3, line4):
+    def update_sign(self, x, y, z, line1, line2, line3, line4):
         sign = Sign(utils.Vector(x, y, z), line1, line2, line3, line4)
         if sign.is_waypoint:
             self.new(sign)

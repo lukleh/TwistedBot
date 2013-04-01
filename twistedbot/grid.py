@@ -140,11 +140,11 @@ class Grid(object):
             data_str = data.read(256)
             chunk.biome = array.array('b', data_str)
 
-    def on_load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array):
+    def load_chunk(self, x, z, continuous, primary_bit, add_bit, data_array):
         self._load_chunk(x, z, continuous, primary_bit, add_bit, StringIO.StringIO(data_array))
         self.chunk_updated(x, z)
 
-    def on_load_bulk_chunk(self, metas, data_array, light_data):
+    def load_bulk_chunk(self, metas, data_array, light_data):
         data = StringIO.StringIO(data_array)
         for meta in metas:
             self._load_chunk(meta.x, meta.z, True, meta.primary_bitmap, meta.add_bitmap, data, light_data=light_data)
@@ -178,10 +178,10 @@ class Grid(object):
         new_block = self.make_block(x, y, z, block_type, meta)
         return current_block, new_block
 
-    def on_block_change(self, x, y, z, btype, bmeta):
+    def block_change(self, x, y, z, btype, bmeta):
         _, _ = self.change_block_to(x, y, z, btype, bmeta)
 
-    def on_multi_block_change(self, chunk_x, chunk_z, blocks):
+    def multi_block_change(self, chunk_x, chunk_z, blocks):
         shift_x = chunk_x << 4
         shift_z = chunk_z << 4
         for block in blocks:

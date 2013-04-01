@@ -61,7 +61,7 @@ class Statistics(object):
     def __init__(self):
         self.stats = defaultdict(lambda: 0)
 
-    def on_update(self, sid, count):
+    def update(self, sid, count):
         log.msg('update %d by %d' % (sid, count))
         self.stats[sid] += count
 

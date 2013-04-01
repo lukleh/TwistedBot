@@ -111,12 +111,12 @@ class BotEntity(object):
             self.location_received = False
             self.chunks_ready = False
 
-    def on_new_location(self, kw):
-        self.bot_object.set_xyz(kw["x"], kw["y"], kw["z"])
-        self.bot_object.stance_diff = kw["stance"] - kw["y"]
-        self.bot_object.on_ground = kw["grounded"]
-        self.bot_object.yaw = kw["yaw"]
-        self.bot_object.pitch = kw["pitch"]
+    def new_location(self, x, y, z, stance, grounded, yaw, pitch):
+        self.bot_object.set_xyz(x, y, z)
+        self.bot_object.stance_diff = stance - y
+        self.bot_object.on_ground = grounded
+        self.bot_object.yaw = yaw
+        self.bot_object.pitch = pitch
         self.bot_object.velocities = utils.Vector(0.0, 0.0, 0.0)
         self.check_location_received = True
         if self.location_received is False:
@@ -436,21 +436,9 @@ class BotEntity(object):
     def do_respawn(self):
         self.world.send_packet("client statuses", {"status": 1})
 
-    def on_health_update(self, health, food, food_saturation):
-        if health <= 0:
-            self.on_death()
-
-    def on_death(self):
-        log.msg("I am dead")
-        self.i_am_dead = True
-        utils.do_later(2.0, self.do_respawn)
-
     def standing_on_block(self, b_obj):
         return self.world.grid.standing_on_block(b_obj.aabb)
 
     def is_standing(self, b_obj):
         return self.standing_on_block(b_obj) is not None
 
-    def on_update_experience(self, experience_bar=None, level=None, total_experience=None):
-        #TODO relevant when we can enchant or use anvil
-        pass

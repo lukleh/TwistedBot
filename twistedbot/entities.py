@@ -209,7 +209,7 @@ class Entities(object):
             entity = self.get_entity(eid)
             if entity is None:
                 # received entity update packet for entity that was not initialized with new_*, this should not happen
-                log.msg("do not have entity id %d registered" % eid)
+                log.msg("do not have entity id %d registered call by %s" % (eid, fn.__name__))
                 return
             if entity.is_bot:
                 # server is trying to change my parameters, like velocity, and I can ignore it :)
@@ -232,52 +232,52 @@ class Entities(object):
         self.entities[eid] = EntityBot(eid=eid, x=0, y=0, z=0)
 
     @entitynew
-    def on_new_player(self, **kwargs):
+    def new_player(self, **kwargs):
         return EntityPlayer(world=self.world, **kwargs)
 
     @entitynew
-    def on_new_objectvehicle(self, etype=None, **kwargs):
+    def new_objectvehicle(self, etype, **kwargs):
         if etype == 2:
             return EntityItem(**kwargs)
         else:
             return EntityObjectVehicle(etype=etype, **kwargs)
 
     @entitynew
-    def on_new_mob(self, **kwargs):
+    def new_mob(self, **kwargs):
         return EntityMob(**kwargs)
 
     @entitynew
-    def on_new_painting(self, **kwargs):
+    def new_painting(self, **kwargs):
         return EntityPainting(**kwargs)
 
     @entitynew
-    def on_new_experience_orb(self, **kwargs):
+    def new_experience_orb(self, **kwargs):
         return EntityExperienceOrb(**kwargs)
 
     @entityupdate
-    def on_velocity(self, entity, eid=None, x=None, y=None, z=None):
+    def velocity(self, entity, eid, x, y, z):
         entity.velocity = Vector(x, y, z)
 
-    def on_destroy(self, eids):
+    def destroy(self, eids):
         for eid in eids:
             if not self.delete_entity(eid):
                 log.msg('Cannot destroy entity id %d because it is not registered' % eid)
                 pass
 
     @entityupdate
-    def on_move(self, entity, eid=None, dx=None, dy=None, dz=None):
+    def move(self, entity, eid, dx, dy, dz):
         entity.x += dx
         entity.y += dy
         entity.z += dz
         self.position_updated(entity)
 
     @entityupdate
-    def on_look(self, entity, eid=None, yaw=None, pitch=None):
+    def look(self, entity, eid, yaw, pitch):
         entity.yaw = yaw
         entity.pitch = pitch
 
     @entityupdate
-    def on_move_look(self, entity, eid=None, dx=None, dy=None, dz=None, yaw=None, pitch=None):
+    def move_look(self, entity, eid, dx, dy, dz, yaw, pitch):
         entity.x += dx
         entity.y += dy
         entity.z += dz
@@ -286,7 +286,7 @@ class Entities(object):
         self.position_updated(entity)
 
     @entityupdate
-    def on_teleport(self, entity, eid=None, x=None, y=None, z=None, yaw=None, pitch=None):
+    def teleport(self, entity, eid, x, y, z, yaw, pitch):
         entity.x = x
         entity.y = y
         entity.z = z
@@ -295,19 +295,19 @@ class Entities(object):
         self.position_updated(entity)
 
     @entityupdate
-    def on_head_look(self, entity, eid=None, yaw=None):
+    def head_look(self, entity, eid, yaw):
         entity.yaw = yaw
 
     @entityupdate
-    def on_status(self, entity, eid=None, status=None):
+    def status(self, entity, eid, status):
         entity.status = status
 
     @entityupdate
-    def on_attach(self, entity, eid=None, vehicle_id=None):
+    def attach(self, entity, eid, vehicle_id):
         pass
 
     @entityupdate
-    def on_metadata(self, entity, eid=None, metadata=None):
+    def metadata(self, entity, eid, metadata):
         if entity.is_itemstack:
             slotdata = metadata[10].value
             istack = items.ItemStack.from_slotdata(slotdata)
