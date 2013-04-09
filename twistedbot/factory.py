@@ -457,10 +457,11 @@ class MineCraftFactory(ReconnectingClientFactory):
             _, _, config.USERNAME, self.session_id, _ = response.split(':')
             utils.do_later(10, self.keep_alive)
 
+    @inlineCallbacks
     def keep_alive(self):
         log.msg('keep alive to https://login.minecraft.net')
         url = "https://login.minecraft.net/session?name=%s&session=%s" % (config.USERNAME, self.session_id)
-        getPage(url)
+        yield getPage(url)
         utils.do_later(config.KEEP_ALIVE_PERIOD, self.keep_alive)
 
     def startedConnecting(self, connector):
