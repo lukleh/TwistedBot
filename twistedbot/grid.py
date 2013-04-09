@@ -284,16 +284,6 @@ class Grid(object):
                 return False
         return True
 
-    def aabb_eyelevel_inside_water(self, bb, eye_height=config.PLAYER_EYELEVEL):
-        eye_y = bb.min_y + eye_height
-        ey = utils.grid_shift(eye_y)
-        blk = self.get_block(bb.gridpos_x, ey, bb.gridpos_z)
-        if blk.is_water:
-            wh = blk.height_percent - 0.11111111
-            return eye_y < (ey + 1 - wh)
-        else:
-            return False
-
     def grid_column_around(self, center, distance):
         min_x = center.x - distance
         max_x = center.x + distance + 1

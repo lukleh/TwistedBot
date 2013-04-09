@@ -401,7 +401,7 @@ class MineCraftProtocol(Protocol):
         else:
             d = "%x" % d
         hashstr = d
-        url = "http://session.minecraft.net/game/joinserver.jsp?user=%s&serverId=%s&sessionId=%s" % (self.factory.case_username, hashstr, self.factory.session_id)
+        url = "http://session.minecraft.net/game/joinserver.jsp?user=%s&serverId=%s&sessionId=%s" % (config.USERNAME, hashstr, self.factory.session_id)
         response = yield getPage(url).addErrback(logbot.exit_on_error)
         log.msg("responce from http://session.minecraft.net: %s" % response)
 
@@ -454,12 +454,12 @@ class MineCraftFactory(ReconnectingClientFactory):
             log.msg("did not authenticate with mojang, quiting")
             reactor.stop()
         else:
-            _, _, self.case_username, self.session_id, _ = response.split(':')
+            _, _, config.USERNAME, self.session_id, _ = response.split(':')
             utils.do_later(10, self.keep_alive)
 
     def keep_alive(self):
         log.msg('keep alive to https://login.minecraft.net')
-        url = "https://login.minecraft.net/session?name=%s&session=%s" % (self.case_username, self.session_id)
+        url = "https://login.minecraft.net/session?name=%s&session=%s" % (config.USERNAME, self.session_id)
         getPage(url)
         utils.do_later(config.KEEP_ALIVE_PERIOD, self.keep_alive)
 

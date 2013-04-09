@@ -156,7 +156,7 @@ class BotEntity(object):
         """
         if b_obj.action != b_obj._action:
             b_obj.action = b_obj._action
-            self.send_packet("entity action", {"eid": self.eid, "action": b_obj._action})
+            self.world.send_packet("entity action", {"eid": self.eid, "action": b_obj._action})
 
     def turn_to_point(self, b_obj, point):
         if point.x == b_obj.x and point.z == b_obj.z:
@@ -410,7 +410,15 @@ class BotEntity(object):
         return False
 
     def head_inside_water(self, b_obj):
-        return self.world.grid.aabb_eyelevel_inside_water(b_obj.aabb)
+        bb = b_obj.aabb
+        eye_y = bb.min_y + eye_height
+        ey = utils.grid_shift(eye_y)
+        blk = self.world.grid.get_block(bb.gridpos_x, ey, bb.gridpos_z)
+        if blk.is_water:
+            wh = blk.height_percent - 0.11111111
+            return eye_y < (ey + 1 - wh)
+        else:
+            return False
 
     def do_block_collision(self, b_obj):
         bb = b_obj.aabb.expand(-0.001, -0.001, -0.001)

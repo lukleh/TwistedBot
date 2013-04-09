@@ -75,10 +75,11 @@ class World(object):
             self.bot.tick()
             self.chat.tick()
             self.every_n_ticks()
+            self.game_ticks += 1
         utils.do_later(self.predict_next_ticktime(tick_start), self.tick)
 
     def every_n_ticks(self, n=100):
-        self.game_ticks += 1
+        pass
 
     def on_shutdown(self):
         log.msg("Shutdown")
