@@ -455,6 +455,7 @@ class MineCraftFactory(ReconnectingClientFactory):
             reactor.stop()
         else:
             _, _, config.USERNAME, self.session_id, _ = response.split(':')
+            log.msg("my username according to Minecraft is %s" % config.USERNAME)
             utils.do_later(10, self.keep_alive)
 
     @inlineCallbacks
