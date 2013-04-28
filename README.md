@@ -31,17 +31,9 @@ Possible flags
 	pypy bot.py -h
 
 #### In game commands
-If your username (commander) is set, then you can use chat to send commands to bot.
+type "help" in chat to see available commands, then use "help command" for details.
 
-- "look at me" stands still and looks at you, this is now the default behavior
-- "rotate 'group'" rotates (after the end, goes back to the beginning) between signs -> details below
-- "circulate 'group'" circulates (at the end, goes backward towards the beginnings) between signs -> details below
-- "go 'name'" go to specific waypoint identified by name, or if name is group and order separated with space
-- "show sign 'name'" show in chat waypoint, group or waypoints in group
-- "show inventory" prints to chat its inventory
-- "show cursor" prints to chat the block you are pointing at with your cursor
-- "follow me" bot starts following you
-- "stop" cancel current activity
+If your username (commander) is set, then you can use chat to send commands to bot.
 
 #### Sign waypoints
 Use signs as a waypoints. When you want the sign to be part of waypoints that bot can travel between do the following, all without quotes:

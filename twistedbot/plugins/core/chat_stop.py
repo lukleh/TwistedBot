@@ -9,7 +9,7 @@ class Stop(PluginChatBase):
 
     @property
     def help(self):
-        return "stops current activity"
+        return "cancel current activity"
 
     def command(self, sender, command, args):
         self.world.bot.behavior_tree.cancel_running()

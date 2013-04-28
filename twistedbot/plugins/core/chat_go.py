@@ -10,7 +10,7 @@ class Go(PluginChatBase):
 
     @property
     def help(self):
-        return "go to specific sign"
+        return "go to specific sign, can be group name and order separated with space"
 
     def command(self, sender, command, args):
         if subject:

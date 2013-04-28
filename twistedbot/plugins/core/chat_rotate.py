@@ -14,7 +14,9 @@ class Rotate(PluginChatBase):
 
     @property
     def help(self):
-        return "rotate/circulate sign group"
+        return ["rotate/circulate sign group",
+                "rotate - 'group' rotates (after the end, goes back to the beginning) between signs (see readme)",
+                "circulate -'group' circulates (at the end, goes backward towards the beginnings) between signs"]
 
     def command(self, sender, command, args):
         if subject:

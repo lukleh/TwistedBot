@@ -10,7 +10,7 @@ class Follow(PluginChatBase):
 
     @property
     def help(self):
-        return "follow you"
+        return "bot starts following you"
 
     def command(self, sender, command, args):
         self.world.bot.behavior_tree.new_command(FollowPlayer)

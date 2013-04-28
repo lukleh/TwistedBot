@@ -10,7 +10,10 @@ class Show(PluginChatBase):
 
     @property
     def help(self):
-        return "show signs, inventory or block under cursor"
+        return ["show [sign, inventory, cursor]",
+                "sign - show waypoint, group or waypoints in group",
+                "inventory - prints bot inventory",
+                "cursor - prints block you are pointing at with your cursor"]
 
     def command(self, sender, command, args):
         if args:
