@@ -1243,8 +1243,6 @@ class ItemDB(object):
         self.min_block_mine_tool = {}
 
     def bind(self, name, istack):
-        if name == 'bed':
-            pass#raise Exception('bed')
         if name in self.item_names_map:
             raise Exception("%s already binded" % name)
         self.item_names_map[name] = istack
@@ -1283,7 +1281,6 @@ def init_list():
     for name, obj in globals().items():
         if isinstance(obj, ItemMetaClass) and hasattr(obj, 'number'):
             item = obj()
-            print item
             item_db.register(item)
 
     for block_name in ["wool", "wood", "wooden planks", "stone bricks", "sandstone", "slab", "wooden slab", "saplings", "leaves", "grass", "cobblestone wall", "bed block"]:
