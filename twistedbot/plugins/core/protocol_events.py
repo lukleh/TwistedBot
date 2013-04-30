@@ -9,6 +9,10 @@ log = twistedbot.logbot.getlogger("CORE EVENT")
 
 class ProtocolEvents(PluginEventHandlerBase):
 
+    def __init__(self, world):
+        self.world = world
+        self.event = self.world.eventregister
+
     def on_connection_made(self):
         self.world.connected = True
         self.world.send_packet("handshake", {"protocol": self.world.config.PROTOCOL_VERSION,
