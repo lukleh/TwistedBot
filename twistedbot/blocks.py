@@ -826,10 +826,11 @@ class NoteBlock(BlockCube):
     material = materials.wood
 
 
-class Bed(BlockSolid):
+class BedBlock(BlockSolid):
     inventory_avoid = True
     number = 26
     bounding_box = AABB(0.0, 0.0, 0.0, 1.0, 0.5625, 1.0)
+    sub_names = ["Top", "Bottom"]
     material = materials.cloth
     render_as_normal_block = False
     is_opaque_cube = False
@@ -1093,7 +1094,7 @@ class SignPost(BlockSign):
     number = 63
 
 
-class WoodenDoor(BlockDoor):
+class WoodenDoorBlock(BlockDoor):
     inventory_avoid = True
     number = 64
     material = materials.wood
@@ -1159,7 +1160,7 @@ class StonePressurePlate(BlockNonSolid):
     material = materials.rock
 
 
-class IronDoor(BlockDoor):
+class IronDoorBlock(BlockDoor):
     inventory_avoid = True
     number = 71
     material = materials.iron
@@ -1309,7 +1310,7 @@ class JackOLantern(BlockCube):
     material = materials.pumpkin
 
 
-class Cake(BlockSolid):
+class CakeBlock(BlockSolid):
     inventory_avoid = True
     number = 92
     material = materials.cake
@@ -1523,7 +1524,7 @@ class NetherBrickStairs(BlockStairs):
     material = NetherBricks.material
 
 
-class NetherWart(BlockFlower):
+class NetherWartBlock(BlockFlower):
     inventory_avoid = True
     number = 115
 
@@ -1540,7 +1541,7 @@ class EnchantmentTable(BlockSolid):
         return True
 
 
-class BrewingStand(BlockMultiBox):
+class BrewingStandBlock(BlockMultiBox):
     inventory_avoid = True
     number = 117
     material = materials.iron
@@ -1554,7 +1555,7 @@ class BrewingStand(BlockMultiBox):
         out.append(self.bounding_box_base.offset(self.x, self.y, self.z))
 
 
-class Cauldron(BlockMultiBox):
+class CauldronBlock(BlockMultiBox):
     inventory_avoid = True
     number = 118
     material = materials.iron
@@ -1735,7 +1736,7 @@ class CobblestoneWall(BlockFence):
     has_common_type = False
 
 
-class FlowerPot(BlockSolid):
+class FlowerPotBlock(BlockSolid):
     inventory_avoid = True
     number = 140
     material = materials.circuits
