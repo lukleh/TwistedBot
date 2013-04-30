@@ -168,7 +168,7 @@ class ProtocolEvents(PluginEventHandlerBase):
         self.world.inventories.set_slots(window_id=window_id, slotdata_list=slotdata_list)
 
     def on_confirm_transaction(self, window_id, action_number, confirmed):
-        self.world.inventories.confirm_transaction(window_id=c.window_id, action_number=c.action_number, confirmed=c.confirmed)
+        self.world.inventories.confirm_transaction(window_id=window_id, action_number=action_number, confirmed=confirmed)
 
     def on_update_sign(self, x, y, z, line1, line2, line3, line4):
         self.world.sign_waypoints.update_sign(x=x, y=y, z=z, line1=line1, line2=line2, line3=line3, line4=line4)

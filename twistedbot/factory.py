@@ -336,7 +336,7 @@ class MineCraftProtocol(Protocol):
         pass
 
     def p_confirm_transaction(self, c):
-        self.event.on_confirm_transaction.fire(window_id=c.window_id, action_number=c.action_number, confirmed=c.acknowledged)
+        self.event.on_confirm_transaction.fire(window_id=c.window_id, action_number=c.action_number, confirmed=c.confirmed)
 
     def p_sign(self, c):
         self.event.on_update_sign.fire(x=c.x, y=c.y, z=c.z, line1=c.line1, line2=c.line2, line3=c.line3, line4=c.line4)
