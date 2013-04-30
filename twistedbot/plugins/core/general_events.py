@@ -1,8 +1,12 @@
-import twistedbot
+
+import twistedbot.logbot
+
 from twistedbot import utils
 from twistedbot.plugins.base import PluginEventHandlerBase
 
-log = twistedbot.logbot.getlogger("CORE EVENT")
+
+log = twistedbot.logbot.getlogger("GENERAL EVENT")
+
 
 class GeneralEvents(PluginEventHandlerBase):
 

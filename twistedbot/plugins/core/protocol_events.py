@@ -9,10 +9,6 @@ log = twistedbot.logbot.getlogger("CORE EVENT")
 
 class ProtocolEvents(PluginEventHandlerBase):
 
-    def __init__(self, world):
-        self.world = world
-        self.event = self.world.eventregister
-
     def on_connection_made(self):
         self.world.connected = True
         self.world.send_packet("handshake", {"protocol": self.world.config.PROTOCOL_VERSION,
@@ -62,7 +58,7 @@ class ProtocolEvents(PluginEventHandlerBase):
 
     def on_health_update(self, health, food, food_saturation):
         if health <= 0:
-            self.event.on_death.fire()
+            self.world.eventregister.on_death.fire()
 
     def on_respawn(self, game_mode, dimension, difficulty):
         log.msg("RESPAWN received")
