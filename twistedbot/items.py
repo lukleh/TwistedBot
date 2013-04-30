@@ -105,7 +105,8 @@ class ItemBlock(Item):
         self.name = block.name
         self.block = block
         if block.inventory_avoid:
-            raise Exception("trying to make an invalid item? block %s" % self.block)
+            #raise Exception("trying to make an invalid item? block %s" % self.block)
+            log.err("trying to make an invalid item? block %s" % self.block)
 
 
 class ItemHandles(Item):
@@ -1287,7 +1288,8 @@ def init_list():
         item_db.register(ItemBlockMulti(block=block))
 
     for i in xrange(1, 256):
-        if blocks.block_list[i] is None or blocks.block_list[i].inventory_avoid or not item_db.slot_empty(i):
+        #removed inventory_avoid check here - blocks.block_list[i].inventory_avoid
+        if blocks.block_list[i] is None or not item_db.slot_empty(i):
             continue
         item = ItemBlock(block=blocks.block_list[i])
         item_db.register(item)
