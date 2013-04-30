@@ -61,6 +61,7 @@ class BlackBoard(object):
         self.bot_turn_to_point = self._bot.turn_to_point
         self.bot_turn_to_vector = self._bot.turn_to_vector
         self.bot_turn_to_direction = self._bot.turn_to_direction
+        self.bot_start_sneaking = self._bot.start_sneaking
         self.itemstack_as_slotdata = packets.itemstack_as_slotdata
         self.send_packet = self._world.send_packet
         self.inventory_player = self._world.inventories.player_inventory
