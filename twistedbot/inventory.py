@@ -7,6 +7,7 @@ from twisted.internet.defer import Deferred
 import items
 import logbot
 import utils
+import entities
 
 
 log = logbot.getlogger("INVENTORY")
@@ -218,9 +219,12 @@ class InvetoryContainer(object):
     def collect_action(self, collected_eid=None, collector_eid=None):
         if self.world.bot.eid == collector_eid:  # it's me picking up item
             ent = self.world.entities.get_entity(collected_eid)
-            itemstack = ent.itemstack
-            self.item_collected_count[itemstack.name] += itemstack.count
-            log.msg("collected %s" % itemstack)
+            if isinstance(ent, entities.EntityItem):
+                itemstack = ent.itemstack
+                self.item_collected_count[itemstack.name] += itemstack.count
+                log.msg("collected %s" % itemstack)
+            elif isinstance(ent, entities.EntityExperienceOrb):
+                pass # TODO: add some exp handling here?
 
     def get_confirmation(self, action_number, window_id):
         con = Confirmation(action_number=action_number, window_id=window_id)

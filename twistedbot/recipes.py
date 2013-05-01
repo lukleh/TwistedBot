@@ -1697,7 +1697,7 @@ class GoldNugget_craft(CraftBluePrint):
 
 class Netherwart(MineBluePrint):
     name = "nether wart"
-    block = "nether wart"
+    block = "nether wart block"
 
     @classmethod
     def block_filter(cls, meta):
